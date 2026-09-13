@@ -27,6 +27,11 @@ namespace Blocky.Runtime.Triggers
         /// <summary>Call when a new play session starts, so <see cref="FirePlayClicked"/> can fire again.</summary>
         public void ResetPlaySession() => _playClickedFired = false;
 
+        /// <summary>The in-game "Go" button (TDD-equivalent of Scratch's green flag) — click it as many times as you like, each fires this again.</summary>
+        public event Action OnGoClicked;
+
+        public void FireGoClicked() => OnGoClicked?.Invoke();
+
         private readonly HashSet<Key> _keysDownLastPoll = new();
 
         /// <summary>Rising edge only, filtered by key id downstream by each listener (TDD §9).</summary>

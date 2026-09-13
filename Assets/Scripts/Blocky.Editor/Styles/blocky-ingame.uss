@@ -1,0 +1,131 @@
+/* Chrome for BlockyInGamePanel's Scratch-like layout. Deliberately neutral (grays/off-white) — the only
+   saturated color in the whole workspace is each block's category tint (blocky-base.uss / blocky-*.uss),
+   plus the green Go button, so the UI reads as "colorful where it matters" rather than noisy. */
+
+.blocky-ingame-root {
+    background-color: rgb(230, 231, 236);
+}
+
+.blocky-ingame-topbar {
+    flex-direction: row;
+    align-items: center;
+    height: 44px;
+    padding: 0 10px;
+    background-color: rgb(64, 68, 82);
+}
+
+.blocky-ingame-title {
+    color: rgb(235, 235, 240);
+    -unity-font-style: bold;
+    margin-right: 12px;
+}
+
+.blocky-ingame-status {
+    color: rgb(190, 192, 200);
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+}
+
+.blocky-ingame-go-button {
+    background-color: rgb(76, 191, 86);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    border-radius: 16px;
+    border-width: 0;
+    padding: 4px 18px;
+    margin-left: 8px;
+}
+
+.blocky-ingame-go-button:hover {
+    background-color: rgb(92, 209, 102);
+}
+
+.blocky-ingame-body {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.blocky-ingame-tabrail {
+    width: 64px;
+    background-color: rgb(64, 68, 82);
+}
+
+/* Scratch-style tab: a colored dot with the category name underneath. */
+.blocky-ingame-tab {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 54px;
+    margin: 2px 0;
+    padding: 4px 0;
+    border-width: 0;
+    border-radius: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.blocky-ingame-tab:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.blocky-ingame-tab__dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.blocky-ingame-tab__label {
+    margin-top: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+    color: rgb(215, 217, 225);
+    -unity-text-align: middle-center;
+}
+
+.blocky-ingame-palette {
+    width: 230px;
+    background-color: rgb(246, 247, 250);
+    border-right-width: 1px;
+    border-right-color: rgb(210, 211, 216);
+}
+
+.blocky-palette__section-title {
+    -unity-font-style: bold;
+    margin: 8px 0 4px 8px;
+    color: rgb(70, 72, 80);
+}
+
+.blocky-ingame-canvas-scroll {
+    flex-grow: 1;
+    background-color: rgb(238, 239, 243);
+}
+
+.blocky-palette__prototype {
+    margin: 3px 8px;
+}
+
+.blocky-palette__ghost {
+    opacity: 0.85;
+}
+
+/* Sits in the root's right padding strip — the seam between the workspace and the live game view. */
+.blocky-ingame-resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgb(64, 68, 82);
+}
+
+.blocky-ingame-resize-handle:hover {
+    background-color: rgb(110, 116, 136);
+}
+
+/* The glow shown at the exact rect a dragged palette block would snap into. */
+.blocky-drop-indicator {
+    background-color: rgba(255, 224, 64, 0.55);
+    border-radius: 3px;
+    border-width: 2px;
+    border-color: rgba(255, 224, 64, 0.95);
+}

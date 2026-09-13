@@ -436,6 +436,7 @@ MonoBehaviour:
   - {fileID: 7433441132597879392, guid: 26c6ab444a4253e4592cf8523eb91f49, type: 3}
   - {fileID: 7433441132597879392, guid: 6c9e720c1c0d514488030885cb52d99c, type: 3}
   - {fileID: 7433441132597879392, guid: ddd85bc8647422646b20563e9b12222c, type: 3}
+  - {fileID: 7433441132597879392, guid: 3123c2d1f6d70054d864c9a75242dd9b, type: 3}
   panelWidth: 420
 --- !u!114 &285563666
 MonoBehaviour:

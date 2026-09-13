@@ -88,6 +88,13 @@ namespace Blocky.Runtime
                         _unsubscribe.Add(() => broker.OnPlayClicked -= Handler);
                         break;
                     }
+                    case "event.when_go_clicked":
+                    {
+                        void Handler() => Fire(stack, triggerDef, entryPc);
+                        broker.OnGoClicked += Handler;
+                        _unsubscribe.Add(() => broker.OnGoClicked -= Handler);
+                        break;
+                    }
                     case "event.when_key_pressed":
                     {
                         void Handler(Key key)
