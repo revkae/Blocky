@@ -1,3 +1,4 @@
 .blocky-block--category-motion {
     background-color: var(--blocky-color-motion);
+    --blocky-fill: rgb(76, 151, 255);
 }

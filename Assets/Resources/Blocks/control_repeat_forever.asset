@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Blocky.Compiler::Blocky.Compiler.BlockDefinition
   blockType: control.repeat_forever
   displayNameKey: Repeat Forever
-  shape: 2
+  shape: 3
   category: 3
   branchCount: 1
   parameters: []

@@ -60,12 +60,17 @@ namespace Blocky.Editor
             for (var i = 0; i < definition.parameters.Length; i++)
             {
                 var spec = definition.parameters[i];
+                var text = spec.defaultText;
+                // An empty choice fails validation, which silently skips the whole stack — default to the first option.
+                if (spec.kind == ParamKind.Choice && string.IsNullOrEmpty(text) && spec.choices.Length > 0)
+                    text = spec.choices[0].stableId;
+
                 node.parameters[i] = new BlockParam
                 {
                     key = spec.key,
                     kind = spec.kind,
                     number = spec.defaultNumber,
-                    text = spec.defaultText
+                    text = text
                 };
             }
 

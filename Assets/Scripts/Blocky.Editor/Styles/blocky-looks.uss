@@ -1,3 +1,4 @@
 .blocky-block--category-looks {
     background-color: var(--blocky-color-looks);
+    --blocky-fill: rgb(153, 102, 204);
 }

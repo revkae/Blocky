@@ -8,7 +8,8 @@ namespace Blocky.Data
         ParamChanged,
         StackCreated,
         StackDeleted,
-        StackMoved
+        StackMoved,
+        ChainDropped
     }
 
     /// <summary>Diff raised by <see cref="ProgramStore.OnChanged"/> so a view can rebuild one subtree, not the whole canvas.</summary>

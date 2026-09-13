@@ -1,4 +1,3 @@
-using System;
 using Blocky.Compiler;
 using Blocky.Data;
 using UnityEngine.UIElements;
@@ -6,61 +5,49 @@ using UnityEngine.UIElements;
 namespace Blocky.Editor
 {
     /// <summary>
-    /// Renders one trigger-headed stack: the trigger header plus its top-level sequence. Read-only unless a
-    /// <see cref="ProgramStore"/> is supplied, in which case fields become live and delete/add affordances appear.
+    /// One stack on the table: a <see cref="HatView"/> plus the sequence under it, or — for a loose stack — just
+    /// the sequence. Read-only unless a <see cref="ProgramStore"/> is supplied; <c>buttons</c> adds the Editor
+    /// window's delete/"+ Add" affordances.
     /// </summary>
     public sealed class StackView : VisualElement
     {
         public string StackId { get; }
 
-        /// <summary>The top-level sequence container — used by <see cref="DropCandidateBuilder"/>.</summary>
+        /// <summary>The event block heading this stack, or null for a loose stack.</summary>
+        public HatView Hat { get; }
+
+        /// <summary>The top-level sequence container — used by <see cref="DropCandidateBuilder"/> and <see cref="SnapTargetCollector"/>.</summary>
         public VisualElement SequenceContainer { get; }
 
-        public StackView(BlockStack stack, BlockRegistry registry, ProgramStore store = null)
+        public StackView(BlockStack stack, BlockRegistry registry, ProgramStore store = null, bool buttons = true)
         {
             StackId = stack.id;
             AddToClassList("blocky-stack");
 
-            var triggerDef = registry.Find(stack.triggerBlockType);
-            var header = new VisualElement();
-            header.AddToClassList("blocky-block");
-            header.AddToClassList("blocky-block--shape-trigger");
-            header.Add(new Label(triggerDef != null
-                ? (string.IsNullOrEmpty(triggerDef.displayNameKey) ? triggerDef.blockType : triggerDef.displayNameKey)
-                : $"Unknown trigger: {stack.triggerBlockType}"));
-
-            if (triggerDef != null)
-                foreach (var spec in triggerDef.parameters)
-                {
-                    var value = Array.Find(stack.triggerParameters, p => p.key == spec.key);
-                    if (store != null)
-                    {
-                        header.Add(ParamFieldFactory.CreateLiveField(spec, value, newValue =>
-                            store.Apply(new SetParam(new ParamTarget(stack.id, null), spec.key, newValue))));
-                    }
-                    else
-                    {
-                        header.Add(ParamFieldFactory.CreateReadOnlyField(spec, value));
-                    }
-                }
-
-            if (store != null)
+            if (ProgramQuery.IsLoose(stack))
             {
-                var deleteButton = new Button(() => store.Apply(new DeleteStack(stack.id))) { text = "✕ Delete Stack" };
-                deleteButton.AddToClassList("blocky-stack__delete");
-                header.Add(deleteButton);
+                AddToClassList("blocky-stack--loose");
             }
-
-            Add(header);
+            else
+            {
+                Hat = new HatView(registry.Find(stack.triggerBlockType), stack.triggerBlockType, stack.triggerParameters, stack.id, store);
+                if (store != null && buttons)
+                {
+                    var deleteButton = new Button(() => store.Apply(new DeleteStack(stack.id))) { text = "✕ Delete Stack" };
+                    deleteButton.AddToClassList("blocky-stack__delete");
+                    Hat.Header.Add(deleteButton);
+                }
+                Add(Hat);
+            }
 
             SequenceContainer = new VisualElement();
             SequenceContainer.AddToClassList("blocky-stack__sequence");
             foreach (var node in stack.sequence)
-                SequenceContainer.Add(BlockView.Create(node, registry, stack.id, store));
+                SequenceContainer.Add(BlockView.Create(node, registry, stack.id, store, buttons));
 
-            if (store != null)
+            if (store != null && buttons)
             {
-                var popup = new BlockPickerPopup(registry, def => def.shape == BlockShape.Statement || def.shape == BlockShape.CBlock, def =>
+                var popup = new BlockPickerPopup(registry, def => def.shape != BlockShape.Trigger, def =>
                 {
                     var current = ProgramQuery.FindStack(store.Program, stack.id);
                     var index = current?.sequence.Length ?? 0;

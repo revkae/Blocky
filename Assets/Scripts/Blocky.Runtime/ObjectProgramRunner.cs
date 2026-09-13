@@ -51,6 +51,7 @@ namespace Blocky.Runtime
             for (var i = 0; i < program.stacks.Length; i++)
             {
                 var stack = program.stacks[i];
+                if (ProgramQuery.IsLoose(stack)) continue; // blocks lying loose on the table never run
                 var entryPc = _compiled.StackEntryPoints[i];
                 var triggerDef = registry.Find(stack.triggerBlockType);
                 if (triggerDef == null || entryPc < 0) continue; // unknown trigger type, or this stack failed to compile (TDD §10.2)

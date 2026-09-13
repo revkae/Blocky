@@ -1,3 +1,4 @@
 .blocky-block--category-control {
     background-color: var(--blocky-color-control);
+    --blocky-fill: rgb(255, 171, 25);
 }

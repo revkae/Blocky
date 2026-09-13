@@ -27,7 +27,53 @@ namespace Blocky.Editor
         {
             var field = BuildField(spec, value, onChanged);
             field.AddToClassList("blocky-param-field");
+
+            // The key label belongs to the block's drag handle, not to the control. Left pickable, a number field's
+            // label is Unity's "drag to change the value" handle, which fights dragging the block.
+            var label = field.Q(className: "unity-base-field__label");
+            if (label != null) label.pickingMode = PickingMode.Ignore;
+
+            // A Toggle is clickable across its whole row, label included. Only the checkbox square should tick it —
+            // a press on the text is a press on the block (select / drag). The click handler lives on the Toggle
+            // itself, so clicks on the square still reach it by bubbling.
+            if (field is Toggle) field.pickingMode = PickingMode.Ignore;
+
+            // Commit on Enter / focus loss, not per keystroke: every committed value rebuilds the canvas, which
+            // would destroy the very field being typed into after the first character.
+            if (field is FloatField floatField) floatField.isDelayed = true;
+            if (field is TextField textField) textField.isDelayed = true;
+
             return field;
+        }
+
+        /// <summary>
+        /// Static display for palette prototypes: the key, then the value in a white oval. No input control — the
+        /// whole prototype is one drag handle, so nothing inside it may take the pointer.
+        /// </summary>
+        public static VisualElement CreateChip(ParamSpec spec, BlockParam value)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("blocky-param-field");
+
+            var key = new Label(spec.key);
+            key.AddToClassList("blocky-param-chip__key");
+            row.Add(key);
+
+            var chip = new Label(DescribeValue(spec, value));
+            chip.AddToClassList("blocky-param-chip");
+            row.Add(chip);
+            return row;
+        }
+
+        private static string DescribeValue(ParamSpec spec, BlockParam value)
+        {
+            switch (spec.kind)
+            {
+                case ParamKind.Number: return (value?.number ?? spec.defaultNumber).ToString("0.##");
+                case ParamKind.Bool: return (value?.boolean ?? false) ? "true" : "false";
+                case ParamKind.Reporter: return "…";
+                default: return value?.text ?? spec.defaultText ?? string.Empty;
+            }
         }
 
         private static VisualElement BuildField(ParamSpec spec, BlockParam value, Action<BlockParam> onChanged)

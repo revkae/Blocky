@@ -24,18 +24,22 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 `BlockyManager` holds the single `BlockyRuntimeTicker` that drives everything (TDD §6.5 — one scheduler tick, one keyboard poll, one look-at check per frame, shared scene-wide).
 
 ## In-game program editor
-`BlockyInGamePanel` (GameObject in this scene) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it. Its layout:
+`BlockyInGamePanel` (GameObject in this scene) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it.
 
-- **Left icon rail** — one tab per `BlockCategory` actually present in the registry (Motion, Looks, Control, Event; no dead tabs for categories with zero blocks). Clicking a tab scrolls the palette to that category's section (`ScrollView.ScrollTo`).
-- **Palette** — every block in the registry, grouped by category, color-tinted per category the same way canvas blocks are.
-- **Canvas** — drag a block out of the palette and drop it into the program; it snaps into place using the exact same `DropCandidateBuilder`/`DropCandidateResolver` math the in-canvas reorder drag already used (a new `PaletteDragManipulator`, distinct from the existing `BlockDragManipulator` which only reorders blocks already in a program). Dropping a trigger block creates a new stack wherever you drop it (nudged clear of existing stacks); dropping a statement/C-block snaps it into the nearest slot under the pointer. Dropping a statement over open canvas — nowhere to snap to — is a no-op.
-- **Green "▶ Go" button** — fires a new `event.when_go_clicked` trigger block (independent of the auto-fired `event.when_play_clicked`), so a program can be (re)started on demand instead of only once at scene start.
+- **Left icon rail** — one tab per `BlockCategory` present in the registry. Clicking a tab scrolls the palette to that category.
+- **Palette** — every block drawn in its real shape: events are hats (rounded top, nothing can go above), ordinary blocks have a notch on top and a tab underneath (connect both ways), C-blocks have a mouth (`if`, `repeat`; `if else` has two), and `forever` is a cap (no tab — nothing can follow it).
+- **The table** (canvas) — an unbounded surface with no buttons:
+  - **Place** — drag a block from the palette and drop it anywhere; it lies there loose. Bring its connector close to another block's and the edge it will attach to **glows** — release to snap.
+  - **Move** — grab a block from anywhere on it (its text, number boxes and checkboxes included) and it comes with everything under it; grab an event hat and the whole script comes along. A plain click on a number box still lets you type.
+  - **Look around** — drag empty space to pan, scroll to zoom toward the cursor, or use the **+ / − / =** buttons in the corner (= resets).
+  - **Select & delete** — click a block to select it (it turns lighter with a white outline); press **Delete** or **Backspace** to remove it. Only that block goes; the blocks below close up. Deleting an event hat keeps its blocks on the table. You can also drop anything on the palette to delete it.
+  - Loose blocks with no event on top are saved but never run (same as Scratch) — put an event hat above them to make them a script.
+- **Green "▶ Go" button** — fires the `when Go clicked` event, so a script can be (re)started on demand; `when Play Clicked` still runs once at scene start.
 
-Every structural edit — drag-in, delete, param change — still flows through the same `ProgramStore.OnChanged`, which autosaves to `RuntimeProgramStorage` (`Application.persistentDataPath/BlockyPrograms/<name>.json`) and hot-reloads the live `ObjectProgramRunner`. There is no separate save step, drag-and-drop included.
+Every edit — drop, delete, value change — autosaves to `Application.persistentDataPath/BlockyPrograms/<name>.json` and hot-reloads the object's `ObjectProgramRunner`. There is no save step. Number and text boxes commit when you press Enter or click away.
 
-This is a different tool from `Blocky/Program Editor` (the Editor-only window from before): that one edits project assets and only works in the Editor; this one works identically in the Editor's Play mode and in a real build. See [[05 Editor UI/Editor UI|Editor UI]] for how both share the same underlying `BlockView`/`ProgramCanvasView` components.
+This is a different tool from `Blocky/Program Editor` (the Editor-only window, which edits project assets and keeps its button-based editing). See [[05 Editor UI/Editor UI|Editor UI]] for how both share the same `BlockView`/`HatView`/`ProgramCanvasView` components.
 
-**Verification note:** this environment's automated Play-mode harness could not pump the player loop past frame 2 (a harness limitation, not a code issue — confirmed via `Time.frameCount` polling), so the drag interaction couldn't be captured as a live screenshot this session. What *is* verified: 88/88 EditMode tests still pass, `recompile` is clean, and the built visual tree was inspected directly in Play mode (correct child structure: topbar/body/drag-layer, correct category classes, correct stylesheet assignment). Treat the drag-and-drop path as code-reviewed and structurally verified, not yet pixel-confirmed — worth an actual manual Play-mode check next time you're at the keyboard.
-
-## Known limitation
-None beyond the note above — drag-to-reorder-within-canvas (`BlockDragManipulator`) and drag-from-palette (`PaletteDragManipulator`) now both exist; only pixel-level Play-mode confirmation of the newest palette-drag path is outstanding.
+## Known limitations
+- Drag, pan and zoom gestures in the running game haven't been exercised by automation (Play-mode automation stalls the player loop). The data side (`DropChain`, `DeleteBlock`), the snap rules (`SnapResolver`) and selection are unit-tested, and the shapes and selection highlight were checked visually — but a manual pass is still the real test.
+- No auto-scroll when dragging a block to the edge of the table — pan first, or drop it and move it again.

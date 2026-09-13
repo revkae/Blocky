@@ -1,3 +1,4 @@
 .blocky-block--category-event {
     background-color: var(--blocky-color-event);
+    --blocky-fill: rgb(255, 191, 0);
 }

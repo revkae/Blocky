@@ -8,13 +8,16 @@
 }
 
 .blocky-stack {
-    margin: 8px;
+    margin: 0;
+    align-items: flex-start;
 }
 
 .blocky-stack__sequence {
-    margin-left: 4px;
+    margin-left: 0;
+    align-items: flex-start;
 }
 
+/* Plain rectangle look — only unknown/error blocks still use it. */
 .blocky-block {
     background-color: var(--blocky-color-neutral);
     border-radius: 6px;
@@ -22,17 +25,55 @@
     margin: 2px 0;
 }
 
+/* Shaped blocks draw their own silhouette (BlockOutline): no rectangle, no spacing — each block's tab sits in
+   the next block's notch. Two classes so this beats every single-class category rule whatever the sheet order. */
+.blocky-block.blocky-shaped {
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 64px;
+}
+
+.blocky-block--shape-trigger.blocky-shaped,
+.blocky-block--shape-cblock.blocky-shaped,
+.blocky-block--shape-cap.blocky-shaped {
+    min-width: 110px;
+}
+
 .blocky-block__header {
     flex-direction: row;
     align-items: center;
+    min-height: 34px;
+    padding: 6px 10px 4px 10px;
 }
 
+/* Room for the hat's rounded bump above the text. */
+.blocky-block--shape-trigger > .blocky-block__header {
+    padding-top: 20px;
+}
+
+.blocky-shaped Label {
+    color: rgb(255, 255, 255);
+    font-size: 12px;
+}
+
+/* A C-block's mouth: indented by the spine, children keep their own widths. */
 .blocky-block__body-slot {
     margin-left: 16px;
-    min-height: 20px;
-    padding-left: 4px;
-    border-left-width: 2px;
-    border-left-color: rgba(255, 255, 255, 0.25);
+    min-height: 24px;
+    align-items: flex-start;
+}
+
+.blocky-block__arm {
+    flex-direction: row;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 10px;
+}
+
+.blocky-block__footer {
+    height: 18px;
 }
 
 .blocky-block--error {
@@ -41,11 +82,54 @@
     border-color: rgb(255, 255, 255);
 }
 
+/* Inputs: the key as small white text, the value in a white oval — Scratch's reporter-slot look. */
 .blocky-param-field {
-    margin-left: 8px;
-    min-width: 40px;
+    flex-direction: row;
+    align-items: center;
+    margin: 0 0 0 6px;
+    min-width: 0;
 }
 
+.blocky-param-field > .unity-base-field__label {
+    min-width: 0;
+    margin: 0 4px 0 0;
+    padding: 0;
+    font-size: 11px;
+    color: rgb(255, 255, 255);
+}
+
+.blocky-param-field .unity-base-field__input {
+    background-color: rgb(255, 255, 255);
+    border-width: 0;
+    border-radius: 10px;
+    min-width: 34px;
+    padding: 1px 6px;
+    color: rgb(70, 70, 80);
+}
+
+/* Dropdowns carry their own text/arrow colors from the theme, which beat the inherited color above. */
+.blocky-param-field .unity-base-popup-field__text,
+.blocky-param-field .unity-base-popup-field__arrow {
+    color: rgb(70, 70, 80);
+    -unity-background-image-tint-color: rgb(70, 70, 80);
+}
+
+.blocky-param-chip__key {
+    font-size: 11px;
+    margin-right: 4px;
+}
+
+.blocky-shaped .blocky-param-chip {
+    background-color: rgb(255, 255, 255);
+    border-radius: 10px;
+    min-width: 24px;
+    padding: 1px 7px;
+    color: rgb(70, 70, 80);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+}
+
+/* Editor window (button mode) affordances. */
 .blocky-block__delete, .blocky-stack__delete {
     margin-left: 8px;
 }

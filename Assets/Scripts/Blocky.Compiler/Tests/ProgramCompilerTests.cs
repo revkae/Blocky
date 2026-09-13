@@ -145,6 +145,33 @@ namespace Blocky.Compiler.Tests
         }
 
         [Test]
+        public void Link_LooseStack_IsNotCompiled_AndIsNotAnError()
+        {
+            var program = SampleProgram();
+            var loose = new BlockStack
+            {
+                id = "stk_loose",
+                triggerBlockType = "",
+                sequence = new[]
+                {
+                    new BlockNode
+                    {
+                        id = "n_loose",
+                        blockType = "motion.move_forward",
+                        parameters = new[] { new BlockParam { key = "distance", kind = ParamKind.Number, number = 1 } }
+                    }
+                }
+            };
+            program.stacks = new[] { program.stacks[0], loose };
+
+            var result = ProgramCompiler.Link(program, BuildCatalogRegistry());
+
+            Assert.IsFalse(result.HasErrors);
+            Assert.AreEqual(0, result.Program.StackEntryPoints[0]);
+            Assert.AreEqual(-1, result.Program.StackEntryPoints[1]);
+        }
+
+        [Test]
         public void Link_StackWithError_IsSkippedButOthersStillCompile()
         {
             var program = SampleProgram();

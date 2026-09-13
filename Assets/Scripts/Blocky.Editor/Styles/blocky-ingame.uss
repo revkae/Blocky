@@ -6,27 +6,37 @@
     background-color: rgb(230, 231, 236);
 }
 
+/* Responsive top bar: title and Go keep their size; the status text takes what's left and ends in "…"
+   instead of pushing the Go button out of the panel when the workspace is narrow. */
 .blocky-ingame-topbar {
     flex-direction: row;
     align-items: center;
     height: 44px;
     padding: 0 10px;
+    overflow: hidden;
     background-color: rgb(64, 68, 82);
 }
 
 .blocky-ingame-title {
+    flex-shrink: 0;
     color: rgb(235, 235, 240);
     -unity-font-style: bold;
     margin-right: 12px;
 }
 
 .blocky-ingame-status {
-    color: rgb(190, 192, 200);
     flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: rgb(190, 192, 200);
     -unity-text-align: middle-left;
 }
 
 .blocky-ingame-go-button {
+    flex-shrink: 0;
     background-color: rgb(76, 191, 86);
     color: rgb(255, 255, 255);
     -unity-font-style: bold;
@@ -83,30 +93,84 @@
     -unity-text-align: middle-center;
 }
 
+/* Shrinks with a narrow workspace instead of squeezing the table to nothing. */
 .blocky-ingame-palette {
-    width: 230px;
+    flex-basis: 250px;
+    flex-shrink: 1;
+    min-width: 140px;
     background-color: rgb(246, 247, 250);
     border-right-width: 1px;
     border-right-color: rgb(210, 211, 216);
 }
 
+/* Each prototype keeps its own width, like Scratch's palette — never stretched to the column. */
+.blocky-palette__section {
+    align-items: flex-start;
+    padding-bottom: 6px;
+}
+
 .blocky-palette__section-title {
     -unity-font-style: bold;
-    margin: 8px 0 4px 8px;
+    margin: 10px 0 6px 10px;
     color: rgb(70, 72, 80);
 }
 
-.blocky-ingame-canvas-scroll {
+/* Bottom margin leaves room for the tab hanging under each block. */
+.blocky-palette__prototype {
+    margin: 0 10px 14px 10px;
+}
+
+/* The table: an unbounded surface seen through this clipped viewport — drag empty space to move around,
+   scroll to zoom. The canvas inside is moved and scaled with translate/scale, never resized. */
+.blocky-ingame-canvas-viewport {
     flex-grow: 1;
+    min-width: 120px;
+    overflow: hidden;
     background-color: rgb(238, 239, 243);
 }
 
-.blocky-palette__prototype {
-    margin: 3px 8px;
+/* How-to line along the bottom of the table; wraps rather than overflowing, and stays clear of the zoom buttons. */
+.blocky-ingame-hint {
+    position: absolute;
+    left: 10px;
+    right: 56px;
+    bottom: 8px;
+    font-size: 11px;
+    white-space: normal;
+    color: rgb(140, 142, 152);
 }
 
-.blocky-palette__ghost {
-    opacity: 0.85;
+.blocky-zoom-controls {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+}
+
+.blocky-zoom-button {
+    width: 32px;
+    height: 32px;
+    margin: 3px 0;
+    padding: 0;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: rgb(200, 202, 210);
+    background-color: rgb(255, 255, 255);
+    color: rgb(70, 72, 80);
+    font-size: 16px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.blocky-zoom-button:hover {
+    background-color: rgb(232, 236, 245);
+}
+
+.blocky-drag-ghost {
+    opacity: 0.9;
+}
+
+.blocky-drag-chain {
+    align-items: flex-start;
 }
 
 /* Sits in the root's right padding strip — the seam between the workspace and the live game view. */
@@ -122,10 +186,10 @@
     background-color: rgb(110, 116, 136);
 }
 
-/* The glow shown at the exact rect a dragged palette block would snap into. */
+/* The glow on the edge a dragged block is about to connect to. */
 .blocky-drop-indicator {
-    background-color: rgba(255, 224, 64, 0.55);
+    background-color: rgba(255, 236, 110, 0.85);
     border-radius: 3px;
-    border-width: 2px;
-    border-color: rgba(255, 224, 64, 0.95);
+    border-width: 1px;
+    border-color: rgb(255, 255, 255);
 }

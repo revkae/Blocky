@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
 using UnityEngine;
@@ -7,187 +6,132 @@ using UnityEngine.UIElements;
 namespace Blocky.Editor
 {
     /// <summary>
-    /// Drags a fresh block out of the palette and into the canvas (Scratch's "drag from library" gesture) —
-    /// distinct from <see cref="BlockDragManipulator"/>, which reorders a block that already exists in a
-    /// program. A trigger definition becomes a new <see cref="BlockStack"/> wherever it's dropped (nudged clear
-    /// of existing stacks via <see cref="StackPlacementResolver"/>, same as "+ Add Stack"); a statement/C-block
-    /// definition is inserted at the nearest <see cref="DropCandidate"/> across every stack on the canvas,
-    /// reusing the exact snapping math <see cref="DropCandidateBuilder"/>/<see cref="DropCandidateResolver"/>
-    /// already provide for in-canvas reordering. While dragging a statement/C-block, the current best candidate
-    /// is shown as a glowing bar (<see cref="_snapIndicator"/>) at the exact rect it would snap into — the same
-    /// "which side is it about to attach to" feedback Scratch gives, just drawn as a highlight strip rather than
-    /// tinting the neighboring block itself (there's no need to reach into that block's own visuals).
-    /// The ghost appears the instant the pointer goes down (no drag-threshold) — a palette item has no other
-    /// click behaviour to protect against an accidental drag, unlike an existing block in the canvas.
+    /// Takes a fresh block out of the palette. The ghost is a new prototype of the same definition, so it has the
+    /// real silhouette while it moves. Released over the table it becomes one <see cref="DropChain"/> — snapped if
+    /// an edge was glowing, lying loose where it was dropped otherwise. Released anywhere else, nothing happens.
+    /// Tracks the pointer on the panel root (see <see cref="CanvasDragManipulator"/> for why not capture), and can
+    /// be ended by the host through <see cref="IActiveDrag"/> if the pointer-up never arrives.
     /// </summary>
-    public sealed class PaletteDragManipulator : PointerManipulator
+    public sealed class PaletteDragManipulator : PointerManipulator, IActiveDrag
     {
-        private static readonly Vector2 NominalStackSize = new(240f, 160f);
-
         private readonly BlockDefinition _definition;
-        private readonly ProgramStore _store;
-        private readonly ProgramCanvasView _canvasView;
-        private readonly DragLayer _dragLayer;
+        private readonly DragContext _context;
+        private VisualElement _tree;
+        private int _pointerId = -1;
+        private ChainDragSession _session;
+        private bool _eventMovedSincePoll;
 
-        private VisualElement _ghost;
-        private VisualElement _snapIndicator;
-        private DropCandidate? _bestCandidate;
-        private bool _dragging;
-
-        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, ProgramStore store,
-            ProgramCanvasView canvasView, DragLayer dragLayer)
+        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, DragContext context)
         {
             target = paletteItem;
             _definition = definition;
-            _store = store;
-            _canvasView = canvasView;
-            _dragLayer = dragLayer;
+            _context = context;
         }
 
-        protected override void RegisterCallbacksOnTarget()
+        protected override void RegisterCallbacksOnTarget() => target.RegisterCallback<PointerDownEvent>(OnPointerDown);
+
+        protected override void UnregisterCallbacksFromTarget() => target.UnregisterCallback<PointerDownEvent>(OnPointerDown);
+
+        public void Poll(Vector2 panelPointer)
         {
-            target.RegisterCallback<PointerDownEvent>(OnPointerDown);
-            target.RegisterCallback<PointerMoveEvent>(OnPointerMove);
-            target.RegisterCallback<PointerUpEvent>(OnPointerUp);
-            target.RegisterCallback<PointerCaptureOutEvent>(OnPointerCaptureOut);
+            if (_pointerId == -1) return;
+
+            // UI move events are the primary source; the poll only fills in when they stop arriving.
+            if (_eventMovedSincePoll)
+            {
+                _eventMovedSincePoll = false;
+                return;
+            }
+            _session?.Move(panelPointer);
         }
 
-        protected override void UnregisterCallbacksFromTarget()
+        public void ForceEnd(Vector2 panelPointer)
         {
-            target.UnregisterCallback<PointerDownEvent>(OnPointerDown);
-            target.UnregisterCallback<PointerMoveEvent>(OnPointerMove);
-            target.UnregisterCallback<PointerUpEvent>(OnPointerUp);
-            target.UnregisterCallback<PointerCaptureOutEvent>(OnPointerCaptureOut);
+            if (_pointerId != -1) Finish(panelPointer);
         }
 
         private void OnPointerDown(PointerDownEvent evt)
         {
-            _dragging = true;
-            _bestCandidate = null;
-            target.CapturePointer(evt.pointerId);
-            SpawnGhost();
-            UpdateGhostPosition(evt.position);
+            if (evt.button != 0 || _pointerId != -1 || _context.ActiveDrag != null) return;
+
+            _pointerId = evt.pointerId;
+            var ghost = BlockPrototype.Create(_definition, _context.Registry);
+            _session = new ChainDragSession(_context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
+                hasHat: _definition.shape == BlockShape.Trigger, endsWithCap: _definition.shape == BlockShape.Cap,
+                fromCanvas: false, MakeCommand);
+            _session.Move(evt.position);
+
+            _tree = target.panel.visualTree;
+            _tree.RegisterCallback<PointerMoveEvent>(OnTreeMove, TrickleDown.TrickleDown);
+            _tree.RegisterCallback<PointerUpEvent>(OnTreeUp, TrickleDown.TrickleDown);
+            _tree.RegisterCallback<PointerCancelEvent>(OnTreeCancel, TrickleDown.TrickleDown);
+            _context.ActiveDrag = this;
+            evt.StopPropagation();
         }
 
-        private void OnPointerMove(PointerMoveEvent evt)
+        private void OnTreeMove(PointerMoveEvent evt)
         {
-            if (!_dragging) return;
-            UpdateGhostPosition(evt.position);
-            UpdateSnapIndicator(evt.position);
+            if (evt.pointerId != _pointerId) return;
+            _eventMovedSincePoll = true;
+            _session.Move(evt.position);
+            evt.StopPropagation();
         }
 
-        private void OnPointerUp(PointerUpEvent evt)
+        private void OnTreeUp(PointerUpEvent evt)
         {
-            target.ReleasePointer(evt.pointerId);
-            if (_dragging) CommitDrop(evt.position);
-            CleanUp();
+            if (evt.pointerId != _pointerId) return;
+            Finish(evt.position);
+            evt.StopPropagation();
         }
 
-        private void OnPointerCaptureOut(PointerCaptureOutEvent evt) => CleanUp();
-
-        private void SpawnGhost()
+        private void OnTreeCancel(PointerCancelEvent evt)
         {
-            _ghost = new Label(string.IsNullOrEmpty(_definition.displayNameKey) ? _definition.blockType : _definition.displayNameKey);
-            _ghost.AddToClassList("blocky-block");
-            _ghost.AddToClassList($"blocky-block--category-{_definition.category.ToString().ToLowerInvariant()}");
-            _ghost.AddToClassList("blocky-palette__ghost");
-            _ghost.style.position = Position.Absolute;
-            _ghost.pickingMode = PickingMode.Ignore;
-            _dragLayer.Add(_ghost);
+            if (evt.pointerId != _pointerId) return;
+            var session = _session;
+            EndTracking();
+            session?.Cancel();
         }
 
-        private void UpdateGhostPosition(Vector2 pointerPosition)
+        private void Finish(Vector2 pointer)
         {
-            var local = _dragLayer.WorldToLocal(pointerPosition);
-            _ghost.style.left = local.x;
-            _ghost.style.top = local.y;
+            var session = _session;
+            EndTracking();
+            session?.Drop(pointer);
         }
 
-        /// <summary>Recomputes the best drop candidate every move (cheap — a few dozen rects) and shows a glow bar there; hidden for trigger definitions, which don't snap to anything.</summary>
-        private void UpdateSnapIndicator(Vector2 pointerPosition)
+        private void EndTracking()
         {
-            if (_definition.shape == BlockShape.Trigger)
-            {
-                _bestCandidate = null;
-                HideIndicator();
-                return;
-            }
-
-            var candidates = new List<DropCandidate>();
-            foreach (var stackView in _canvasView.StackViews.Values)
-                candidates.AddRange(DropCandidateBuilder.Build(stackView));
-
-            _bestCandidate = DropCandidateResolver.FindBestCandidate(candidates, pointerPosition);
-
-            if (_bestCandidate is not { } candidate)
-            {
-                HideIndicator();
-                return;
-            }
-
-            _snapIndicator ??= CreateIndicator();
-            _snapIndicator.style.display = DisplayStyle.Flex;
-            var local = _dragLayer.WorldToLocal(new Vector2(candidate.Rect.x, candidate.Rect.y));
-            _snapIndicator.style.left = local.x;
-            _snapIndicator.style.top = local.y;
-            _snapIndicator.style.width = candidate.Rect.width;
-            _snapIndicator.style.height = Mathf.Max(candidate.Rect.height, 4f);
+            _tree?.UnregisterCallback<PointerMoveEvent>(OnTreeMove, TrickleDown.TrickleDown);
+            _tree?.UnregisterCallback<PointerUpEvent>(OnTreeUp, TrickleDown.TrickleDown);
+            _tree?.UnregisterCallback<PointerCancelEvent>(OnTreeCancel, TrickleDown.TrickleDown);
+            _tree = null;
+            _pointerId = -1;
+            _session = null;
+            _eventMovedSincePoll = false;
+            if (_context.ActiveDrag == this) _context.ActiveDrag = null;
         }
 
-        private VisualElement CreateIndicator()
+        private IProgramCommand MakeCommand(ChainTarget target)
         {
-            var indicator = new VisualElement();
-            indicator.AddToClassList("blocky-drop-indicator");
-            indicator.style.position = Position.Absolute;
-            indicator.pickingMode = PickingMode.Ignore;
-            _dragLayer.Add(indicator);
-            return indicator;
+            var prototype = PaletteView.InstantiatePrototype(_definition);
+            return _definition.shape == BlockShape.Trigger
+                ? DropChain.FromNewTrigger(_definition.blockType, prototype.parameters, target)
+                : DropChain.FromNewNode(prototype, target);
         }
+    }
 
-        private void HideIndicator()
+    /// <summary>Palette rendering of a definition: the real silhouette with default values as static chips. The whole element is one drag handle — nothing inside it takes the pointer.</summary>
+    public static class BlockPrototype
+    {
+        public static VisualElement Create(BlockDefinition definition, BlockRegistry registry)
         {
-            if (_snapIndicator != null) _snapIndicator.style.display = DisplayStyle.None;
-        }
+            VisualElement view = definition.shape == BlockShape.Trigger
+                ? new HatView(definition, definition.blockType, PaletteView.InstantiatePrototype(definition).parameters, null, null, prototype: true)
+                : BlockView.CreatePrototype(definition, registry);
 
-        private void CleanUp()
-        {
-            _ghost?.RemoveFromHierarchy();
-            _ghost = null;
-            _snapIndicator?.RemoveFromHierarchy();
-            _snapIndicator = null;
-            _bestCandidate = null;
-            _dragging = false;
-        }
-
-        private void CommitDrop(Vector2 pointerPosition)
-        {
-            if (!_canvasView.worldBound.Contains(pointerPosition)) return; // released back over the palette/chrome — cancel
-
-            if (_definition.shape == BlockShape.Trigger)
-            {
-                DropAsNewStack(pointerPosition);
-                return;
-            }
-
-            if (_bestCandidate is not { } candidate) return; // no snap target under the pointer — nothing to attach to
-
-            var location = candidate.ParentNodeId != null
-                ? NodeLocation.InBranch(candidate.StackId, candidate.ParentNodeId, candidate.BranchIndex, candidate.Index)
-                : NodeLocation.InStack(candidate.StackId, candidate.Index);
-
-            _store.Apply(new InsertNode(location, PaletteView.InstantiatePrototype(_definition)));
-        }
-
-        private void DropAsNewStack(Vector2 pointerPosition)
-        {
-            var canvasLocal = _canvasView.WorldToLocal(pointerPosition);
-
-            var existingPositions = new List<Vector2>();
-            foreach (var s in _store.Program.stacks) existingPositions.Add(s.canvasPosition);
-
-            var position = StackPlacementResolver.FindFreePosition(canvasLocal, existingPositions, NominalStackSize);
-            var stack = new BlockStack { id = IdGenerator.NewId(), triggerBlockType = _definition.blockType, canvasPosition = position };
-            _store.Apply(new CreateStack(stack));
+            view.AddToClassList("blocky-palette__prototype");
+            foreach (var child in view.Children()) ChainDragSession.IgnorePicking(child);
+            return view;
         }
     }
 }

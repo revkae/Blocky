@@ -12,6 +12,9 @@ namespace Blocky.Data
             return null;
         }
 
+        /// <summary>A stack with no hat block — blocks left lying on the table. Saved like any other stack, but never compiled or run (Scratch's loose blocks).</summary>
+        public static bool IsLoose(BlockStack stack) => string.IsNullOrEmpty(stack.triggerBlockType);
+
         public static BlockNode FindNode(ObjectProgram program, string stackId, string nodeId)
         {
             var stack = FindStack(program, stackId);

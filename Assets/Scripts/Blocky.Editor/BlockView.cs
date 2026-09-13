@@ -2,61 +2,77 @@ using System;
 using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Blocky.Editor
 {
     /// <summary>
-    /// One VisualElement subtree per node (TDD §8.2). Holds the node's <see cref="NodeId"/>, never a reference
-    /// to the <see cref="BlockNode"/> itself, so a rebuilt data model never leaves a stale pointer.
-    /// Read-only (Milestone 4) unless a <see cref="ProgramStore"/> is supplied, in which case param fields
-    /// become live and a delete button plus a per-branch "add" affordance appear (the authoring window).
+    /// One VisualElement subtree per node (TDD §8.2), drawn with its Scratch-style silhouette
+    /// (<see cref="BlockOutline"/>): header row, then per branch a mouth (<see cref="BodySlots"/>) with an arm
+    /// between branches ("else") and a footer arm after the last. Holds the node's <see cref="NodeId"/>, never
+    /// the <see cref="BlockNode"/> itself, so a rebuilt data model never leaves a stale pointer.
+    /// Field modes: read-only (no store), live (store — edits dispatch <see cref="SetParam"/>), prototype
+    /// (palette — static chips). <c>buttons</c> adds the Editor window's delete/"+ Add" affordances; the in-game
+    /// table passes false and uses drag and drop instead.
     /// </summary>
     public sealed class BlockView : VisualElement
     {
         public string NodeId { get; }
         public string StackId { get; }
+        public BlockDefinition Definition { get; }
+
+        /// <summary>A cap block (e.g. <c>forever</c>): no tab underneath, so nothing can attach below it.</summary>
+        public bool IsTerminal => Definition.shape == BlockShape.Cap;
 
         private readonly List<VisualElement> _bodySlots = new();
+        private readonly BlockShapePainter _painter;
 
-        /// <summary>One entry per branch (TDD §8.2's <c>bodySlot</c>), in branch order — used by <see cref="DropCandidateBuilder"/>.</summary>
+        /// <summary>One entry per branch (TDD §8.2's <c>bodySlot</c>), in branch order.</summary>
         public IReadOnlyList<VisualElement> BodySlots => _bodySlots;
 
         /// <summary>Builds a normal block view, or an <see cref="UnknownBlockView"/> if the block type no longer resolves.</summary>
-        public static VisualElement Create(BlockNode node, BlockRegistry registry, string stackId = null, ProgramStore store = null)
+        public static VisualElement Create(BlockNode node, BlockRegistry registry, string stackId = null, ProgramStore store = null, bool buttons = true)
         {
             var definition = registry.Find(node.blockType);
-            return definition != null ? new BlockView(node, definition, registry, stackId, store) : new UnknownBlockView(node);
+            return definition != null
+                ? new BlockView(node, definition, registry, stackId, store, buttons, prototype: false)
+                : new UnknownBlockView(node);
         }
 
-        private BlockView(BlockNode node, BlockDefinition definition, BlockRegistry registry, string stackId, ProgramStore store)
+        /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
+        public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
+            new(PaletteView.InstantiatePrototype(definition), definition, registry, null, null, buttons: false, prototype: true);
+
+        internal static string DisplayName(BlockDefinition definition) =>
+            string.IsNullOrEmpty(definition.displayNameKey) ? definition.blockType : definition.displayNameKey;
+
+        private BlockView(BlockNode node, BlockDefinition definition, BlockRegistry registry, string stackId, ProgramStore store, bool buttons, bool prototype)
         {
             NodeId = node.id;
             StackId = stackId;
+            Definition = definition;
 
             AddToClassList("blocky-block");
+            AddToClassList("blocky-shaped");
             AddToClassList($"blocky-block--category-{definition.category.ToString().ToLowerInvariant()}");
             AddToClassList($"blocky-block--shape-{definition.shape.ToString().ToLowerInvariant()}");
 
             var header = new VisualElement();
             header.AddToClassList("blocky-block__header");
-            header.Add(new Label(string.IsNullOrEmpty(definition.displayNameKey) ? definition.blockType : definition.displayNameKey));
+            header.Add(new Label(DisplayName(definition)));
 
             foreach (var spec in definition.parameters)
             {
                 var value = Array.Find(node.parameters, p => p.key == spec.key);
-                if (store != null)
-                {
+                if (prototype) header.Add(ParamFieldFactory.CreateChip(spec, value));
+                else if (store != null)
                     header.Add(ParamFieldFactory.CreateLiveField(spec, value, newValue =>
                         store.Apply(new SetParam(new ParamTarget(stackId, node.id), spec.key, newValue))));
-                }
-                else
-                {
-                    header.Add(ParamFieldFactory.CreateReadOnlyField(spec, value));
-                }
+                else header.Add(ParamFieldFactory.CreateReadOnlyField(spec, value));
             }
 
-            if (store != null)
+            if (store != null && buttons)
             {
                 var deleteButton = new Button(() =>
                 {
@@ -71,19 +87,41 @@ namespace Blocky.Editor
 
             for (var branchIndex = 0; branchIndex < definition.branchCount; branchIndex++)
             {
+                if (branchIndex > 0) Add(BuildArm(definition.branchCount == 2 ? "else" : null, footer: false));
+
                 var slot = new VisualElement();
                 slot.AddToClassList("blocky-block__body-slot");
 
                 if (branchIndex < node.branches.Length)
                     foreach (var child in node.branches[branchIndex])
-                        slot.Add(Create(child, registry, stackId, store));
+                        slot.Add(Create(child, registry, stackId, store, buttons));
 
-                if (store != null)
+                if (store != null && buttons)
                     slot.Add(BuildAddButton(registry, store, stackId, node.id, branchIndex));
 
                 _bodySlots.Add(slot);
                 Add(slot);
             }
+
+            if (definition.branchCount > 0) Add(BuildArm(null, footer: true));
+
+            _painter = new BlockShapePainter(this, BuildOutline);
+            foreach (var slot in _bodySlots) _painter.TrackGeometryOf(slot);
+        }
+
+        private BlockOutline BuildOutline()
+        {
+            var mouths = new List<Vector2>(_bodySlots.Count);
+            foreach (var slot in _bodySlots) mouths.Add(new Vector2(slot.layout.y, slot.layout.yMax));
+            return new BlockOutline { Width = layout.width, Height = layout.height, BottomTab = !IsTerminal, Mouths = mouths };
+        }
+
+        private static VisualElement BuildArm(string label, bool footer)
+        {
+            var arm = new VisualElement();
+            arm.AddToClassList(footer ? "blocky-block__footer" : "blocky-block__arm");
+            if (label != null) arm.Add(new Label(label));
+            return arm;
         }
 
         private static VisualElement BuildAddButton(BlockRegistry registry, ProgramStore store, string stackId, string parentNodeId, int branchIndex)
@@ -91,7 +129,7 @@ namespace Blocky.Editor
             var container = new VisualElement();
             container.AddToClassList("blocky-block__add-container");
 
-            var popup = new BlockPickerPopup(registry, def => def.shape == BlockShape.Statement || def.shape == BlockShape.CBlock, def =>
+            var popup = new BlockPickerPopup(registry, def => def.shape != BlockShape.Trigger, def =>
             {
                 var parent = ProgramQuery.FindNode(store.Program, stackId, parentNodeId);
                 var index = parent?.branches[branchIndex].Length ?? 0;

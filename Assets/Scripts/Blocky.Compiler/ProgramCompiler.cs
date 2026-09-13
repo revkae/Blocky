@@ -25,7 +25,9 @@ namespace Blocky.Compiler
                 if (!seenIds.Add(stack.id))
                     diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stack.id, null, $"Duplicate id '{stack.id}'."));
 
-                if (registry.Find(stack.triggerBlockType) == null)
+                // A loose stack (no hat) is blocks lying on the table: legal, just never run. Checked first because
+                // registry.Find(null) would throw.
+                if (!ProgramQuery.IsLoose(stack) && registry.Find(stack.triggerBlockType) == null)
                     diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stack.id, null,
                         $"Unknown block type '{stack.triggerBlockType}'."));
 
@@ -95,7 +97,7 @@ namespace Blocky.Compiler
             for (var i = 0; i < program.stacks.Length; i++)
             {
                 var stack = program.stacks[i];
-                if (erroredStackIds.Contains(stack.id))
+                if (erroredStackIds.Contains(stack.id) || ProgramQuery.IsLoose(stack))
                 {
                     stackEntryPoints[i] = -1;
                     continue;
