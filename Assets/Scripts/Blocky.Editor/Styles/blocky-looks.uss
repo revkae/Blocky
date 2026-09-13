@@ -1,0 +1,3 @@
+.blocky-block--category-looks {
+    background-color: var(--blocky-color-looks);
+}

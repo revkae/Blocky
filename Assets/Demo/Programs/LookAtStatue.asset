@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87e8706c282a80c42858d47c0318efe4, type: 3}
+  m_Name: LookAtStatue
+  m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.Persistence.BlockProgramAsset
+  json: "{\r\n  \"schemaVersion\": 1,\r\n  \"targetObjectUid\": \"LookAtStatue\",\r\n  \"stacks\": [\r\n    {\r\n      \"id\": \"gABsQtx3G0CutQPY\",\r\n      \"triggerBlockType\": \"event.when_looked_at\",\r\n      \"triggerParameters\": [\r\n        {\r\n          \"key\": \"angle_threshold\",\r\n          \"kind\": \"Number\",\r\n          \"number\": 20.0\r\n        }\r\n      ],\r\n      \"sequence\": [\r\n        {\r\n          \"id\": \"P-kP2PKmvkiiLZ_8\",\r\n          \"blockType\": \"looks.set_scale\",\r\n          \"parameters\": [\r\n            {\r\n              \"key\": \"x\",\r\n              \"kind\": \"Number\",\r\n              \"number\": 2.0\r\n            },\r\n            {\r\n              \"key\": \"y\",\r\n              \"kind\": \"Number\",\r\n              \"number\": 2.0\r\n            },\r\n            {\r\n              \"key\": \"z\",\r\n              \"kind\": \"Number\",\r\n              \"number\": 2.0\r\n            },\r\n            {\r\n              \"key\": \"duration\",\r\n              \"kind\": \"Number\",\r\n              \"number\": 1.0\r\n            }\r\n          ],\r\n          \"branches\": []\r\n        }\r\n      ],\r\n      \"canvasPosition\": {\r\n        \"x\": 0.0,\r\n        \"y\": 0.0\r\n      }\r\n    }\r\n  ]\r\n}"

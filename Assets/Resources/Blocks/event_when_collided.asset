@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1cec2095f06074785434437d452952, type: 3}
+  m_Name: event_when_collided
+  m_EditorClassIdentifier: Blocky.Compiler::Blocky.Compiler.BlockDefinition
+  blockType: event.when_collided
+  displayNameKey: When Collided
+  shape: 1
+  category: 0
+  branchCount: 0
+  parameters:
+  - key: tag_filter
+    kind: 1
+    defaultText: 
+    defaultNumber: 0
+    min: 0
+    max: 0
+    choices: []
+  executorKey: 
+  retrigger: 0

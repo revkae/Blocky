@@ -1,0 +1,18 @@
+{
+    "name": "Blocky.Runtime",
+    "rootNamespace": "Blocky.Runtime",
+    "references": [
+        "Blocky.Data",
+        "Blocky.Compiler",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

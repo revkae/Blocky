@@ -1,0 +1,80 @@
+:root {
+    --blocky-color-motion: rgb(76, 151, 255);
+    --blocky-color-looks: rgb(153, 102, 204);
+    --blocky-color-control: rgb(255, 171, 25);
+    --blocky-color-event: rgb(255, 191, 0);
+    --blocky-color-error: rgb(190, 60, 60);
+    --blocky-color-neutral: rgb(90, 90, 90);
+}
+
+.blocky-stack {
+    margin: 8px;
+}
+
+.blocky-stack__sequence {
+    margin-left: 4px;
+}
+
+.blocky-block {
+    background-color: var(--blocky-color-neutral);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 2px 0;
+}
+
+.blocky-block__header {
+    flex-direction: row;
+    align-items: center;
+}
+
+.blocky-block__body-slot {
+    margin-left: 16px;
+    min-height: 20px;
+    padding-left: 4px;
+    border-left-width: 2px;
+    border-left-color: rgba(255, 255, 255, 0.25);
+}
+
+.blocky-block--error {
+    background-color: var(--blocky-color-error);
+    border-width: 1px;
+    border-color: rgb(255, 255, 255);
+}
+
+.blocky-param-field {
+    margin-left: 8px;
+    min-width: 40px;
+}
+
+.blocky-block__delete, .blocky-stack__delete {
+    margin-left: 8px;
+}
+
+.blocky-block__add-container {
+    position: relative;
+    margin: 2px 0 2px 16px;
+}
+
+.blocky-block__add-button {
+    align-self: flex-start;
+}
+
+.blocky-picker-popup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: rgb(45, 45, 45);
+    border-width: 1px;
+    border-color: rgb(20, 20, 20);
+    border-radius: 4px;
+    padding: 2px;
+    min-width: 160px;
+}
+
+.blocky-picker-popup__item {
+    padding: 3px 6px;
+}
+
+.blocky-picker-popup__item:hover {
+    background-color: rgb(70, 70, 70);
+}

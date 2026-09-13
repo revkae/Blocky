@@ -1,0 +1,3 @@
+.blocky-block--category-event {
+    background-color: var(--blocky-color-event);
+}

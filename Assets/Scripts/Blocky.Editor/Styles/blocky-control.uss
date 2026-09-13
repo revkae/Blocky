@@ -1,0 +1,3 @@
+.blocky-block--category-control {
+    background-color: var(--blocky-color-control);
+}

@@ -1,0 +1,119 @@
+---
+tags: [build-log]
+---
+
+# Build Log
+
+Reverse-chronological. One entry per session/milestone step.
+
+## 2026-09-13 — In-game authoring: BlockyInGamePanel
+- User correction: the Editor window wasn't what was wanted — needed to write code to an object *while playing*, in-game, not tucked into a separate Editor tool.
+- New assembly `Blocky.Game` (not Editor-restricted — compiles into real builds too) holding `BlockyInGamePanel`: a `UIDocument`-hosted sidebar, Tab to toggle, click any collider in the scene to select it (raycast from `Camera.main`, gated so clicks over the sidebar itself don't also pick a world object). Reuses the exact same `ProgramCanvasView`/`BlockView` editable-mode components as the Editor window — proof the "runtime + editor" reusability goal from the TDD's very first page actually paid off.
+- **Deliberately does not touch `UnityEditor`/`AssetDatabase`** — edits persist to a real file (`RuntimeProgramStorage`, `Application.persistentDataPath/BlockyPrograms/<name>.json`), the same model a shipped game's save data would use. A player editing a program in a build should never be writing into the project's source assets — that's what makes this different from `BlockyProgramEditorWindow`, not a lesser version of it.
+- Added `ObjectProgramRunner.ProgramAsset` (public getter — the in-game panel can't use `SerializedObject`, which is Editor-only) and made `OnProgramChanged` hot-reload the runner (`Shutdown()` + `Initialize()`) after every edit, since a component already running since scene start won't pick up a mid-session change on its own.
+- Verified for real via a scripted session (Awake, then a simulated click-select on `WaiterCube`, then a live param edit): the edit persisted to the actual save file, and the *same* `ObjectProgramRunner` instance picked it up via hot-reload — confirmed by reference-equality check, not just "no exception thrown." Cleaned up the test's save file afterward and restored `WaiterCube` from its original asset so the demo scene stays as documented.
+- 88/88 tests still passing — this feature has no dedicated automated tests yet (`Update()`'s raycast/input logic needs Play mode to exercise meaningfully, which EditMode tests don't provide); correctness here rests on the scripted verification above plus the fact that every component it composes (`ProgramStore`, `ProgramCanvasView`, `RuntimeProgramStorage`, `ObjectProgramRunner`) is independently tested.
+
+## 2026-09-13 — Real authoring: BlockyProgramEditorWindow
+- User need: a way to actually write a program for any object, not just watch pre-built demo programs run. This closed the "live editing" gap explicitly called out as deferred back in Milestone 5.
+- `ParamFieldFactory.CreateLiveField` — live counterpart to the read-only fields, dispatching a `BlockParam` via callback per edit.
+- `BlockView`/`StackView`/`ProgramCanvasView` extended with an optional `ProgramStore` / `editable` flag: live fields, per-block delete, per-container "+ Add" via a new dependency-free `BlockPickerPopup` (not `GenericMenu`, so the same component still works outside the Editor).
+- `ProgramQuery.FindLocation` (Blocky.Data) — finds a node's current position on demand, needed for delete/insert-after without every view separately tracking its own index.
+- **New assembly `Blocky.Tooling`** (Editor-only platform) hosting `BlockyProgramEditorWindow` (`Blocky/Program Editor` menu item): pick any GameObject, auto-provisions `ObjectProgramRunner` + `BlockProgramAsset` if missing, hosts a fully editable `ProgramCanvasView` in `EditorWindow.rootVisualElement`. This is the first genuine live UI Toolkit panel in the whole project — meaning `BlockDragManipulator`'s real pointer/`worldBound` logic (built in Milestone 5, never testable before now) has a place to actually run for the first time, though it isn't wired into this window yet.
+- Verified for real, not just by inspection: opened the window via a scripted session, targeted the demo scene's `IfDemo` object, inserted a `control.wait` node through the actual store the UI is bound to, confirmed it appeared in the live visual tree (77 elements, 3 `BlockView`s, 3 `FloatField`s, 7 buttons), confirmed the change persisted to the real `.asset` file, then reverted the test insertion to keep the demo scene's documented state intact.
+- 88/88 tests still passing (added 3 for `ProgramQuery.FindLocation`); no regressions from threading `editable`/`store` through three existing, previously-read-only-only-tested classes.
+
+**Known gap:** drag-to-reorder isn't wired into the window (button-based insert/delete works; dragging existing blocks around does not yet, though the underlying machinery should now function against a real panel for the first time).
+
+## 2026-09-13 — v1 complete; Milestone 8 deliberately not started
+- Flagged a real tension in the TDD before continuing: §13's build order lists Milestone 8 ("undo UI → variables → expression blocks → custom procedures") as the next step, but §1.2 explicitly names all four as v1 non-goals. Asked the user rather than silently picking a reading — see [[09 Decisions/Decisions#ADR-009|ADR-009]].
+- Decision: stop at Milestone 7. Milestones 1–7 satisfy every TDD §1.2 v1 goal (data-driven extensibility, deterministic execution, zero-allocation-capable steady state, structural isolation, headless testability), all 18 catalog blocks exist as real assets, and a program runs end-to-end from a scene. 85/85 tests passing across the whole project.
+- Milestone 8 is now an explicit, documented "not started" — not silently dropped, not accidentally begun. Vault's [[Home]] status section reflects this.
+
+## 2026-09-13 — Milestone 7: full catalog, real assets, profiling, virtualization
+- **6 new ops** completing the v1 motion/looks catalog: `TurnDirectionOp`, `RotateAxisOp`, `SetRotationOp` (motion), `SetVisibleOp`, `ChangeColorOp`, `SetScaleOp` (looks). Two absolute-target duration ops (`change_color`, `set_scale`) needed a different technique than `move_forward`'s relative-delta approach — see [[06 Block Catalog/Block Catalog|Block Catalog]] for the "remaining-fraction convergence" trick that stays within the single-float `Scratch` budget without remembering a start value.
+- **`Assets/Resources/Blocks/` populated for the first time** — 18 real `BlockDefinition` assets (4 events, 5 motion, 3 looks, 6 control) covering the entire v1 catalog, generated via a one-shot Editor `eval` script rather than hand-built one at a time. Verified live: `BlockRegistry.LoadFromResources()` → 18 opcodes; `OpTableBuilder.Build` → 14/18 bound (4 triggers correctly skipped). This is the first time `BlockyRuntime.Registry` (used by every real `ObjectProgramRunner`, as opposed to test fixtures) has had any actual content.
+- **Profiling** (TDD §11.3): `ProfilerMarker`s around `VmScheduler.Tick`, `VmScheduler.Step`, and `ProgramCompiler.Link` — visible in the Unity Profiler now; no debug overlay or numeric budget-verification yet (TDD §11.1's ms budgets are unmeasured, just now measurable).
+- **View virtualization** (TDD §8.4 "huge programs"): `ProgramCanvasView.SetViewport(Rect?)` skips instantiating any `StackView` whose nominal footprint doesn't intersect the viewport + margin. Nothing drives this yet (no pan/zoom exists to call it), but the mechanism itself is built and tested.
+- Tests: 6 new ops + 2 virtualization tests = 8 new. **85/85 passing** project-wide, no bugs found this round.
+- **Explicitly not done, called out rather than dropped** — see [[Home#Known gaps carried forward|Home]]: `BlockViewPool` (view recycling), the collapsed-stack toggle, and actual thread pooling (the markers now let someone *measure* whether it's needed, but no pooling work happened).
+
+**Milestone 7 is done per the TDD's own scope.** Per [[Home|the build order]], only Milestone 8 remains — explicitly deferred, in dependency order: undo UI → variables → expression blocks → custom procedures.
+
+## 2026-09-13 — Milestone 6: integration — a program runs end-to-end
+- **Triggers** (`Assets/Scripts/Blocky.Runtime/Triggers/`): `TriggerBroker` — one shared instance for the whole scene, typed events for all 4 v1 triggers (`OnPlayClicked` fires once per session, `OnKeyPressed` one poll for every listener via the new Input System, `OnCollided` forwarded by `BlockCollisionRelay` rather than raised by a block, `OnLookedAt` rising-edge per registered target with its own angle threshold).
+- **Runtime host** (`BlockyRuntime` static class + `BlockyRuntimeTicker` MonoBehaviour): the single driver that ticks the scheduler and polls triggers once per frame, shared across every `ObjectProgramRunner` in the scene (TDD §6.5/§6.7's "one poll for all listeners" made concrete). `BlockyRuntime.SetForTests`/`Reset` give tests a clean injection seam.
+- **Persistence** (`Persistence/BlockProgramAsset.cs`): a `ScriptableObject` wrapping `ProgramSerializer` JSON so a program can be assigned in the Inspector — the "canvas persistence" half of this milestone.
+- **`ObjectProgramRunner`** (the actual "first end-to-end authored-and-run behaviour"): compiles its program on `Initialize()`, subscribes one handler per stack to the matching broker channel, and applies `RetriggerPolicy` (`RestartOnRetrigger` kills-and-restarts rather than resetting pc in place — a documented v1 simplification, equivalent until real thread pooling exists in Milestone 7). Auto-adds `BlockCollisionRelay` when a `Collider` is present. `Shutdown()` halts every thread it started and unsubscribes.
+- **Editor side**: `PaletteView` (groups prototypes by category; `InstantiatePrototype` clones a fresh node with a regenerated id and spec defaults — the missing piece for Milestone 5's drag-out-from-palette flow) and `ProgramCanvasView` (hosts every stack at its `canvasPosition`, full rebuild on any `ProgramStore.OnChanged` — correct and simple; per-subtree patching is a later optimization, not a correctness gap).
+- **Two real bugs found by the tests, not by inspection:**
+  1. `TriggerBroker.PollLookedAt` mutated its dictionary's values while foreach-ing the dictionary directly — .NET's enumerator throws "Collection was modified" even for an existing-key update. Fixed by snapshotting the key list first.
+  2. `ObjectProgramRunner`'s `OnEnable` firing via `GameObject.SetActive(true)` inside an EditMode test proved unreliable — added an explicit public `Initialize()`/`Shutdown()` seam that `OnEnable`/`OnDisable` now just call, so both production code and tests share one deterministic entry point instead of tests depending on Unity's edit-mode activation timing.
+- Tests: 16 new (`TriggerBroker`, `BlockProgramAsset`, `ObjectProgramRunner` including both non-trivial retrigger policies, `PaletteView`, `ProgramCanvasView`). **77/77 passing** project-wide.
+- **Known gaps carried forward, not silently dropped** — see [[Home#Known gaps carried forward|Home]]: live param editing, interactive pan/zoom, `BlockDragManipulator` unit coverage, most of the motion/looks catalog, thread pooling.
+
+**Next up:** Milestone 7 (Expansion — remaining catalog blocks, editor polish, view virtualization, profiling pass) or closing the gaps above; Milestone 8 (undo UI → variables → expression blocks → custom procedures) is explicitly deferred past both.
+
+## 2026-09-13 — Milestone 5: drag interaction
+- Split drag/drop into a pure, panel-independent core and a thin UI Toolkit adapter — the only way to get real unit test coverage on something TDD §8.4 explicitly wants tested, since `VisualElement.worldBound` is meaningless without a live panel.
+- `DropCandidate`/`DropCandidateKind`/`DropCandidateResolver` (innermost-wins hit test), `DropCandidateBuilder` (tree → flat candidate list, rect lookup injected for testability), `StackPlacementResolver` (the (16,16) nudge-avoidance edge case), `DragState`/`BlockDragController` (the actual state machine — nesting-depth cap, same-container index-shift correction, and the "model untouched until commit" guarantee all live here and are all unit tested), `DragLayer` + `BlockDragManipulator` (real pointer-event wiring — not unit tested, needs a live panel; documented as such rather than claimed covered).
+- Extended `BlockView`/`StackView` from Milestone 4 with `StackId`, `BodySlots`, and `SequenceContainer` — needed so the candidate builder can address a location without walking CSS-class-based queries.
+- **Real correctness detail caught by writing the test, not by inspection:** `MoveNode`'s own doc comment (Milestone 1) already warned that a same-container move needs its target index adjusted for the shift caused by the source's own removal — `BlockDragController.AdjustForSameContainerShift` implements exactly that, and `DragWithinSameContainer_AdjustsTargetIndexForRemovalShift` verifies the off-by-one both ways.
+- Tests: 15 new, all passing first run. **61/61 passing** project-wide.
+
+**Next up:** Milestone 6 (Integration — `PaletteView`, canvas persistence, `TriggerBroker`, `ObjectProgramRunner`) is the last thing standing between what exists now and a program actually running from a real scene.
+
+## 2026-09-13 — Milestone 4: static, read-only UI
+- `Assets/Scripts/Blocky.Editor/`: `ParamFieldFactory` (real `FloatField`/`Toggle`/`TextField`/`DropdownField` controls, disabled — Milestone 5 re-enables the same instances rather than swapping them out), `BlockView` (recursive, `branchCount`-driven body slots, holds only `NodeId`), `UnknownBlockView` (removed/renamed block type still renders with its raw params preserved, TDD §10.2), `StackView` (trigger header + sequence).
+- `Styles/`: one base USS sheet + one small per-category sheet (motion/looks/control/event), colors as USS custom properties per TDD §8.5.
+- No `EditorWindow` or `UIDocument` host built yet — that wiring, plus `PaletteView` and `ProgramCanvasView`'s pan/zoom, is Milestone 5. Tests exercise the `VisualElement` tree directly via `Query<T>()`, which needs no live panel.
+- Tests (`Blocky.Editor.Tests`, EditMode): all 5 `ParamKind` → control mappings, statement-block class/field assembly, nested C-block body-slot recursion, unknown-block-type placeholder preserving params, and stack-level trigger+sequence rendering. **46/46 passing** project-wide, no bugs found this round — first green run.
+
+**Next up:** Milestone 5 (drag interaction — live fields, `BlockDragManipulator`, `DragLayer`, drop candidates) or Milestone 6 (integration — `TriggerBroker`, `ObjectProgramRunner`, actually running from a scene). Milestone 5 depends only on what's already built; Milestone 6 doesn't depend on Milestone 5 at all, so order between them is a free choice.
+
+## 2026-09-13 — Milestone 3 finished: full control catalog
+- Corrected a scope error from the previous entry: `TriggerBroker`/`ObjectProgramRunner` are Milestone 6 (Integration) in the TDD's own build order (§13), not Milestone 3. Left them out.
+- Added the rest of v1's control flow: `control.if`, `control.if_else`, `control.repeat_forever`, `control.repeat_until` (`Ops/IfOp.cs`, `IfElseOp.cs`, `RepeatForeverOp.cs`, `RepeatUntilOp.cs`), plus a second motion block, `motion.set_position` (exercises the `Choice` param path via a world/local space argument).
+- `if`/`if_else` needed no new VM machinery beyond what `repeat` already has — `if` doesn't even need a `Frame` (falling through a taken branch already lands at the right place); `if_else` reuses the same push/pop mechanism as a *one-shot* redirect so the taken arm skips the untaken one (branches are laid out back-to-back in the flat array).
+- **Real design gap found and fixed:** the loop-yield rule (force a yield at every frame wrap) was written generically before `if_else` existed. Applied to `if_else`, it would've added a hidden per-frame delay to the single most common block shape in any program. Added `Frame.IsLoop` — see [[09 Decisions/Decisions#ADR-005|ADR-005]] — so only actual loops force the yield.
+- Tests: 8 new (if true/false, if_else true/false confirming the untaken branch never runs, repeat_forever's yield-forever behavior, repeat_until with both a literal-true and literal-false condition, set_position). **37/37 passing**, all green on the first run after the `IsLoop` fix — no new bugs this round.
+
+**Milestone 3 is now fully done per the TDD's own scope.** Next up per [[Home|the build order]]: Milestone 4 (static UI) or Milestone 6 (integration: `TriggerBroker`, `ObjectProgramRunner`) — worth deciding which, since Milestone 5 (drag interaction) depends on Milestone 4's static UI existing first.
+
+## 2026-09-13 — Milestone 3 (partial): the VM runs
+- `Assets/Scripts/Blocky.Runtime/`: `OpResult`, `ThreadState`, `Frame`, `VmThread` (TDD's "Thread", renamed to dodge `System.Threading.Thread`), `OpContext` (ref struct), `IBlockOp`, `BlockExecutorAttribute` + `OpTableBuilder` (reflection-once executorKey binding, per our earlier call to defer source-gen), and `VmScheduler` (the tick loop from TDD §6.5).
+- Three ops in `Ops/`: `WaitOp` (`control.wait` — real `Sleeping`/`WakeAt`, not busy-polling), `MoveForwardOp` (`motion.move_forward` — instant vs `Retry`-until-elapsed), `RepeatOp` (`control.repeat` — the Frame push/pop loop mechanism described in [[04 Runtime/Runtime VM|Runtime VM]]).
+- Tests (`Blocky.Runtime.Tests`, EditMode, real `GameObject` targets): instant move, move-over-time via Retry, wait-then-move, repeat forcing exactly one lap per tick, and an instruction-budget/runaway-thread case using 20 sequential moves with a deliberately low budget. **29/29 passing** project-wide.
+- **Two real bugs found and fixed while getting these green** (both worth remembering, not just "tests failed once"):
+  1. `VmScheduler` merged newly-`Start`ed threads into the active list at the *end* of `Tick()`, so a thread started before the very first tick call didn't run until the *second* tick — silently contradicted the intuitive reading of "next tick" and broke every test until moved to the top of `Tick()`.
+  2. [[09 Decisions/Decisions#ADR-004|ADR-004]]: `BlockShape.Trigger` being enum value 0 meant test `BlockDefinition`s that forgot to set `shape` were silently treated as triggers and skipped by `OpTableBuilder`, producing a null op table entry that turned into a swallowed `NullReferenceException` → quiet `Fail`. Reordered the enum so the default is the loud-failure case.
+- Also learned: after `Tick()` returns, a thread's externally-visible state for "still going" is `YieldedFrame` (or `Sleeping`), not `Running` — `Running` only exists transiently *during* a tick's step loop. Worth remembering if writing more scheduler tests or any UI that displays thread status.
+- **Deferred, called out but not built:** thread pooling/zero-allocation (TDD §11.2 — explicitly a Milestone 7 profiling-pass concern), the rest of the block catalog (if/if_else, repeat_until, repeat_forever), `TriggerBroker` and `ObjectProgramRunner` (needed before anything can run from an actual scene instead of a hand-built test program).
+
+**Next up:** finish out Milestone 3 (remaining control-flow ops + `TriggerBroker`/`ObjectProgramRunner`) or move to Milestone 4 (static UI) — worth deciding which before continuing.
+
+## 2026-09-13 — Milestone 2: Registry + Compiler implemented
+- `Assets/Scripts/Blocky.Compiler/`: `BlockDefinition` (ScriptableObject) + `ParamSpec`/`ChoiceEntry`/`BlockShape`/`BlockCategory`/`RetriggerPolicy` (TDD §7).
+- `BlockRegistry.Build`/`LoadFromResources("Blocks")` — opcode assignment by sorted `blockType`, duplicate/casing checks. `Assets/Resources/Blocks/` created as the drop folder for `BlockDefinition` assets (empty for now — no blocks authored yet, that's Milestone 3+ when we need real ops to test against).
+- `ProgramCompiler.Validate` — all 5 diagnostics from TDD §12: unknown block type, duplicate id, missing required param, out-of-range number, wrong branch count (plus an invalid-choice-value check, folded into the same pass).
+- `ProgramCompiler.Link` — flattens each error-free stack into `CompiledProgram.Code` (depth-first), resolves params into a flat `ParamTable`, computes `StackEntryPoints`. Per-stack error isolation per [[09 Decisions/Decisions#ADR-003|ADR-003]].
+- Extended the TDD's `Instruction` shape with `JumpAExit`/`JumpBExit` — see [[09 Decisions/Decisions#ADR-002|ADR-002]] — needed so Milestone 3 can bound a branch without re-walking node structure at runtime.
+- Went with reflection + `Resources.LoadAll` for the registry (not a source generator) per the earlier discussion — cheapest path that TDD §14 explicitly allows, revisit only if a WebGL/IL2CPP build shows stripping problems.
+- Tests (`Blocky.Compiler.Tests`, EditMode): registry opcode ordering/dedup/casing, all 5 validation diagnostics, link produces correct entry point + branch bounds + param values, and a mixed-program case proving one bad stack doesn't block the rest. **21/21 passing** (12 new + the 9 from Milestone 1).
+
+**Next up:** Milestone 3 — the VM (scheduler, thread pool, `IBlockOp`, first two motion blocks).
+
+## 2026-09-13 — Vault set up, Milestone 1 implemented
+- Restructured `Assets/Docs/Blocky` as an Obsidian vault: [[Home]] dashboard + one folder per architecture layer, mirroring TDD §3.
+- Added [[09 Decisions/Decisions|Decisions]] log seeded from TDD §15 open questions.
+- Added `com.unity.nuget.newtonsoft-json@3.2.1` via UPM (Unity MCP `package_add`). UniTask still not added — not needed until Milestone 3 (async adapter only, TDD §6.6).
+- **Milestone 1 (Data model + serialization) done** — `Assets/Scripts/Blocky.Data/`:
+  - Shapes: `ParamKind`, `BlockParam`, `BlockNode`, `BlockStack`, `ObjectProgram` (TDD §4.1-4.2)
+  - `IdGenerator` (16-char base64 GUID-prefix ids + subtree regeneration on duplication, §4.3)
+  - Mutation API: `IProgramCommand`, `ProgramStore` (undo capped at 0 by default), `StructureChange` diff, and all 7 v1 commands (`InsertNode`, `RemoveNode`, `MoveNode`, `SetParam`, `CreateStack`, `DeleteStack`, `MoveStack`) — addressed via `NodeLocation`/`ParamTarget` + `ProgramQuery` (§4.4)
+  - Serialization: `ProgramSerializer` (Newtonsoft, version-gated load, migration hook via `ISchemaMigration`), `BlockParamConverter` (only writes the field matching `kind`), `Vector2Converter` (§5.1-5.2)
+  - Tests (`Blocky.Data.Tests`, EditMode): round-trip + byte-identical re-serialize, missing/future schemaVersion refusal, command undo/redo, `OnChanged` diff, id uniqueness. **9/9 passing.**
+- **Gotcha not in the TDD:** `UnityEngine.Vector2` has a self-referencing `normalized` property that breaks Newtonsoft's default reflection serializer (`Self referencing loop detected`). Needed a dedicated `Vector2Converter` writing only x/y. Worth remembering for any other Unity value type (`Vector3`, `Quaternion`, `Color`) that gets serialized later — likely needs the same treatment.
+- No migrations registered yet (schema is v1, nothing to migrate from) — `ISchemaMigration` contract exists and is exercised by the future/missing-version tests.
+
+**Next up:** Milestone 2 — Registry + compiler (`BlockDefinition`, `ParamSpec`, `BlockRegistry`, `ProgramCompiler.Link`/`Validate`).

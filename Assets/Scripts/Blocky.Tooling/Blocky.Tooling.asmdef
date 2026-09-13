@@ -1,0 +1,21 @@
+{
+    "name": "Blocky.Tooling",
+    "rootNamespace": "Blocky.Tooling",
+    "references": [
+        "Blocky.Data",
+        "Blocky.Compiler",
+        "Blocky.Editor",
+        "Blocky.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

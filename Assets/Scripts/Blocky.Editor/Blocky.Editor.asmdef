@@ -1,0 +1,17 @@
+{
+    "name": "Blocky.Editor",
+    "rootNamespace": "Blocky.Editor",
+    "references": [
+        "Blocky.Data",
+        "Blocky.Compiler"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
