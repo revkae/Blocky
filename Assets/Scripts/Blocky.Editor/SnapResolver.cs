@@ -89,6 +89,69 @@ namespace Blocky.Editor
         }
     }
 
+    /// <summary>A block's condition slot on the table, in panel (world) space — somewhere a dragged condition can go.</summary>
+    public readonly struct ConditionSlotTarget
+    {
+        public readonly string StackId;
+        public readonly string OwnerNodeId;
+        public readonly string ParamKey;
+        public readonly Rect Bounds;
+
+        public ConditionSlotTarget(string stackId, string ownerNodeId, string paramKey, Rect bounds)
+        {
+            StackId = stackId;
+            OwnerNodeId = ownerNodeId;
+            ParamKey = paramKey;
+            Bounds = bounds;
+        }
+    }
+
+    /// <summary>
+    /// Where a dragged condition snaps: the slot nearest the condition's left point (its leading tip, the part
+    /// you aim with), within <c>radius</c> of the slot's outline. Filled slots count too — dropping there swaps.
+    /// On a tie (the tip inside two slots, one within the other) the smaller, innermost slot wins.
+    /// </summary>
+    public static class ConditionSlotResolver
+    {
+        public const float DefaultRadius = 28f;
+
+        public static ConditionSlotTarget? FindBest(IReadOnlyList<ConditionSlotTarget> slots, Vector2 tip, float radius = DefaultRadius)
+        {
+            ConditionSlotTarget? best = null;
+            var bestDistance = radius;
+            var bestArea = float.MaxValue;
+
+            foreach (var slot in slots)
+            {
+                var distance = DistanceToRect(tip, slot.Bounds);
+                var area = slot.Bounds.width * slot.Bounds.height;
+                if (distance > bestDistance || (Mathf.Approximately(distance, bestDistance) && area >= bestArea)) continue;
+                best = slot;
+                bestDistance = distance;
+                bestArea = area;
+            }
+
+            return best;
+        }
+
+        private static float DistanceToRect(Vector2 point, Rect rect)
+        {
+            var dx = Mathf.Max(rect.xMin - point.x, 0f, point.x - rect.xMax);
+            var dy = Mathf.Max(rect.yMin - point.y, 0f, point.y - rect.yMax);
+            return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
+        /// <summary>Every condition slot on the table. Slots inside a chain being dragged sit in the drag layer, not the canvas, so they never appear.</summary>
+        public static List<ConditionSlotTarget> Collect(ProgramCanvasView canvas)
+        {
+            var targets = new List<ConditionSlotTarget>();
+            foreach (var slot in canvas.Query<ConditionSlot>().ToList())
+                if (slot.OwnerNodeId != null)
+                    targets.Add(new ConditionSlotTarget(slot.StackId, slot.OwnerNodeId, slot.ParamKey, slot.worldBound));
+            return targets;
+        }
+    }
+
     /// <summary>
     /// Walks the live canvas and lists every connection point. Elements being dragged are re-parented into the
     /// drag layer for the duration, so they are naturally absent — a chain can never snap onto itself.

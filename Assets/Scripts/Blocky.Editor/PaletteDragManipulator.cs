@@ -58,7 +58,7 @@ namespace Blocky.Editor
             var ghost = BlockPrototype.Create(_definition, _context.Registry);
             _session = new ChainDragSession(_context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
                 hasHat: _definition.shape == BlockShape.Trigger, endsWithCap: _definition.shape == BlockShape.Cap,
-                fromCanvas: false, MakeCommand);
+                fromCanvas: false, MakeCommand, isCondition: _definition.shape == BlockShape.Boolean);
             _session.Move(evt.position);
 
             _tree = target.panel.visualTree;
@@ -125,9 +125,12 @@ namespace Blocky.Editor
     {
         public static VisualElement Create(BlockDefinition definition, BlockRegistry registry)
         {
-            VisualElement view = definition.shape == BlockShape.Trigger
-                ? new HatView(definition, definition.blockType, PaletteView.InstantiatePrototype(definition).parameters, null, null, prototype: true)
-                : BlockView.CreatePrototype(definition, registry);
+            VisualElement view = definition.shape switch
+            {
+                BlockShape.Trigger => new HatView(definition, definition.blockType, PaletteView.InstantiatePrototype(definition).parameters, null, null, prototype: true),
+                BlockShape.Boolean => ConditionView.CreatePrototype(definition, registry),
+                _ => BlockView.CreatePrototype(definition, registry)
+            };
 
             view.AddToClassList("blocky-palette__prototype");
             foreach (var child in view.Children()) ChainDragSession.IgnorePicking(child);

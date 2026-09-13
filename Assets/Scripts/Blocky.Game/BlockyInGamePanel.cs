@@ -69,12 +69,32 @@ namespace Blocky.Game
         private string _storageKey;
         private bool _visible;
 
+        private int _pointerOverEditorFrame = -1;
+        private bool _pointerOverEditor;
+
         private void Awake()
         {
             _uiDocument = GetComponent<UIDocument>();
             _registry = BlockyRuntime.Registry;
             BuildChrome();
             SetVisible(false);
+            BlockyInput.IsPointerOverUi = IsPointerOverEditor; // presses on this workspace aren't "mouse down?" in the game
+        }
+
+        private void OnDestroy()
+        {
+            if (BlockyInput.IsPointerOverUi == (Func<bool>)IsPointerOverEditor) BlockyInput.IsPointerOverUi = null;
+        }
+
+        /// <summary>Asked by condition blocks, possibly many times a frame — hit-tests once per frame and remembers.</summary>
+        private bool IsPointerOverEditor()
+        {
+            if (_pointerOverEditorFrame == Time.frameCount) return _pointerOverEditor;
+
+            _pointerOverEditorFrame = Time.frameCount;
+            var mouse = Mouse.current;
+            _pointerOverEditor = _visible && mouse != null && IsOverWorkspace(mouse.position.ReadValue());
+            return _pointerOverEditor;
         }
 
         private void Update()
@@ -109,12 +129,20 @@ namespace Blocky.Game
 
         /// <summary>
         /// Real panel hit-testing instead of a fixed pixel guess — correct regardless of resizing or DPI scaling,
-        /// and it swallows clicks on *any* empty space inside the workspace, not just clicks on a block.
+        /// and it swallows clicks on *any* empty space inside the workspace, not just clicks on a block. An open
+        /// dropdown menu (a condition slot's list, a choice field) counts too: it lives at the panel's root, not
+        /// inside the workspace, and can hang past the workspace's edge over the game.
         /// </summary>
         private bool IsOverWorkspace(Vector2 screenPointer)
         {
             if (_root.panel == null) return false;
-            return _root.ContainsPoint(_root.WorldToLocal(ScreenToPanel(screenPointer)));
+
+            var point = ScreenToPanel(screenPointer);
+            if (_root.ContainsPoint(_root.WorldToLocal(point))) return true;
+
+            for (var el = _root.panel.Pick(point); el != null; el = el.parent)
+                if (el.ClassListContains(GenericDropdownMenu.ussClassName)) return true;
+            return false;
         }
 
         /// <summary>
@@ -211,7 +239,7 @@ namespace Blocky.Game
             _canvasViewport.RegisterCallback<PointerUpEvent>(OnViewportPointerUp);
             _canvasViewport.RegisterCallback<WheelEvent>(OnViewportWheel);
 
-            var hint = new Label("Drag blocks anywhere · click to select, click again to unselect · Delete removes · drag empty space to move · scroll to zoom");
+            var hint = new Label("Drag blocks anywhere · click an empty ⬡ slot to pick a condition · click to select, again to unselect · Delete removes · drag empty space to move · scroll to zoom");
             hint.AddToClassList("blocky-ingame-hint");
             hint.pickingMode = PickingMode.Ignore;
             _canvasViewport.Add(hint);
@@ -255,7 +283,7 @@ namespace Blocky.Game
         private bool IsTableBackground(VisualElement hit)
         {
             for (var el = hit; el != null && el != _canvasViewport; el = el.parent)
-                if (el is BlockView || el is HatView || el is UnknownBlockView || el is Button) return false;
+                if (el is BlockView || el is HatView || el is ConditionView || el is UnknownBlockView || el is Button) return false;
             return true;
         }
 
@@ -475,6 +503,8 @@ namespace Blocky.Game
                 if (stackView.Hat != null) stackView.Hat.AddManipulator(new CanvasDragManipulator(stackView.Hat, _dragContext));
                 foreach (var block in stackView.Query<BlockView>().ToList())
                     block.AddManipulator(new CanvasDragManipulator(block, _dragContext));
+                foreach (var condition in stackView.Query<ConditionView>().ToList())
+                    condition.AddManipulator(new CanvasDragManipulator(condition, _dragContext));
             }
         }
 
@@ -495,6 +525,7 @@ namespace Blocky.Game
             var program = RuntimeProgramStorage.Exists(_storageKey)
                 ? RuntimeProgramStorage.Load(_storageKey)
                 : _runner.ProgramAsset != null ? _runner.ProgramAsset.Load() : new ObjectProgram { targetObjectUid = go.name };
+            ProgramUpgrades.UpgradeCheckboxConditions(program, _registry); // old checkbox conditions become condition blocks (saved with the next edit)
 
             _store = new ProgramStore(program);
             _store.OnChanged += _ => OnProgramChanged();

@@ -19,7 +19,7 @@ MonoBehaviour:
   branchCount: 2
   parameters:
   - key: condition
-    kind: 2
+    kind: 5
     defaultText: 
     defaultNumber: 0
     min: 0

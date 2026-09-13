@@ -21,18 +21,84 @@ namespace Blocky.Data
             return stack == null ? null : FindInSequence(stack.sequence, nodeId);
         }
 
+        /// <summary>Searches sequences, branches, and the condition blocks sitting in params (so a condition's own params can be edited too).</summary>
         private static BlockNode FindInSequence(BlockNode[] sequence, string nodeId)
         {
             foreach (var node in sequence)
             {
-                if (node.id == nodeId) return node;
-                foreach (var branch in node.branches)
-                {
-                    var found = FindInSequence(branch, nodeId);
-                    if (found != null) return found;
-                }
+                var found = FindInNode(node, nodeId);
+                if (found != null) return found;
             }
             return null;
+        }
+
+        private static BlockNode FindInNode(BlockNode node, string nodeId)
+        {
+            if (node.id == nodeId) return node;
+
+            foreach (var param in node.parameters)
+                if (param?.reporter != null)
+                {
+                    var found = FindInNode(param.reporter, nodeId);
+                    if (found != null) return found;
+                }
+
+            foreach (var branch in node.branches)
+            {
+                var found = FindInSequence(branch, nodeId);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Finds the block whose condition slot holds <paramref name="reporterNodeId"/>, and which param that is.
+        /// Condition blocks never sit in a sequence, so <see cref="FindLocation"/> can't see them.
+        /// </summary>
+        public static bool TryFindConditionOwner(ObjectProgram program, string stackId, string reporterNodeId, out BlockNode owner, out string paramKey)
+        {
+            owner = null;
+            paramKey = null;
+            var stack = FindStack(program, stackId);
+            if (stack == null) return false;
+
+            foreach (var node in stack.sequence)
+                if (TryFindConditionOwnerIn(node, reporterNodeId, out owner, out paramKey)) return true;
+            return false;
+        }
+
+        private static bool TryFindConditionOwnerIn(BlockNode node, string reporterNodeId, out BlockNode owner, out string paramKey)
+        {
+            foreach (var param in node.parameters)
+            {
+                if (param?.reporter == null) continue;
+                if (param.reporter.id == reporterNodeId)
+                {
+                    owner = node;
+                    paramKey = param.key;
+                    return true;
+                }
+                if (TryFindConditionOwnerIn(param.reporter, reporterNodeId, out owner, out paramKey)) return true;
+            }
+
+            foreach (var branch in node.branches)
+                foreach (var child in branch)
+                    if (TryFindConditionOwnerIn(child, reporterNodeId, out owner, out paramKey)) return true;
+
+            owner = null;
+            paramKey = null;
+            return false;
+        }
+
+        /// <summary>Replaces the condition in <paramref name="owner"/>'s slot <paramref name="paramKey"/> (null empties it), returning what was there.</summary>
+        internal static BlockNode SetCondition(BlockNode owner, string paramKey, BlockNode condition)
+        {
+            var index = Array.FindIndex(owner.parameters, p => p.key == paramKey);
+            if (index < 0) throw new InvalidOperationException($"Block '{owner.id}' has no param '{paramKey}'.");
+
+            var previous = owner.parameters[index].kind == ParamKind.Reporter ? owner.parameters[index].reporter : null;
+            owner.parameters[index] = new BlockParam { key = paramKey, kind = ParamKind.Reporter, reporter = condition };
+            return previous;
         }
 
         /// <summary>Finds where a node currently sits (its container + index), for building a <c>RemoveNode</c>/<c>MoveNode</c>/insert-after location without the caller having to track it separately.</summary>

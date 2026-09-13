@@ -68,17 +68,22 @@ namespace Blocky.Editor
         private readonly bool _hasHat;
         private readonly bool _endsWithCap;
         private readonly bool _fromCanvas;
+        private readonly bool _isCondition;
         private readonly Func<ChainTarget, IProgramCommand> _makeCommand;
+
+        private const float SlotGlowPadding = 3f;
 
         private VisualElement _indicator;
         private SnapTarget? _best;
+        private ConditionSlotTarget? _bestSlot;
         private Vector2 _ghostTopLeft;
         private float _ghostScale = -1f;
 
         /// <param name="grabOffset">Pointer position minus the chain's top-left, in world pixels at <paramref name="sourceScale"/>.</param>
         /// <param name="sourceScale">The zoom the chain was picked up at: the table's zoom, or 1 for the palette.</param>
+        /// <param name="isCondition">The ghost is one condition block: it snaps into condition slots, never onto stack connectors.</param>
         public ChainDragSession(DragContext context, VisualElement ghost, Vector2 grabOffset, float sourceScale, bool hasHat,
-            bool endsWithCap, bool fromCanvas, Func<ChainTarget, IProgramCommand> makeCommand)
+            bool endsWithCap, bool fromCanvas, Func<ChainTarget, IProgramCommand> makeCommand, bool isCondition = false)
         {
             _context = context;
             _ghost = ghost;
@@ -86,6 +91,7 @@ namespace Blocky.Editor
             _hasHat = hasHat;
             _endsWithCap = endsWithCap;
             _fromCanvas = fromCanvas;
+            _isCondition = isCondition;
             _makeCommand = makeCommand;
 
             ghost.style.position = Position.Absolute;
@@ -110,10 +116,17 @@ namespace Blocky.Editor
             _ghost.style.left = local.x;
             _ghost.style.top = local.y;
 
-            _best = overCanvas
-                ? SnapResolver.FindBest(SnapTargetCollector.Collect(_context.Canvas),
-                    new DraggedChain(_ghostTopLeft, _ghostTopLeft + new Vector2(0f, LocalHeight * scale), _hasHat, _endsWithCap))
-                : null;
+            _best = null;
+            _bestSlot = null;
+            if (overCanvas)
+            {
+                if (_isCondition)
+                    _bestSlot = ConditionSlotResolver.FindBest(ConditionSlotResolver.Collect(_context.Canvas),
+                        _ghostTopLeft + new Vector2(0f, LocalHeight * scale / 2f)); // the hexagon's left tip
+                else
+                    _best = SnapResolver.FindBest(SnapTargetCollector.Collect(_context.Canvas),
+                        new DraggedChain(_ghostTopLeft, _ghostTopLeft + new Vector2(0f, LocalHeight * scale), _hasHat, _endsWithCap));
+            }
             UpdateIndicator();
         }
 
@@ -152,6 +165,13 @@ namespace Blocky.Editor
             if (_context.IsOverDiscard(pointer)) return _fromCanvas ? ChainTarget.Discard() : null;
             if (!_context.IsOverCanvas(pointer)) return null;
 
+            if (_bestSlot is { } slot)
+            {
+                // A condition already in the slot pops out just below-right of it: still in view, clear of the one dropped.
+                var eject = _context.Canvas.WorldToLocal(new Vector2(slot.Bounds.xMax, slot.Bounds.yMax)) + new Vector2(24f, 24f);
+                return ChainTarget.IntoConditionSlot(slot.StackId, slot.OwnerNodeId, slot.ParamKey, eject);
+            }
+
             if (_best is { } snap)
             {
                 if (snap.Kind != SnapKind.AboveStack) return ChainTarget.Insert(snap.InsertAt);
@@ -170,7 +190,12 @@ namespace Blocky.Editor
 
         private void UpdateIndicator()
         {
-            if (_best is not { } snap)
+            Rect edge;
+            if (_best is { } snap) edge = snap.Edge;
+            else if (_bestSlot is { } slot)
+                edge = new Rect(slot.Bounds.x - SlotGlowPadding, slot.Bounds.y - SlotGlowPadding,
+                    slot.Bounds.width + SlotGlowPadding * 2f, slot.Bounds.height + SlotGlowPadding * 2f);
+            else
             {
                 if (_indicator != null) _indicator.style.display = DisplayStyle.None;
                 return;
@@ -186,11 +211,12 @@ namespace Blocky.Editor
             }
 
             _indicator.style.display = DisplayStyle.Flex;
-            var local = _context.DragLayer.WorldToLocal(snap.Edge.position);
+            _indicator.EnableInClassList("blocky-drop-indicator--slot", _bestSlot != null); // a slot glows as a ring around the hole, not a bar
+            var local = _context.DragLayer.WorldToLocal(edge.position);
             _indicator.style.left = local.x;
             _indicator.style.top = local.y;
-            _indicator.style.width = snap.Edge.width;
-            _indicator.style.height = snap.Edge.height;
+            _indicator.style.width = edge.width;
+            _indicator.style.height = edge.height;
         }
 
         private void CleanUp()

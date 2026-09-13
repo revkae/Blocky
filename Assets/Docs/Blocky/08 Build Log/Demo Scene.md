@@ -19,6 +19,8 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 | **LookAtStatue** | when_looked_at | Camera starts aimed at it — `looks.set_scale` grows it immediately on Play (rising-edge trigger) |
 | **IfDemo** | when_play_clicked | `control.if` (condition literal `true`) → `motion.move_forward` |
 | **IfElseSign** | when_play_clicked | `control.if_else` (condition literal `true`) → `looks.set_visible(false)`, else-branch never taken |
+
+(These two assets predate condition blocks and still store their condition as a checkbox value; it runs as before, and opening the object in the in-game editor shows it as a `true` condition block.)
 | **WaiterCube** | when_play_clicked | `control.wait(2s)` → `motion.set_position` teleport |
 
 `BlockyManager` holds the single `BlockyRuntimeTicker` that drives everything (TDD §6.5 — one scheduler tick, one keyboard poll, one look-at check per frame, shared scene-wide).
@@ -34,6 +36,7 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
   - **Look around** — drag empty space to pan, scroll to zoom toward the cursor, or use the **+ / − / =** buttons in the corner (= resets).
   - **Select & delete** — click a block to select it (it turns lighter with a white outline); press **Delete** or **Backspace** to remove it. Only that block goes; the blocks below close up. Deleting an event hat keeps its blocks on the table. You can also drop anything on the palette to delete it.
   - Loose blocks with no event on top are saved but never run (same as Scratch) — put an event hat above them to make them a script.
+  - **Conditions** — the **Conditions** tab holds hexagonal blocks: `mouse down?`, `mouse up?`, `true`, `false`. `if`, `if else` and `repeat until` have a matching hexagonal hole. Drag a condition near the hole (it glows) and release, or just **click the empty hole** and pick one from the list. Drag it out again, or select it and press Delete, to empty the hole. An empty hole counts as false. Dropping onto a filled hole swaps, and the old condition pops out onto the table. `mouse down?` only counts presses on the game, not on this workspace.
 - **Green "▶ Go" button** — fires the `when Go clicked` event, so a script can be (re)started on demand; `when Play Clicked` still runs once at scene start.
 
 Every edit — drop, delete, value change — autosaves to `Application.persistentDataPath/BlockyPrograms/<name>.json` and hot-reloads the object's `ObjectProgramRunner`. There is no save step. Number and text boxes commit when you press Enter or click away.

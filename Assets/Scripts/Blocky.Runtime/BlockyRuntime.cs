@@ -12,12 +12,14 @@ namespace Blocky.Runtime
     {
         private static BlockRegistry _registry;
         private static IBlockOp[] _opTable;
+        private static IConditionOp[] _conditionTable;
         private static VmScheduler _scheduler;
         private static TriggerBroker _triggers;
 
         public static BlockRegistry Registry => _registry ??= BlockRegistry.LoadFromResources();
         private static IBlockOp[] OpTable => _opTable ??= OpTableBuilder.Build(Registry);
-        public static VmScheduler Scheduler => _scheduler ??= new VmScheduler(OpTable);
+        private static IConditionOp[] ConditionTable => _conditionTable ??= OpTableBuilder.BuildConditions(Registry);
+        public static VmScheduler Scheduler => _scheduler ??= new VmScheduler(OpTable, ConditionTable);
         public static TriggerBroker Triggers => _triggers ??= new TriggerBroker();
 
         /// <summary>Test-only hook: injects fixtures instead of the Resources-scanned registry/reflection-bound op table.</summary>
@@ -33,6 +35,7 @@ namespace Blocky.Runtime
         {
             _registry = null;
             _opTable = null;
+            _conditionTable = null;
             _scheduler = null;
             _triggers = null;
         }

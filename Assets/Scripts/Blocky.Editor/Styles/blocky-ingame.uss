@@ -186,6 +186,14 @@
     background-color: rgb(110, 116, 136);
 }
 
+/* A condition about to drop into a slot: a glowing ring around the hole (drawn under the ghost). */
+.blocky-drop-indicator.blocky-drop-indicator--slot {
+    background-color: rgba(255, 236, 110, 0.35);
+    border-width: 2px;
+    border-color: rgb(255, 236, 110);
+    border-radius: 12px;
+}
+
 /* The glow on the edge a dragged block is about to connect to. */
 .blocky-drop-indicator {
     background-color: rgba(255, 236, 110, 0.85);

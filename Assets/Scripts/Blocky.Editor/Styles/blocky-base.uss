@@ -3,6 +3,7 @@
     --blocky-color-looks: rgb(153, 102, 204);
     --blocky-color-control: rgb(255, 171, 25);
     --blocky-color-event: rgb(255, 191, 0);
+    --blocky-color-conditions: rgb(92, 177, 214);
     --blocky-color-error: rgb(190, 60, 60);
     --blocky-color-neutral: rgb(90, 90, 90);
 }
@@ -46,6 +47,31 @@
     align-items: center;
     min-height: 34px;
     padding: 6px 10px 4px 10px;
+}
+
+/* Conditions category. Kept in this sheet rather than its own file so the scene's stylesheet list and the
+   Editor window's sheet list need no new entry. */
+.blocky-block--category-conditions {
+    background-color: var(--blocky-color-conditions);
+    --blocky-fill: rgb(92, 177, 214);
+}
+
+/* Condition block: a hexagon, shorter than a stack block, with room for the pointed ends. */
+.blocky-block--shape-boolean.blocky-shaped {
+    min-width: 0;
+}
+
+.blocky-block--shape-boolean > .blocky-block__header {
+    min-height: 24px;
+    padding: 3px 14px;
+}
+
+/* The hexagonal hole a condition drops into. Two classes so this beats the owner's category rule, whose
+   rectangular background-color would otherwise paint behind the hexagon. */
+.blocky-param-field.blocky-condition-slot {
+    background-color: rgba(0, 0, 0, 0);
+    min-width: 44px;
+    min-height: 24px;
 }
 
 /* Room for the hat's rounded bump above the text. */

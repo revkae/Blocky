@@ -1,9 +1,9 @@
 namespace Blocky.Runtime.Ops
 {
     /// <summary>
-    /// <c>control.repeat_until</c> — condition evaluated before each iteration (TDD §9). The condition param is
-    /// a Bool literal in v1 (becomes a Reporter slot with no schema change once expression blocks land) — this
-    /// op already re-reads it fresh on every lap, so nothing here changes when that lands.
+    /// <c>control.repeat_until</c> — condition evaluated before each iteration (TDD §9). The condition slot is
+    /// re-evaluated fresh on every lap through <see cref="OpContext.GetBool"/>, so a live condition such as
+    /// <c>mouse down?</c> ends the loop the lap after it becomes true.
     /// </summary>
     [BlockExecutor("control.repeat_until")]
     public sealed class RepeatUntilOp : IBlockOp
@@ -15,7 +15,7 @@ namespace Blocky.Runtime.Ops
             if (thread.FrameCount > 0 && thread.TopFrame().OwnerPc == ctx.Pc)
                 thread.PopFrame(); // previous lap's frame; we'll push a fresh one below if we loop again
 
-            if (ctx.Params[0].Boolean)
+            if (ctx.GetBool(0))
             {
                 ctx.NextPc = ctx.Instruction.JumpAExit;
                 return OpResult.Jump;

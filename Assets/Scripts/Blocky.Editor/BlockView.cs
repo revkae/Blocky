@@ -31,14 +31,22 @@ namespace Blocky.Editor
         /// <summary>One entry per branch (TDD §8.2's <c>bodySlot</c>), in branch order.</summary>
         public IReadOnlyList<VisualElement> BodySlots => _bodySlots;
 
-        /// <summary>Builds a normal block view, or an <see cref="UnknownBlockView"/> if the block type no longer resolves.</summary>
+        /// <summary>
+        /// Builds a normal block view, a <see cref="ConditionView"/> for a condition lying loose on the table, or an
+        /// <see cref="UnknownBlockView"/> if the block type no longer resolves.
+        /// </summary>
         public static VisualElement Create(BlockNode node, BlockRegistry registry, string stackId = null, ProgramStore store = null, bool buttons = true)
         {
             var definition = registry.Find(node.blockType);
-            return definition != null
-                ? new BlockView(node, definition, registry, stackId, store, buttons, prototype: false)
-                : new UnknownBlockView(node);
+            if (definition == null) return new UnknownBlockView(node);
+            return definition.shape == BlockShape.Boolean
+                ? new ConditionView(node, definition, registry, stackId, store)
+                : new BlockView(node, definition, registry, stackId, store, buttons, prototype: false);
         }
+
+        /// <summary>What the Editor window's "+ Add" pickers offer inside a sequence: no hats, no conditions.</summary>
+        internal static bool IsSequenceBlock(BlockDefinition definition) =>
+            definition.shape != BlockShape.Trigger && definition.shape != BlockShape.Boolean;
 
         /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
         public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
@@ -63,14 +71,7 @@ namespace Blocky.Editor
             header.Add(new Label(DisplayName(definition)));
 
             foreach (var spec in definition.parameters)
-            {
-                var value = Array.Find(node.parameters, p => p.key == spec.key);
-                if (prototype) header.Add(ParamFieldFactory.CreateChip(spec, value));
-                else if (store != null)
-                    header.Add(ParamFieldFactory.CreateLiveField(spec, value, newValue =>
-                        store.Apply(new SetParam(new ParamTarget(stackId, node.id), spec.key, newValue))));
-                else header.Add(ParamFieldFactory.CreateReadOnlyField(spec, value));
-            }
+                header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
 
             if (store != null && buttons)
             {
@@ -129,7 +130,7 @@ namespace Blocky.Editor
             var container = new VisualElement();
             container.AddToClassList("blocky-block__add-container");
 
-            var popup = new BlockPickerPopup(registry, def => def.shape != BlockShape.Trigger, def =>
+            var popup = new BlockPickerPopup(registry, IsSequenceBlock, def =>
             {
                 var parent = ProgramQuery.FindNode(store.Program, stackId, parentNodeId);
                 var index = parent?.branches[branchIndex].Length ?? 0;

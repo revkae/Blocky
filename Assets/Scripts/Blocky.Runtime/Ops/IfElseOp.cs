@@ -21,7 +21,7 @@ namespace Blocky.Runtime.Ops
                 return OpResult.Jump;
             }
 
-            if (ctx.Params[0].Boolean)
+            if (ctx.GetBool(0))
             {
                 thread.PushFrame(new Frame(ctx.Pc, ctx.Instruction.JumpAExit, 0, isLoop: false));
                 ctx.NextPc = ctx.Instruction.JumpA;

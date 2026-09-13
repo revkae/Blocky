@@ -149,6 +149,7 @@ namespace Blocky.Editor
         {
             if (target is HatView hat) _context.Canvas.Select(hat.StackId, null);
             else if (target is BlockView block) _context.Canvas.Select(block.StackId, block.NodeId);
+            else if (target is ConditionView condition) _context.Canvas.Select(condition.StackId, condition.NodeId);
         }
 
         private bool IsSelected()
@@ -156,6 +157,7 @@ namespace Blocky.Editor
             var canvas = _context.Canvas;
             if (!canvas.HasSelection) return false;
             if (target is HatView hat) return canvas.SelectedNodeId == null && canvas.SelectedStackId == hat.StackId;
+            if (target is ConditionView condition) return canvas.SelectedNodeId == condition.NodeId;
             return target is BlockView block && canvas.SelectedNodeId == block.NodeId;
         }
 
@@ -168,16 +170,20 @@ namespace Blocky.Editor
             for (var el = hit; el != null; el = el.parent)
             {
                 if (el.ClassListContains("unity-base-popup-field")) return false;
-                if (el is BlockView || el is HatView) return el == target;
+                if (el is BlockView || el is HatView || el is ConditionView) return el == target;
             }
             return false;
         }
 
-        /// <summary>True when the press is on an input's own box — the checkbox square, a number or text box — rather than on the block.</summary>
+        /// <summary>
+        /// True when the press is on an input's own box — the checkbox square, a number or text box, an empty
+        /// condition slot (which opens its dropdown) — rather than on the block.
+        /// </summary>
         private bool IsOnControl(VisualElement hit)
         {
             for (var el = hit; el != null && el != target; el = el.parent)
-                if (el.ClassListContains("unity-toggle__input") || el.ClassListContains("unity-base-field__input")) return true;
+                if (el.ClassListContains("unity-toggle__input") || el.ClassListContains("unity-base-field__input") ||
+                    el.ClassListContains(ConditionSlot.UssClassName)) return true;
             return false;
         }
 
@@ -189,6 +195,26 @@ namespace Blocky.Editor
             SelectTarget(); // the block being moved is the selected one
             _context.Canvas.panel?.focusController?.focusedElement?.Blur(); // a field pressed on the way in must not keep focus
             var zoom = _context.CanvasZoom();
+
+            if (target is ConditionView condition)
+            {
+                if (condition.IsInSlot)
+                {
+                    // Out of its slot: the slot is left empty (and redraws as a hole) while the condition follows the pointer.
+                    var grab = pointer - condition.worldBound.position;
+                    var (stackId, ownerId, paramKey) = (condition.StackId, condition.OwnerNodeId, condition.ParamKey);
+                    condition.RemoveFromHierarchy();
+                    return new ChainDragSession(_context, condition, grab, zoom, hasHat: false, endsWithCap: false, fromCanvas: true,
+                        t => DropChain.FromConditionSlot(stackId, ownerId, paramKey, t), isCondition: true);
+                }
+
+                // Lying loose: it's the only block of its loose stack, so the whole stack moves.
+                var looseGrab = pointer - stackView.worldBound.position;
+                var looseStackId = stackView.StackId;
+                stackView.RemoveFromHierarchy();
+                return new ChainDragSession(_context, stackView, looseGrab, zoom, hasHat: false, endsWithCap: false, fromCanvas: true,
+                    t => DropChain.FromStack(looseStackId, t), isCondition: true);
+            }
 
             if (target is HatView || IsFirstBlockOfLooseStack(stackView))
             {

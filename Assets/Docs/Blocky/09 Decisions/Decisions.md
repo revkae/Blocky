@@ -58,6 +58,18 @@ ADR-style log for anything that deviates from, extends, or resolves an open ques
 Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per-drag still holds). Its undo is a snapshot restore rather than a step-by-step inverse, since a single drop can edit two containers and add or remove stacks.
 **Consequence:** `BlockDragManipulator`, `BlockDragController`, `DropCandidateBuilder` and `DropCandidateResolver` are no longer used by the in-game UI. They still compile and their tests pass. **Revisit:** delete them, or port the Editor window to the table model, whichever comes first — keeping two drag models long-term is a maintenance trap.
 
+## ADR-011 — Conditions are blocks in `Reporter` params, evaluated live through a separate op table
+**Context:** `if` / `if else` / `repeat until` took a checkbox (`ParamKind.Bool`) — a literal fixed at compile time, so `repeat until` could never end and nothing could react to input. The user asked for Scratch's hexagonal condition blocks (`mouse down?`, `mouse up?`, `true`, `false`) that drop into a matching hexagonal slot, with a dropdown when the empty slot is clicked.
+
+**Decision:**
+- **Data:** a condition is a `BlockNode` stored in `BlockParam.reporter` (`kind = Reporter`) — the slot the schema reserved for exactly this. No schema change. A condition lying on the table is a loose stack whose only block is that condition. `DropChain` gained a `FromConditionSlot` source and an `IntoConditionSlot` target (a filled slot swaps: the old condition pops out as a loose stack); `DeleteBlock` empties a slot; `ProgramQuery.FindNode` also searches slots.
+- **Shape:** `BlockShape.Boolean` (appended, value 4) and `BlockCategory.Conditions` (appended, value 4) — appended so existing assets' serialized numbers keep their meaning. The hexagon has no notch or tab, so the silhouette itself says "doesn't stack, goes inside".
+- **Compile:** a filled slot becomes `ParamValue.Reporter(opcode, paramOffset, paramCount)`; the condition's own params are appended after its owner's contiguous run, so nesting never breaks an instruction's param range. An empty slot is `EmptyReporter` (false, like Scratch). A condition in a runnable sequence, or a non-condition in a slot, is a compile error.
+- **Runtime:** conditions implement `IConditionOp` (not `IBlockOp`) and get their own opcode-indexed table (`OpTableBuilder.BuildConditions`), because they are never scheduled as a step. Ops read condition params with `OpContext.GetBool(i)`, which evaluates the slot *now* — so `repeat until` re-checks every lap.
+- **Input:** `BlockyInput.IsMouseDown` excludes presses over the editor (`IsPointerOverUi`, set by `BlockyInGamePanel`), so dragging blocks while a script runs doesn't count as "mouse down" in the game. `mouse up?` is the button *state* (not held), not a one-frame "released" edge.
+
+**Consequences:** old saves still run unchanged (a `Bool` param under a `Reporter` spec compiles as its literal), and `ProgramUpgrades.UpgradeCheckboxConditions` turns a ticked checkbox into a `true` block when the in-game editor opens the object. Adding a condition later is one asset plus one `IConditionOp` class. The Editor window's "+ Add" pickers exclude conditions (they don't fit a sequence).
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above

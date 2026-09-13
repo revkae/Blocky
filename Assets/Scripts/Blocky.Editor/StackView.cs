@@ -47,7 +47,7 @@ namespace Blocky.Editor
 
             if (store != null && buttons)
             {
-                var popup = new BlockPickerPopup(registry, def => def.shape != BlockShape.Trigger, def =>
+                var popup = new BlockPickerPopup(registry, BlockView.IsSequenceBlock, def =>
                 {
                     var current = ProgramQuery.FindStack(store.Program, stack.id);
                     var index = current?.sequence.Length ?? 0;

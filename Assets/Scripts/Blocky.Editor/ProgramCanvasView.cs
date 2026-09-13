@@ -132,10 +132,20 @@ namespace Blocky.Editor
                 foreach (var stackView in _stackViews.Values)
                 {
                     var block = stackView.Query<BlockView>().Where(b => b.NodeId == _selectedNodeId).First();
-                    if (block == null) continue;
-                    found = block;
-                    _selectedStackId = block.StackId;
-                    break;
+                    if (block != null)
+                    {
+                        found = block;
+                        _selectedStackId = block.StackId;
+                        break;
+                    }
+
+                    var condition = stackView.Query<ConditionView>().Where(c => c.NodeId == _selectedNodeId).First();
+                    if (condition != null)
+                    {
+                        found = condition;
+                        _selectedStackId = condition.StackId;
+                        break;
+                    }
                 }
             }
 

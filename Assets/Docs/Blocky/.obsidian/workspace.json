@@ -117,7 +117,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Welcome.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -136,7 +135,6 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Welcome.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -179,7 +177,6 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -206,8 +203,11 @@
       "bases:Create new base": false
     }
   },
-  "active": "3f81b0b39405119f",
+  "active": "c33690699bb02865",
   "lastOpenFiles": [
+    "08 Build Log/Build Log.md.tmp.30180.9fa0d09e882a",
+    "08 Build Log/Demo Scene.md.tmp.30180.77d015924c6c",
+    "Welcome.md",
     "08 Build Log/Build Log.md.tmp.30180.53a491c8d306",
     "05 Editor UI/Editor UI.md.tmp.30180.1a9d6f1be9d6",
     "08 Build Log/Build Log.md.tmp.30180.a54a6eb61827",
@@ -217,9 +217,7 @@
     "08 Build Log/Build Log.md.tmp.30180.5fa0a1fb10e1",
     "08 Build Log/Build Log.md.tmp.30180.54219b3b3a6f",
     "Home.md.tmp.30180.95ed7615fd7b",
-    "08 Build Log/Demo Scene.md.meta",
     "08 Build Log/Demo Scene.md",
-    "08 Build Log/Demo Scene.md.tmp.30180.3175768b258d",
     "07 Testing/Testing Strategy.md",
     "06 Block Catalog/Block Catalog.md",
     "05 Editor UI/Editor UI.md",
@@ -230,7 +228,6 @@
     "09 Decisions/Decisions.md",
     "01 Architecture/Architecture Overview.md",
     "00 Overview/Goals and Non-Goals.md",
-    "Home.md",
-    "Welcome.md"
+    "Home.md"
   ]
 }

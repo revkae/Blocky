@@ -30,6 +30,7 @@ namespace Blocky.Editor
         public float Height;
         public bool Hat;
         public bool BottomTab;
+        public bool Hexagon; // a condition (or an empty condition slot): pointed ends, no notch or tab — it never stacks
         public List<Vector2> Mouths; // (top, bottom) in local y, one per C-mouth, top to bottom
 
         /// <summary>Class that marks the block the user clicked; drawn as a white outline around the real silhouette.</summary>
@@ -56,6 +57,19 @@ namespace Blocky.Editor
             const float r = CornerRadius;
 
             p.BeginPath();
+
+            if (Hexagon)
+            {
+                var point = Mathf.Min(h / 2f, w / 2f); // how far the pointed ends reach in
+                p.MoveTo(new Vector2(0f, h / 2f));
+                p.LineTo(new Vector2(point, 0f));
+                p.LineTo(new Vector2(w - point, 0f));
+                p.LineTo(new Vector2(w, h / 2f));
+                p.LineTo(new Vector2(w - point, h));
+                p.LineTo(new Vector2(point, h));
+                p.ClosePath();
+                return;
+            }
 
             if (Hat)
             {
@@ -130,12 +144,15 @@ namespace Blocky.Editor
 
         private readonly VisualElement _element;
         private readonly Func<BlockOutline> _outline;
+        private readonly float _shade;
         private Color _fill = FallbackFill;
 
-        public BlockShapePainter(VisualElement element, Func<BlockOutline> outline)
+        /// <param name="shade">Multiplies the fill — below 1 draws a darker hole in the block's color (an empty condition slot).</param>
+        public BlockShapePainter(VisualElement element, Func<BlockOutline> outline, float shade = 1f)
         {
             _element = element;
             _outline = outline;
+            _shade = shade;
             element.RegisterCallback<CustomStyleResolvedEvent>(OnCustomStyleResolved);
             element.RegisterCallback<GeometryChangedEvent>(_ => element.MarkDirtyRepaint());
             element.generateVisualContent += Draw;
@@ -152,7 +169,10 @@ namespace Blocky.Editor
             _element.MarkDirtyRepaint();
         }
 
-        private void Draw(MeshGenerationContext mgc) =>
-            _outline().Draw(mgc.painter2D, _fill, _element.ClassListContains(BlockOutline.SelectedClass));
+        private void Draw(MeshGenerationContext mgc)
+        {
+            var fill = new Color(_fill.r * _shade, _fill.g * _shade, _fill.b * _shade, 1f);
+            _outline().Draw(mgc.painter2D, fill, _element.ClassListContains(BlockOutline.SelectedClass));
+        }
     }
 }

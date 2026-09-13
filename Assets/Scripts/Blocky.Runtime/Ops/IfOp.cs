@@ -10,7 +10,7 @@ namespace Blocky.Runtime.Ops
     {
         public OpResult Execute(ref OpContext ctx)
         {
-            ctx.NextPc = ctx.Params[0].Boolean ? ctx.Instruction.JumpA : ctx.Instruction.JumpAExit;
+            ctx.NextPc = ctx.GetBool(0) ? ctx.Instruction.JumpA : ctx.Instruction.JumpAExit;
             return OpResult.Jump;
         }
     }

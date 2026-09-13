@@ -16,6 +16,7 @@ namespace Blocky.Runtime
         private static readonly ProfilerMarker StepMarker = new("Blocky.VmScheduler.Step");
 
         private readonly IBlockOp[] _opTable;
+        private readonly ConditionEvaluator _conditions;
         private readonly List<VmThread> _threads = new();
         private readonly List<VmThread> _pending = new();
         private readonly HashSet<(CompiledProgram, int)> _loggedFailures = new();
@@ -26,9 +27,11 @@ namespace Blocky.Runtime
         /// <summary>Fired when a thread exhausts its per-tick instruction budget (an infinite-loop guard, TDD §6.4).</summary>
         public event Action<VmThread> OnRunawayThread;
 
-        public VmScheduler(IBlockOp[] opTable)
+        /// <param name="conditionTable">Condition ops by opcode (<see cref="OpTableBuilder.BuildConditions"/>); without it every condition slot reads as false.</param>
+        public VmScheduler(IBlockOp[] opTable, IConditionOp[] conditionTable = null)
         {
             _opTable = opTable;
+            _conditions = new ConditionEvaluator(conditionTable);
         }
 
         public IReadOnlyList<VmThread> Threads => _threads;
@@ -105,7 +108,7 @@ namespace Blocky.Runtime
 
             var instr = t.Program.Code[t.Pc];
             var span = new ReadOnlySpan<ParamValue>(t.Program.ParamTable, instr.ParamOffset, instr.ParamCount);
-            var ctx = new OpContext(t, t.Pc, instr, span, dt, _now);
+            var ctx = new OpContext(t, t.Pc, instr, span, dt, _now, _conditions);
 
             OpResult result;
             try

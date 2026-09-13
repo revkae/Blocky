@@ -14,7 +14,7 @@ namespace Blocky.Data
     /// </summary>
     public sealed class DropChain : IProgramCommand
     {
-        private enum SourceKind { NewNode, NewTrigger, Nodes, Stack }
+        private enum SourceKind { NewNode, NewTrigger, Nodes, Stack, ConditionSlot }
 
         private readonly SourceKind _source;
         private readonly ChainTarget _target;
@@ -23,11 +23,14 @@ namespace Blocky.Data
         private readonly BlockParam[] _newTriggerParameters;
         private readonly NodeLocation _from;
         private readonly string _fromStackId;
+        private readonly string _fromOwnerNodeId;
+        private readonly string _fromParamKey;
 
         private BlockStack[] _before;
 
         private DropChain(SourceKind source, ChainTarget target, BlockNode newNode = null, string newTriggerType = null,
-            BlockParam[] newTriggerParameters = null, NodeLocation from = default, string fromStackId = null)
+            BlockParam[] newTriggerParameters = null, NodeLocation from = default, string fromStackId = null,
+            string fromOwnerNodeId = null, string fromParamKey = null)
         {
             _source = source;
             _target = target;
@@ -36,6 +39,8 @@ namespace Blocky.Data
             _newTriggerParameters = newTriggerParameters ?? Array.Empty<BlockParam>();
             _from = from;
             _fromStackId = fromStackId;
+            _fromOwnerNodeId = fromOwnerNodeId;
+            _fromParamKey = fromParamKey;
         }
 
         public static DropChain FromNewNode(BlockNode node, ChainTarget target) =>
@@ -47,6 +52,10 @@ namespace Blocky.Data
         public static DropChain FromNodes(NodeLocation from, ChainTarget target) => new(SourceKind.Nodes, target, from: from);
 
         public static DropChain FromStack(string stackId, ChainTarget target) => new(SourceKind.Stack, target, fromStackId: stackId);
+
+        /// <summary>Takes the condition block out of <paramref name="ownerNodeId"/>'s slot <paramref name="paramKey"/>, leaving the slot empty.</summary>
+        public static DropChain FromConditionSlot(string stackId, string ownerNodeId, string paramKey, ChainTarget target) =>
+            new(SourceKind.ConditionSlot, target, fromStackId: stackId, fromOwnerNodeId: ownerNodeId, fromParamKey: paramKey);
 
         public void Do(ProgramStore store)
         {
@@ -105,6 +114,16 @@ namespace Blocky.Data
                     return;
                 }
 
+                case SourceKind.ConditionSlot:
+                {
+                    var owner = ProgramQuery.FindNode(program, _fromStackId, _fromOwnerNodeId)
+                        ?? throw new InvalidOperationException($"Node '{_fromOwnerNodeId}' not found in stack '{_fromStackId}'.");
+                    var condition = ProgramQuery.SetCondition(owner, _fromParamKey, null)
+                        ?? throw new InvalidOperationException($"Slot '{_fromParamKey}' of '{_fromOwnerNodeId}' is empty.");
+                    chain = new[] { condition };
+                    return;
+                }
+
                 default: // Stack
                 {
                     var stack = ProgramQuery.FindStack(program, _fromStackId)
@@ -145,6 +164,26 @@ namespace Blocky.Data
                         throw new InvalidOperationException("A hat block can only start a stack; it can't be inserted into one.");
                     var container = ProgramQuery.Resolve(program, _target.InsertAt);
                     container.Set(ArrayUtil.InsertRange(container.Get(), _target.InsertAt.Index, chain));
+                    return;
+                }
+
+                case ChainTargetKind.ConditionSlot:
+                {
+                    if (hasTrigger || chain.Length != 1)
+                        throw new InvalidOperationException("Only a single condition block fits in a condition slot.");
+                    var owner = ProgramQuery.FindNode(program, _target.StackId, _target.NodeId)
+                        ?? throw new InvalidOperationException($"Node '{_target.NodeId}' not found in stack '{_target.StackId}'.");
+
+                    // Scratch's rule: dropping onto a filled slot swaps — the condition that was there pops out onto the table.
+                    var displaced = ProgramQuery.SetCondition(owner, _target.ParamKey, chain[0]);
+                    if (displaced != null)
+                        program.stacks = ArrayUtil.Insert(program.stacks, program.stacks.Length, new BlockStack
+                        {
+                            id = IdGenerator.NewId(),
+                            triggerBlockType = string.Empty,
+                            sequence = new[] { displaced },
+                            canvasPosition = _target.Position
+                        });
                     return;
                 }
 
