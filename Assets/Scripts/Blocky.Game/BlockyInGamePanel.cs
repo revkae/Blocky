@@ -50,6 +50,7 @@ namespace Blocky.Game
         private VisualElement _resizeHandle;
         private DragLayer _dragLayer;
         private readonly Dictionary<BlockCategory, VisualElement> _paletteSections = new();
+        private readonly List<(BlockCategory category, List<BlockDefinition> blocks)> _blocksByCategory = new();
 
         private bool _resizing;
         private float _resizeStartPointerX;
@@ -64,6 +65,7 @@ namespace Blocky.Game
         private GameObject _target;
         private ObjectProgramRunner _runner;
         private ProgramStore _store;
+        private BlockProgramAsset _liveAsset; // the in-memory asset the edited object's runner hot-reloads from — one per target, reused across edits
         private ProgramCanvasView _canvasView;
         private DragContext _dragContext;
         private string _storageKey;
@@ -76,6 +78,7 @@ namespace Blocky.Game
         {
             _uiDocument = GetComponent<UIDocument>();
             _registry = BlockyRuntime.Registry;
+            GroupBlocksByCategory();
             BuildChrome();
             SetVisible(false);
             BlockyInput.IsPointerOverUi = IsPointerOverEditor; // presses on this workspace aren't "mouse down?" in the game
@@ -173,7 +176,7 @@ namespace Blocky.Game
         private bool IsTyping()
         {
             for (var el = _root.panel?.focusController?.focusedElement as VisualElement; el != null; el = el.parent)
-                if (el is TextField || el is FloatField || el.ClassListContains("unity-base-text-field")) return true;
+                if (el is TextField || el is FloatField || el.ClassListContains(TextInputBaseField<string>.ussClassName)) return true;
             return false;
         }
 
@@ -258,6 +261,14 @@ namespace Blocky.Game
 
             _dragLayer = new DragLayer();
             _root.Add(_dragLayer); // last sibling — always renders above everything else in the workspace
+
+            // One drag context for the workspace's whole life, retargeted when an object is picked — so the palette
+            // is built once and can be browsed before anything is selected.
+            _dragContext = new DragContext(_registry, _dragLayer,
+                p => _canvasViewport.worldBound.Contains(p),
+                p => _paletteScroll.worldBound.Contains(p) || _tabRail.worldBound.Contains(p),
+                () => _zoom);
+            BuildPalette();
         }
 
         private VisualElement BuildZoomControls()
@@ -283,7 +294,7 @@ namespace Blocky.Game
         private bool IsTableBackground(VisualElement hit)
         {
             for (var el = hit; el != null && el != _canvasViewport; el = el.parent)
-                if (el is BlockView || el is HatView || el is ConditionView || el is UnknownBlockView || el is Button) return false;
+                if (el is IBlockElement || el is UnknownBlockView || el is Button) return false;
             return true;
         }
 
@@ -425,23 +436,32 @@ namespace Blocky.Game
             _resizeHandle.ReleasePointer(evt.pointerId);
         }
 
-        private void BuildTabRail()
+        /// <summary>The registry's blocks by category, in enum order, empty categories left out — shared by the tab rail and the palette so they always agree.</summary>
+        private void GroupBlocksByCategory()
         {
-            _tabRail.Clear();
-
-            var present = new HashSet<BlockCategory>();
-            for (var i = 0; i < _registry.Count; i++) present.Add(_registry.GetByOpcode(i).category);
+            var byCategory = new Dictionary<BlockCategory, List<BlockDefinition>>();
+            for (var opcode = 0; opcode < _registry.Count; opcode++)
+            {
+                var def = _registry.GetByOpcode(opcode);
+                if (!byCategory.TryGetValue(def.category, out var list))
+                    byCategory[def.category] = list = new List<BlockDefinition>();
+                list.Add(def);
+            }
 
             foreach (BlockCategory category in Enum.GetValues(typeof(BlockCategory)))
-            {
-                if (!present.Contains(category)) continue;
+                if (byCategory.TryGetValue(category, out var defs)) _blocksByCategory.Add((category, defs));
+        }
 
+        private void BuildTabRail()
+        {
+            foreach (var (category, _) in _blocksByCategory)
+            {
                 var tab = new Button(() => ScrollToCategory(category));
                 tab.AddToClassList("blocky-ingame-tab");
 
                 var dot = new VisualElement();
                 dot.AddToClassList("blocky-ingame-tab__dot");
-                dot.AddToClassList($"blocky-block--category-{category.ToString().ToLowerInvariant()}");
+                dot.AddToClassList(BlockClasses.Category(category));
                 tab.Add(dot);
 
                 var label = new Label(category.ToString());
@@ -460,22 +480,8 @@ namespace Blocky.Game
 
         private void BuildPalette()
         {
-            _paletteScroll.Clear();
-            _paletteSections.Clear();
-
-            var byCategory = new Dictionary<BlockCategory, List<BlockDefinition>>();
-            for (var opcode = 0; opcode < _registry.Count; opcode++)
+            foreach (var (category, defs) in _blocksByCategory)
             {
-                var def = _registry.GetByOpcode(opcode);
-                if (!byCategory.TryGetValue(def.category, out var list))
-                    byCategory[def.category] = list = new List<BlockDefinition>();
-                list.Add(def);
-            }
-
-            foreach (BlockCategory category in Enum.GetValues(typeof(BlockCategory)))
-            {
-                if (!byCategory.TryGetValue(category, out var defs)) continue;
-
                 var section = new VisualElement();
                 section.AddToClassList("blocky-palette__section");
 
@@ -499,13 +505,8 @@ namespace Blocky.Game
         private void AttachCanvasDrag()
         {
             foreach (var stackView in _canvasView.StackViews.Values)
-            {
-                if (stackView.Hat != null) stackView.Hat.AddManipulator(new CanvasDragManipulator(stackView.Hat, _dragContext));
-                foreach (var block in stackView.Query<BlockView>().ToList())
-                    block.AddManipulator(new CanvasDragManipulator(block, _dragContext));
-                foreach (var condition in stackView.Query<ConditionView>().ToList())
-                    condition.AddManipulator(new CanvasDragManipulator(condition, _dragContext));
-            }
+                foreach (var element in stackView.Query<VisualElement>().Where(e => e is IBlockElement).ToList())
+                    element.AddManipulator(new CanvasDragManipulator(element, _dragContext));
         }
 
         private void SetVisible(bool value)
@@ -529,11 +530,12 @@ namespace Blocky.Game
 
             _store = new ProgramStore(program);
             _store.OnChanged += _ => OnProgramChanged();
+            _liveAsset = null; // the previous object's runner keeps its own live asset; this object gets a fresh one on its first edit
 
             _statusLabel.text = $"Editing '{go.name}'";
 
             _canvasView?.RemoveFromHierarchy();
-            _canvasView = new ProgramCanvasView(_store, _registry, tableMode: true);
+            _canvasView = new ProgramCanvasView(_store, _registry, CanvasMode.Table);
             _canvasView.style.position = Position.Absolute;
             _canvasView.style.left = 0;
             _canvasView.style.top = 0;
@@ -546,15 +548,10 @@ namespace Blocky.Game
             _zoom = 1f;
             ApplyCanvasTransform();
 
-            _dragContext = new DragContext(_store, _registry, _canvasView, _dragLayer,
-                p => _canvasViewport.worldBound.Contains(p),
-                p => _paletteScroll.worldBound.Contains(p) || _tabRail.worldBound.Contains(p),
-                () => _zoom);
+            _dragContext.SetTarget(_store, _canvasView);
 
             _canvasView.Rebuilt += AttachCanvasDrag;
             AttachCanvasDrag(); // the first build happened inside the constructor, before we could subscribe
-
-            BuildPalette(); // rebuilt per target: each item's drag closes over this object's store and canvas
         }
 
         /// <summary>
@@ -566,10 +563,10 @@ namespace Blocky.Game
         {
             RuntimeProgramStorage.Save(_storageKey, _store.Program);
 
-            var liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
-            liveAsset.Save(_store.Program);
+            if (_liveAsset == null) _liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+            _liveAsset.Save(_store.Program);
             _runner.Shutdown();
-            _runner.SetProgramAsset(liveAsset);
+            _runner.SetProgramAsset(_liveAsset);
             _runner.Initialize();
         }
     }

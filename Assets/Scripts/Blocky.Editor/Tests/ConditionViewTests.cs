@@ -48,7 +48,7 @@ namespace Blocky.Editor.Tests
                     new BlockStack { id = "stk_loose", triggerBlockType = "", sequence = new[] { new BlockNode { id = "c_loose", blockType = "condition.true" } } }
                 }
             };
-            return new ProgramCanvasView(new ProgramStore(program), BuildRegistry(), tableMode: true);
+            return new ProgramCanvasView(new ProgramStore(program), BuildRegistry(), CanvasMode.Table);
         }
 
         [Test]

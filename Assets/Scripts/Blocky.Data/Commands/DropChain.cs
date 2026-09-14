@@ -148,7 +148,7 @@ namespace Blocky.Data
                     return;
 
                 case ChainTargetKind.Free:
-                    program.stacks = ArrayUtil.Insert(program.stacks, program.stacks.Length, new BlockStack
+                    ProgramEdits.AppendStack(program, new BlockStack
                     {
                         id = reusedStackId ?? IdGenerator.NewId(),
                         triggerBlockType = hasTrigger ? trigger : string.Empty,
@@ -177,7 +177,7 @@ namespace Blocky.Data
                     // Scratch's rule: dropping onto a filled slot swaps — the condition that was there pops out onto the table.
                     var displaced = ProgramQuery.SetCondition(owner, _target.ParamKey, chain[0]);
                     if (displaced != null)
-                        program.stacks = ArrayUtil.Insert(program.stacks, program.stacks.Length, new BlockStack
+                        ProgramEdits.AppendStack(program, new BlockStack
                         {
                             id = IdGenerator.NewId(),
                             triggerBlockType = string.Empty,

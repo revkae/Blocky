@@ -8,107 +8,62 @@ namespace Blocky.Editor
     /// <summary>
     /// Takes a fresh block out of the palette. The ghost is a new prototype of the same definition, so it has the
     /// real silhouette while it moves. Released over the table it becomes one <see cref="DropChain"/> — snapped if
-    /// an edge was glowing, lying loose where it was dropped otherwise. Released anywhere else, nothing happens.
-    /// Tracks the pointer on the panel root (see <see cref="CanvasDragManipulator"/> for why not capture), and can
-    /// be ended by the host through <see cref="IActiveDrag"/> if the pointer-up never arrives.
+    /// an edge was glowing (a condition: dropped into a glowing slot), lying loose where it was dropped otherwise.
+    /// Released anywhere else, nothing happens. Pointer tracking lives in <see cref="TableDragManipulator"/>.
     /// </summary>
-    public sealed class PaletteDragManipulator : PointerManipulator, IActiveDrag
+    public sealed class PaletteDragManipulator : TableDragManipulator
     {
         private readonly BlockDefinition _definition;
-        private readonly DragContext _context;
-        private VisualElement _tree;
-        private int _pointerId = -1;
         private ChainDragSession _session;
-        private bool _eventMovedSincePoll;
 
-        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, DragContext context)
+        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, DragContext context) : base(paletteItem, context)
         {
-            target = paletteItem;
             _definition = definition;
-            _context = context;
         }
 
         protected override void RegisterCallbacksOnTarget() => target.RegisterCallback<PointerDownEvent>(OnPointerDown);
 
         protected override void UnregisterCallbacksFromTarget() => target.UnregisterCallback<PointerDownEvent>(OnPointerDown);
 
-        public void Poll(Vector2 panelPointer)
-        {
-            if (_pointerId == -1) return;
-
-            // UI move events are the primary source; the poll only fills in when they stop arriving.
-            if (_eventMovedSincePoll)
-            {
-                _eventMovedSincePoll = false;
-                return;
-            }
-            _session?.Move(panelPointer);
-        }
-
-        public void ForceEnd(Vector2 panelPointer)
-        {
-            if (_pointerId != -1) Finish(panelPointer);
-        }
-
         private void OnPointerDown(PointerDownEvent evt)
         {
-            if (evt.button != 0 || _pointerId != -1 || _context.ActiveDrag != null) return;
+            // Before any object is picked there's no table to drop on — the palette can be browsed, not dragged from.
+            if (evt.button != 0 || IsTracking || Context.ActiveDrag != null || !Context.HasTarget) return;
 
-            _pointerId = evt.pointerId;
-            var ghost = BlockPrototype.Create(_definition, _context.Registry);
-            _session = new ChainDragSession(_context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
-                hasHat: _definition.shape == BlockShape.Trigger, endsWithCap: _definition.shape == BlockShape.Cap,
-                fromCanvas: false, MakeCommand, isCondition: _definition.shape == BlockShape.Boolean);
+            var ghost = BlockPrototype.Create(_definition, Context.Registry);
+            _session = new ChainDragSession(Context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
+                ChainShape.Of(_definition), fromCanvas: false, MakeCommand);
             _session.Move(evt.position);
 
-            _tree = target.panel.visualTree;
-            _tree.RegisterCallback<PointerMoveEvent>(OnTreeMove, TrickleDown.TrickleDown);
-            _tree.RegisterCallback<PointerUpEvent>(OnTreeUp, TrickleDown.TrickleDown);
-            _tree.RegisterCallback<PointerCancelEvent>(OnTreeCancel, TrickleDown.TrickleDown);
-            _context.ActiveDrag = this;
+            BeginTracking(evt.pointerId);
             evt.StopPropagation();
         }
 
-        private void OnTreeMove(PointerMoveEvent evt)
+        protected override bool OnPointerMoved(Vector2 pointer)
         {
-            if (evt.pointerId != _pointerId) return;
-            _eventMovedSincePoll = true;
-            _session.Move(evt.position);
-            evt.StopPropagation();
+            _session?.Move(pointer);
+            return true;
         }
 
-        private void OnTreeUp(PointerUpEvent evt)
+        protected override bool OnReleased(Vector2 pointer)
         {
-            if (evt.pointerId != _pointerId) return;
-            Finish(evt.position);
-            evt.StopPropagation();
-        }
-
-        private void OnTreeCancel(PointerCancelEvent evt)
-        {
-            if (evt.pointerId != _pointerId) return;
             var session = _session;
-            EndTracking();
+            StopTracking();
+            session?.Drop(pointer);
+            return true;
+        }
+
+        protected override void OnCancelled()
+        {
+            var session = _session;
+            StopTracking();
             session?.Cancel();
         }
 
-        private void Finish(Vector2 pointer)
+        private void StopTracking()
         {
-            var session = _session;
             EndTracking();
-            session?.Drop(pointer);
-        }
-
-        private void EndTracking()
-        {
-            _tree?.UnregisterCallback<PointerMoveEvent>(OnTreeMove, TrickleDown.TrickleDown);
-            _tree?.UnregisterCallback<PointerUpEvent>(OnTreeUp, TrickleDown.TrickleDown);
-            _tree?.UnregisterCallback<PointerCancelEvent>(OnTreeCancel, TrickleDown.TrickleDown);
-            _tree = null;
-            _pointerId = -1;
             _session = null;
-            _eventMovedSincePoll = false;
-            if (_context.ActiveDrag == this) _context.ActiveDrag = null;
         }
 
         private IProgramCommand MakeCommand(ChainTarget target)

@@ -30,7 +30,7 @@ namespace Blocky.Runtime
         }
 
         public OpContext(VmThread thread, int pc, Instruction instruction, ReadOnlySpan<ParamValue> parameters, float deltaTime, float now,
-            ConditionEvaluator conditions = null)
+            ConditionEvaluator conditions)
         {
             _thread = thread;
             _conditions = conditions;
@@ -46,7 +46,6 @@ namespace Blocky.Runtime
         /// Reads a true/false param. A condition slot is evaluated right now — so <c>repeat until &lt;mouse down?&gt;</c>
         /// sees the mouse as it is on this lap, not as it was when the program compiled. Empty slots read as false.
         /// </summary>
-        public bool GetBool(int index) =>
-            _conditions != null ? _conditions.Evaluate(Params[index], _thread) : Params[index].Boolean;
+        public bool GetBool(int index) => _conditions.Evaluate(Params[index], _thread);
     }
 }

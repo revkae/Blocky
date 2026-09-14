@@ -581,6 +581,7 @@ GameObject:
   - component: {fileID: 392610770}
   - component: {fileID: 392610769}
   - component: {fileID: 392610768}
+  - component: {fileID: 392610772}
   m_Layer: 0
   m_Name: Ground
   m_TagString: Untagged
@@ -682,6 +683,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &392610772
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 392610767}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1bb1ffc2adae454a975ad65dfff18f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
+  programAsset: {fileID: 11400000, guid: 2582b5f5def13684c9686ae2b4f0c2c3, type: 2}
 --- !u!1 &473371396
 GameObject:
   m_ObjectHideFlags: 0
@@ -1474,6 +1488,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1420600257}
   - component: {fileID: 1420600256}
+  - component: {fileID: 1420600258}
   m_Layer: 0
   m_Name: BlockyManager
   m_TagString: Untagged
@@ -1508,6 +1523,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1420600258
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1420600255}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1bb1ffc2adae454a975ad65dfff18f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
+  programAsset: {fileID: 11400000, guid: 918da674f5d2e3b4db7bdfe5d23e0d66, type: 2}
 --- !u!1 &1509799661
 GameObject:
   m_ObjectHideFlags: 0

@@ -6,6 +6,8 @@ namespace Blocky.Compiler
     /// <summary>
     /// Brings programs saved by older builds up to the current block catalog, in place. Needs the registry (to
     /// know which params are condition slots now), which is why it lives here and not in the schema migrations.
+    /// Every load path calls it — the in-game editor, the Editor window and <c>ObjectProgramRunner</c> — so the
+    /// compiler only ever sees the current format.
     /// </summary>
     public static class ProgramUpgrades
     {
@@ -27,6 +29,7 @@ namespace Blocky.Compiler
         private static bool UpgradeSequence(BlockNode[] sequence, BlockRegistry registry)
         {
             var changed = false;
+            var trueDefinition = registry.Find(TrueConditionType);
             foreach (var node in sequence)
             {
                 var def = registry.Find(node.blockType);
@@ -42,9 +45,7 @@ namespace Blocky.Compiler
                         {
                             key = spec.key,
                             kind = ParamKind.Reporter,
-                            reporter = wasTicked && registry.Find(TrueConditionType) != null
-                                ? new BlockNode { id = IdGenerator.NewId(), blockType = TrueConditionType }
-                                : null
+                            reporter = wasTicked && trueDefinition != null ? BlockNodes.Instantiate(trueDefinition) : null
                         };
                         changed = true;
                     }

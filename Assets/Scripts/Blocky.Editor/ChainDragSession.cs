@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
 using UnityEngine;
@@ -24,15 +25,24 @@ namespace Blocky.Editor
         void ForceEnd(Vector2 panelPointer);
     }
 
-    /// <summary>Everything a drag on the table needs to know about its workspace. Rebuilt whenever the edited object changes.</summary>
+    /// <summary>
+    /// Everything a drag on the table needs to know about its workspace. One per workspace for its whole life:
+    /// <see cref="SetTarget"/> points it at the object being edited, so long-lived drag sources (the palette)
+    /// never need rebuilding when the selection changes.
+    /// </summary>
     public sealed class DragContext
     {
         /// <summary>The press/drag currently holding the pointer, if any. Only one at a time.</summary>
         public IActiveDrag ActiveDrag { get; internal set; }
 
-        public ProgramStore Store { get; }
+        /// <summary>The edited object's program; null until an object is picked.</summary>
+        public ProgramStore Store { get; private set; }
+
         public BlockRegistry Registry { get; }
-        public ProgramCanvasView Canvas { get; }
+
+        /// <summary>The edited object's table; null until an object is picked.</summary>
+        public ProgramCanvasView Canvas { get; private set; }
+
         public DragLayer DragLayer { get; }
         public Func<Vector2, bool> IsOverCanvas { get; }
         public Func<Vector2, bool> IsOverDiscard { get; }
@@ -40,16 +50,24 @@ namespace Blocky.Editor
         /// <summary>The table's current zoom (1 = 100%), so a ghost over the table is drawn at the size it will land at.</summary>
         public Func<float> CanvasZoom { get; }
 
-        public DragContext(ProgramStore store, BlockRegistry registry, ProgramCanvasView canvas, DragLayer dragLayer,
+        /// <summary>An object is being edited — there's somewhere for a drag to land.</summary>
+        public bool HasTarget => Store != null && Canvas != null;
+
+        public DragContext(BlockRegistry registry, DragLayer dragLayer,
             Func<Vector2, bool> isOverCanvas, Func<Vector2, bool> isOverDiscard, Func<float> canvasZoom)
         {
-            Store = store;
             Registry = registry;
-            Canvas = canvas;
             DragLayer = dragLayer;
             IsOverCanvas = isOverCanvas;
             IsOverDiscard = isOverDiscard;
             CanvasZoom = canvasZoom;
+        }
+
+        /// <summary>The edited object changed: drags now read and write this program and this table.</summary>
+        public void SetTarget(ProgramStore store, ProgramCanvasView canvas)
+        {
+            Store = store;
+            Canvas = canvas;
         }
     }
 
@@ -62,37 +80,47 @@ namespace Blocky.Editor
     /// </summary>
     public sealed class ChainDragSession
     {
+        private const float SlotGlowPadding = 3f;
+
         private readonly DragContext _context;
         private readonly VisualElement _ghost;
         private readonly Vector2 _grabOffsetLocal; // where the pointer holds the chain, in unscaled block pixels
-        private readonly bool _hasHat;
-        private readonly bool _endsWithCap;
+        private readonly ChainShape _shape;
         private readonly bool _fromCanvas;
-        private readonly bool _isCondition;
         private readonly Func<ChainTarget, IProgramCommand> _makeCommand;
 
-        private const float SlotGlowPadding = 3f;
+        // Snap targets are collected once and reused until the table changes under the drag: a pan or zoom (the
+        // canvas transform) or a layout pass — the table re-flows the frame after blocks are lifted off it, and a
+        // slot shrinks when its condition is pulled out. Lists are reused across refreshes.
+        private readonly List<SnapTarget> _snapTargets = new();
+        private readonly List<ConditionSlotTarget> _slotTargets = new();
+        private readonly List<VisualElement> _watchedForLayout = new();
+        private readonly EventCallback<GeometryChangedEvent> _onTableLayoutChanged;
+        private bool _targetsDirty = true;
+        private Matrix4x4 _targetsCanvasTransform;
 
         private VisualElement _indicator;
         private SnapTarget? _best;
         private ConditionSlotTarget? _bestSlot;
         private Vector2 _ghostTopLeft;
         private float _ghostScale = -1f;
+        private Vector2 _lastPointer = new(float.NaN, float.NaN);
 
         /// <param name="grabOffset">Pointer position minus the chain's top-left, in world pixels at <paramref name="sourceScale"/>.</param>
         /// <param name="sourceScale">The zoom the chain was picked up at: the table's zoom, or 1 for the palette.</param>
-        /// <param name="isCondition">The ghost is one condition block: it snaps into condition slots, never onto stack connectors.</param>
-        public ChainDragSession(DragContext context, VisualElement ghost, Vector2 grabOffset, float sourceScale, bool hasHat,
-            bool endsWithCap, bool fromCanvas, Func<ChainTarget, IProgramCommand> makeCommand, bool isCondition = false)
+        /// <param name="shape">What the chain can connect to — see <see cref="ChainShape"/>.</param>
+        public ChainDragSession(DragContext context, VisualElement ghost, Vector2 grabOffset, float sourceScale, ChainShape shape,
+            bool fromCanvas, Func<ChainTarget, IProgramCommand> makeCommand)
         {
             _context = context;
             _ghost = ghost;
             _grabOffsetLocal = grabOffset / Mathf.Max(sourceScale, 0.01f);
-            _hasHat = hasHat;
-            _endsWithCap = endsWithCap;
+            _shape = shape;
             _fromCanvas = fromCanvas;
-            _isCondition = isCondition;
             _makeCommand = makeCommand;
+            _onTableLayoutChanged = _ => _targetsDirty = true;
+
+            WatchTableLayout();
 
             ghost.style.position = Position.Absolute;
             ghost.style.transformOrigin = new TransformOrigin(new Length(0f), new Length(0f), 0f);
@@ -105,6 +133,11 @@ namespace Blocky.Editor
         {
             var overCanvas = _context.IsOverCanvas(pointer);
             var scale = overCanvas ? _context.CanvasZoom() : 1f;
+
+            // The host re-sends the held pointer every frame; with nothing moved and the table unchanged, there's nothing to redo.
+            if (pointer == _lastPointer && Mathf.Approximately(scale, _ghostScale) && !TargetsStale) return;
+            _lastPointer = pointer;
+
             if (!Mathf.Approximately(scale, _ghostScale))
             {
                 _ghostScale = scale;
@@ -120,12 +153,12 @@ namespace Blocky.Editor
             _bestSlot = null;
             if (overCanvas)
             {
-                if (_isCondition)
-                    _bestSlot = ConditionSlotResolver.FindBest(ConditionSlotResolver.Collect(_context.Canvas),
-                        _ghostTopLeft + new Vector2(0f, LocalHeight * scale / 2f)); // the hexagon's left tip
+                RefreshTargetsIfStale();
+                if (_shape.IsCondition)
+                    _bestSlot = ConditionSlotResolver.FindBest(_slotTargets, _ghostTopLeft + new Vector2(0f, LocalHeight * scale / 2f)); // the hexagon's left tip
                 else
-                    _best = SnapResolver.FindBest(SnapTargetCollector.Collect(_context.Canvas),
-                        new DraggedChain(_ghostTopLeft, _ghostTopLeft + new Vector2(0f, LocalHeight * scale), _hasHat, _endsWithCap));
+                    _best = SnapResolver.FindBest(_snapTargets,
+                        new DraggedChain(_ghostTopLeft, _ghostTopLeft + new Vector2(0f, LocalHeight * scale), _shape.HasHat, _shape.EndsWithCap));
             }
             UpdateIndicator();
         }
@@ -158,6 +191,33 @@ namespace Blocky.Editor
         {
             CleanUp();
             if (_fromCanvas) _context.Canvas.Refresh();
+        }
+
+        private bool TargetsStale => _targetsDirty || _context.Canvas.worldTransform != _targetsCanvasTransform;
+
+        private void RefreshTargetsIfStale()
+        {
+            if (!TargetsStale) return;
+            _targetsDirty = false;
+            _targetsCanvasTransform = _context.Canvas.worldTransform;
+
+            if (_shape.IsCondition) ConditionSlotResolver.Collect(_context.Canvas, _slotTargets);
+            else SnapTargetCollector.Collect(_context.Canvas, _snapTargets);
+        }
+
+        /// <summary>Any stack or condition slot left on the table re-flowing means cached snap targets moved.</summary>
+        private void WatchTableLayout()
+        {
+            var canvas = _context.Canvas;
+            foreach (var stackView in canvas.StackViews.Values)
+                if (stackView.parent == canvas) Watch(stackView); // a stack being dragged isn't on the table
+            canvas.Query<ConditionSlot>().ForEach(Watch);
+        }
+
+        private void Watch(VisualElement element)
+        {
+            element.RegisterCallback(_onTableLayoutChanged);
+            _watchedForLayout.Add(element);
         }
 
         private ChainTarget? ResolveTarget(Vector2 pointer)
@@ -221,6 +281,9 @@ namespace Blocky.Editor
 
         private void CleanUp()
         {
+            foreach (var element in _watchedForLayout) element.UnregisterCallback(_onTableLayoutChanged);
+            _watchedForLayout.Clear();
+
             _ghost.RemoveFromHierarchy();
             _indicator?.RemoveFromHierarchy();
             _indicator = null;

@@ -71,7 +71,6 @@ namespace Blocky.Editor
             {
                 case ParamKind.Number: return (value?.number ?? spec.defaultNumber).ToString("0.##");
                 case ParamKind.Bool: return (value?.boolean ?? false) ? "true" : "false";
-                case ParamKind.Reporter: return "…";
                 default: return value?.text ?? spec.defaultText ?? string.Empty;
             }
         }

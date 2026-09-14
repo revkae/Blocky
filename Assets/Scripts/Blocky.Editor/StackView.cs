@@ -16,7 +16,7 @@ namespace Blocky.Editor
         /// <summary>The event block heading this stack, or null for a loose stack.</summary>
         public HatView Hat { get; }
 
-        /// <summary>The top-level sequence container — used by <see cref="DropCandidateBuilder"/> and <see cref="SnapTargetCollector"/>.</summary>
+        /// <summary>The top-level sequence container — used by <see cref="SnapTargetCollector"/>.</summary>
         public VisualElement SequenceContainer { get; }
 
         public StackView(BlockStack stack, BlockRegistry registry, ProgramStore store = null, bool buttons = true)

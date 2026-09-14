@@ -7,13 +7,24 @@ using UnityEngine.UIElements;
 
 namespace Blocky.Editor
 {
+    /// <summary>How a <see cref="ProgramCanvasView"/> can be edited.</summary>
+    public enum CanvasMode
+    {
+        /// <summary>A preview: every field disabled, nothing editable.</summary>
+        ReadOnly,
+
+        /// <summary>The Editor window: live fields plus per-block ✕ and "+ Add" buttons.</summary>
+        Buttons,
+
+        /// <summary>The in-game table: live fields and no buttons — blocks are placed, moved and deleted purely by drag and drop (the host attaches the drag manipulators on <see cref="ProgramCanvasView.Rebuilt"/>).</summary>
+        Table
+    }
+
     /// <summary>
     /// Hosts every stack, positioned by <c>canvasPosition</c>, and rebuilds whenever
     /// <see cref="ProgramStore.OnChanged"/> fires (TDD §8.2). Rebuilds the whole canvas on any change rather
     /// than patching the affected subtree — correct and simple; subtree patching is an optimization.
-    /// Modes: read-only (default); <c>editable</c> — live fields plus the Editor window's add/delete buttons;
-    /// <c>tableMode</c> — live fields and no buttons at all: blocks are placed, moved, and deleted purely by drag
-    /// and drop (the in-game workspace attaches the drag manipulators on <see cref="Rebuilt"/>).
+    /// See <see cref="CanvasMode"/> for the three ways it can be used.
     /// Also owns which block is selected, so the highlight survives the rebuild every edit causes.
     /// </summary>
     public sealed class ProgramCanvasView : VisualElement
@@ -44,12 +55,12 @@ namespace Blocky.Editor
         public string SelectedStackId => _selectedStackId;
         public string SelectedNodeId => _selectedNodeId;
 
-        public ProgramCanvasView(ProgramStore store, BlockRegistry registry, bool editable = false, bool tableMode = false)
+        public ProgramCanvasView(ProgramStore store, BlockRegistry registry, CanvasMode mode = CanvasMode.ReadOnly)
         {
             _store = store;
             _registry = registry;
-            _live = editable || tableMode;
-            _buttons = editable && !tableMode;
+            _live = mode != CanvasMode.ReadOnly;
+            _buttons = mode == CanvasMode.Buttons;
             AddToClassList("blocky-canvas");
             style.position = Position.Relative;
 
@@ -131,21 +142,11 @@ namespace Blocky.Editor
             {
                 foreach (var stackView in _stackViews.Values)
                 {
-                    var block = stackView.Query<BlockView>().Where(b => b.NodeId == _selectedNodeId).First();
-                    if (block != null)
-                    {
-                        found = block;
-                        _selectedStackId = block.StackId;
-                        break;
-                    }
-
-                    var condition = stackView.Query<ConditionView>().Where(c => c.NodeId == _selectedNodeId).First();
-                    if (condition != null)
-                    {
-                        found = condition;
-                        _selectedStackId = condition.StackId;
-                        break;
-                    }
+                    var block = stackView.Query<VisualElement>().Where(e => e is IBlockElement b && b.NodeId == _selectedNodeId).First();
+                    if (block == null) continue;
+                    found = block;
+                    _selectedStackId = ((IBlockElement)block).StackId;
+                    break;
                 }
             }
 

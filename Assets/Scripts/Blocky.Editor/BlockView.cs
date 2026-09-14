@@ -16,7 +16,7 @@ namespace Blocky.Editor
     /// (palette — static chips). <c>buttons</c> adds the Editor window's delete/"+ Add" affordances; the in-game
     /// table passes false and uses drag and drop instead.
     /// </summary>
-    public sealed class BlockView : VisualElement
+    public sealed class BlockView : VisualElement, IBlockElement
     {
         public string NodeId { get; }
         public string StackId { get; }
@@ -26,7 +26,6 @@ namespace Blocky.Editor
         public bool IsTerminal => Definition.shape == BlockShape.Cap;
 
         private readonly List<VisualElement> _bodySlots = new();
-        private readonly BlockShapePainter _painter;
 
         /// <summary>One entry per branch (TDD §8.2's <c>bodySlot</c>), in branch order.</summary>
         public IReadOnlyList<VisualElement> BodySlots => _bodySlots;
@@ -63,7 +62,7 @@ namespace Blocky.Editor
 
             AddToClassList("blocky-block");
             AddToClassList("blocky-shaped");
-            AddToClassList($"blocky-block--category-{definition.category.ToString().ToLowerInvariant()}");
+            AddToClassList(BlockClasses.Category(definition.category));
             AddToClassList($"blocky-block--shape-{definition.shape.ToString().ToLowerInvariant()}");
 
             var header = new VisualElement();
@@ -75,11 +74,7 @@ namespace Blocky.Editor
 
             if (store != null && buttons)
             {
-                var deleteButton = new Button(() =>
-                {
-                    var location = ProgramQuery.FindLocation(store.Program, stackId, node.id);
-                    if (location != null) store.Apply(new RemoveNode(location.Value));
-                }) { text = "✕" };
+                var deleteButton = new Button(() => store.Apply(new DeleteBlock(stackId, node.id))) { text = "✕" };
                 deleteButton.AddToClassList("blocky-block__delete");
                 header.Add(deleteButton);
             }
@@ -106,8 +101,8 @@ namespace Blocky.Editor
 
             if (definition.branchCount > 0) Add(BuildArm(null, footer: true));
 
-            _painter = new BlockShapePainter(this, BuildOutline);
-            foreach (var slot in _bodySlots) _painter.TrackGeometryOf(slot);
+            var painter = new BlockShapePainter(this, BuildOutline); // kept alive by the callbacks it registers on this element
+            foreach (var slot in _bodySlots) painter.TrackGeometryOf(slot);
         }
 
         private BlockOutline BuildOutline()

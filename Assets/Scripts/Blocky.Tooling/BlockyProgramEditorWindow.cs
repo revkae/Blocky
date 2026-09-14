@@ -91,10 +91,11 @@ namespace Blocky.Tooling
             }
 
             var program = _asset.Load();
+            ProgramUpgrades.UpgradeCheckboxConditions(program, _registry); // old checkbox conditions show as condition blocks
             _store = new ProgramStore(program);
             _store.OnChanged += _ => Persist();
 
-            _canvasHost.Add(new ProgramCanvasView(_store, _registry, editable: true));
+            _canvasHost.Add(new ProgramCanvasView(_store, _registry, CanvasMode.Buttons));
         }
 
         private static BlockProgramAsset CreateAssetFor(GameObject go)

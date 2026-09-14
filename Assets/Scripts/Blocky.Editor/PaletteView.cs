@@ -30,9 +30,9 @@ namespace Blocky.Editor
 
                 foreach (var def in defs)
                 {
-                    var prototype = new Label(string.IsNullOrEmpty(def.displayNameKey) ? def.blockType : def.displayNameKey);
+                    var prototype = new Label(BlockView.DisplayName(def));
                     prototype.AddToClassList("blocky-block");
-                    prototype.AddToClassList($"blocky-block--category-{def.category.ToString().ToLowerInvariant()}");
+                    prototype.AddToClassList(BlockClasses.Category(def.category));
                     prototype.AddToClassList("blocky-palette__prototype");
                     prototype.userData = def; // read by a drag-out manipulator to know which definition was picked
                     section.Add(prototype);
@@ -47,37 +47,6 @@ namespace Blocky.Editor
         /// defaults (TDD §4.3, §8.2) — this is what a palette drag-out produces before an <c>InsertNode</c>
         /// command places it.
         /// </summary>
-        public static BlockNode InstantiatePrototype(BlockDefinition definition)
-        {
-            var node = new BlockNode
-            {
-                id = IdGenerator.NewId(),
-                blockType = definition.blockType,
-                parameters = new BlockParam[definition.parameters.Length],
-                branches = new BlockNode[definition.branchCount][]
-            };
-
-            for (var i = 0; i < definition.parameters.Length; i++)
-            {
-                var spec = definition.parameters[i];
-                var text = spec.defaultText;
-                // An empty choice fails validation, which silently skips the whole stack — default to the first option.
-                if (spec.kind == ParamKind.Choice && string.IsNullOrEmpty(text) && spec.choices.Length > 0)
-                    text = spec.choices[0].stableId;
-
-                node.parameters[i] = new BlockParam
-                {
-                    key = spec.key,
-                    kind = spec.kind,
-                    number = spec.defaultNumber,
-                    text = text
-                };
-            }
-
-            for (var b = 0; b < definition.branchCount; b++)
-                node.branches[b] = Array.Empty<BlockNode>();
-
-            return node;
-        }
+        public static BlockNode InstantiatePrototype(BlockDefinition definition) => BlockNodes.Instantiate(definition);
     }
 }

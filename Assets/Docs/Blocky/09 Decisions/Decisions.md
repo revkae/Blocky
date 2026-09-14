@@ -68,7 +68,7 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - **Runtime:** conditions implement `IConditionOp` (not `IBlockOp`) and get their own opcode-indexed table (`OpTableBuilder.BuildConditions`), because they are never scheduled as a step. Ops read condition params with `OpContext.GetBool(i)`, which evaluates the slot *now* — so `repeat until` re-checks every lap.
 - **Input:** `BlockyInput.IsMouseDown` excludes presses over the editor (`IsPointerOverUi`, set by `BlockyInGamePanel`), so dragging blocks while a script runs doesn't count as "mouse down" in the game. `mouse up?` is the button *state* (not held), not a one-frame "released" edge.
 
-**Consequences:** old saves still run unchanged (a `Bool` param under a `Reporter` spec compiles as its literal), and `ProgramUpgrades.UpgradeCheckboxConditions` turns a ticked checkbox into a `true` block when the in-game editor opens the object. Adding a condition later is one asset plus one `IConditionOp` class. The Editor window's "+ Add" pickers exclude conditions (they don't fit a sequence).
+**Consequences:** old saves still run unchanged: `ProgramUpgrades.UpgradeCheckboxConditions` turns a ticked checkbox into a `true` block and an unticked one into an empty slot, and it runs at every load point (`ObjectProgramRunner.Initialize`, the in-game editor, the Editor window) — so the compiler has no legacy branch and only ever sees the current format. Adding a condition later is one asset plus one `IConditionOp` class. The Editor window's "+ Add" pickers exclude conditions (they don't fit a sequence).
 
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:

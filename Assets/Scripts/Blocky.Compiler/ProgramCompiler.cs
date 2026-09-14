@@ -214,8 +214,7 @@ namespace Blocky.Compiler
 
         private static ParamValue ResolveReporter(BlockParam param, BlockRegistry registry, List<ParamValue> paramTable)
         {
-            // Programs saved before condition blocks existed stored the condition as a checkbox — keep honouring it.
-            if (param.kind == ParamKind.Bool) return new ParamValue(ParamKind.Bool, 0, null, param.boolean, -1);
+            // Old checkbox-style conditions never get here: ProgramUpgrades converts them at every load point.
             if (param.reporter == null || !registry.TryGetOpcode(param.reporter.blockType, out var opcode)) return ParamValue.EmptyReporter;
 
             var def = registry.GetByOpcode(opcode);

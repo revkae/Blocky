@@ -69,7 +69,7 @@ namespace Blocky.Editor.Tests
                 }
             };
 
-            var canvas = new ProgramCanvasView(new ProgramStore(program), registry, tableMode: true);
+            var canvas = new ProgramCanvasView(new ProgramStore(program), registry, CanvasMode.Table);
 
             Assert.IsNotNull(canvas.StackViews["stk_hat"].Hat);
             Assert.IsNull(canvas.StackViews["stk_loose"].Hat);
@@ -97,7 +97,7 @@ namespace Blocky.Editor.Tests
                 }
             };
             var store = new ProgramStore(program);
-            var canvas = new ProgramCanvasView(store, registry, tableMode: true);
+            var canvas = new ProgramCanvasView(store, registry, CanvasMode.Table);
 
             canvas.Select("stk_1", "n1");
             Assert.IsTrue(canvas.Query<BlockView>().First().ClassListContains(BlockOutline.SelectedClass));

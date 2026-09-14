@@ -10,12 +10,14 @@ namespace Blocky.Editor
     /// event — and a tab underneath for the first block of the script. Fields are live with a store, static
     /// chips for a palette prototype, read-only otherwise.
     /// </summary>
-    public sealed class HatView : VisualElement
+    public sealed class HatView : VisualElement, IBlockElement
     {
         public string StackId { get; }
-        public VisualElement Header { get; }
 
-        private readonly BlockShapePainter _painter;
+        /// <summary>Always null: a hat is addressed by its stack alone.</summary>
+        public string NodeId => null;
+
+        public VisualElement Header { get; }
 
         public HatView(BlockDefinition definition, string triggerBlockType, BlockParam[] values, string stackId, ProgramStore store, bool prototype = false)
         {
@@ -25,26 +27,20 @@ namespace Blocky.Editor
             AddToClassList("blocky-block");
             AddToClassList("blocky-shaped");
             AddToClassList("blocky-block--shape-trigger");
-            if (definition != null) AddToClassList($"blocky-block--category-{definition.category.ToString().ToLowerInvariant()}");
+            if (definition != null) AddToClassList(BlockClasses.Category(definition.category));
 
             Header = new VisualElement();
             Header.AddToClassList("blocky-block__header");
             Header.Add(new Label(definition != null ? BlockView.DisplayName(definition) : $"Unknown trigger: {triggerBlockType}"));
 
+            // A null node id targets the stack's trigger params. No registry: triggers have no condition slots.
             if (definition != null)
                 foreach (var spec in definition.parameters)
-                {
-                    var value = Array.Find(values, p => p.key == spec.key);
-                    if (prototype) Header.Add(ParamFieldFactory.CreateChip(spec, value));
-                    else if (store != null)
-                        Header.Add(ParamFieldFactory.CreateLiveField(spec, value, newValue =>
-                            store.Apply(new SetParam(new ParamTarget(stackId, null), spec.key, newValue))));
-                    else Header.Add(ParamFieldFactory.CreateReadOnlyField(spec, value));
-                }
+                    Header.Add(BlockParams.Create(spec, Array.Find(values, p => p.key == spec.key), definition, null, null, stackId, store, prototype));
 
             Add(Header);
 
-            _painter = new BlockShapePainter(this, () => new BlockOutline
+            new BlockShapePainter(this, () => new BlockOutline
             {
                 Width = layout.width,
                 Height = layout.height,

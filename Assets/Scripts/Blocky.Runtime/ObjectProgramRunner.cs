@@ -44,6 +44,7 @@ namespace Blocky.Runtime
         {
             var registry = BlockyRuntime.Registry;
             var program = programAsset != null ? programAsset.Load() : new ObjectProgram();
+            ProgramUpgrades.UpgradeCheckboxConditions(program, registry); // assets saved before condition blocks existed
             var result = ProgramCompiler.Link(program, registry);
             _compiled = result.Program;
 

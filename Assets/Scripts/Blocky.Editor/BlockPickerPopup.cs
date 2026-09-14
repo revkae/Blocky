@@ -20,7 +20,7 @@ namespace Blocky.Editor
                 var def = registry.GetByOpcode(opcode);
                 if (!filter(def)) continue;
 
-                var item = new Label(string.IsNullOrEmpty(def.displayNameKey) ? def.blockType : def.displayNameKey);
+                var item = new Label(BlockView.DisplayName(def));
                 item.AddToClassList("blocky-picker-popup__item");
                 item.RegisterCallback<PointerUpEvent>(_ =>
                 {

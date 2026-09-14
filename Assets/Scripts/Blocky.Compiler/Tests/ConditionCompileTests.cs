@@ -65,14 +65,17 @@ namespace Blocky.Compiler.Tests
         }
 
         [Test]
-        public void OldCheckboxCondition_StillCompilesAsItsValue()
+        public void OldTickedCheckboxCondition_AfterTheLoadUpgrade_CompilesToTheTrueCondition()
         {
-            var result = ProgramCompiler.Link(Program(false, If(new BlockParam { key = "condition", kind = ParamKind.Bool, boolean = true })), BuildRegistry());
+            var registry = BuildRegistry();
+            var program = Program(false, If(new BlockParam { key = "condition", kind = ParamKind.Bool, boolean = true }));
+            ProgramUpgrades.UpgradeCheckboxConditions(program, registry);
+
+            var result = ProgramCompiler.Link(program, registry);
 
             Assert.IsFalse(result.HasErrors);
-            var value = FirstParamOfFirstInstruction(result);
-            Assert.AreEqual(ParamKind.Bool, value.Kind);
-            Assert.IsTrue(value.Boolean);
+            registry.TryGetOpcode("condition.true", out var trueOpcode);
+            Assert.AreEqual(trueOpcode, FirstParamOfFirstInstruction(result).ReporterOpcode);
         }
 
         [Test]

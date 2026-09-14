@@ -12,7 +12,7 @@ namespace Blocky.Editor
     /// <see cref="ConditionSlot"/> of the same shape. It sits either in a slot (<see cref="OwnerNodeId"/> and
     /// <see cref="ParamKey"/> name it) or loose on the table, as the single block of a loose stack.
     /// </summary>
-    public sealed class ConditionView : VisualElement
+    public sealed class ConditionView : VisualElement, IBlockElement
     {
         public string NodeId { get; }
         public string StackId { get; }
@@ -25,8 +25,6 @@ namespace Blocky.Editor
         public string ParamKey { get; }
 
         public bool IsInSlot => OwnerNodeId != null;
-
-        private readonly BlockShapePainter _painter;
 
         /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
         public static ConditionView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
@@ -43,7 +41,7 @@ namespace Blocky.Editor
 
             AddToClassList("blocky-block");
             AddToClassList("blocky-shaped");
-            AddToClassList($"blocky-block--category-{definition.category.ToString().ToLowerInvariant()}");
+            AddToClassList(BlockClasses.Category(definition.category));
             AddToClassList("blocky-block--shape-boolean");
 
             var header = new VisualElement();
@@ -53,7 +51,7 @@ namespace Blocky.Editor
                 header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
             Add(header);
 
-            _painter = new BlockShapePainter(this, () => new BlockOutline { Width = layout.width, Height = layout.height, Hexagon = true });
+            new BlockShapePainter(this, () => new BlockOutline { Width = layout.width, Height = layout.height, Hexagon = true });
         }
     }
 
@@ -77,7 +75,6 @@ namespace Blocky.Editor
 
         private readonly BlockRegistry _registry;
         private readonly ProgramStore _store;
-        private readonly BlockShapePainter _painter;
 
         public ConditionSlot(ParamSpec spec, BlockParam value, BlockDefinition ownerDefinition, string ownerNodeId, BlockRegistry registry,
             string stackId, ProgramStore store, bool prototype)
@@ -91,7 +88,7 @@ namespace Blocky.Editor
             AddToClassList("blocky-param-field");
             AddToClassList(UssClassName);
             // The owner's category class gives the hole its block's color (darkened below) through --blocky-fill.
-            AddToClassList($"blocky-block--category-{ownerDefinition.category.ToString().ToLowerInvariant()}");
+            AddToClassList(BlockClasses.Category(ownerDefinition.category));
 
             var condition = !prototype && value?.kind == ParamKind.Reporter ? value.reporter : null;
             if (condition != null)
@@ -103,7 +100,7 @@ namespace Blocky.Editor
             }
 
             // Only the empty hole is drawn; a filled slot is the condition's own hexagon.
-            _painter = new BlockShapePainter(this, () => IsEmpty
+            new BlockShapePainter(this, () => IsEmpty
                 ? new BlockOutline { Width = layout.width, Height = layout.height, Hexagon = true }
                 : default, EmptyShade);
 

@@ -145,10 +145,19 @@ namespace Blocky.Editor
         public static List<ConditionSlotTarget> Collect(ProgramCanvasView canvas)
         {
             var targets = new List<ConditionSlotTarget>();
-            foreach (var slot in canvas.Query<ConditionSlot>().ToList())
+            Collect(canvas, targets);
+            return targets;
+        }
+
+        /// <summary>Fills <paramref name="targets"/> (cleared first) — lets a drag reuse one list across refreshes.</summary>
+        public static void Collect(ProgramCanvasView canvas, List<ConditionSlotTarget> targets)
+        {
+            targets.Clear();
+            canvas.Query<ConditionSlot>().ForEach(slot =>
+            {
                 if (slot.OwnerNodeId != null)
                     targets.Add(new ConditionSlotTarget(slot.StackId, slot.OwnerNodeId, slot.ParamKey, slot.worldBound));
-            return targets;
+            });
         }
     }
 
@@ -164,6 +173,14 @@ namespace Blocky.Editor
         public static List<SnapTarget> Collect(ProgramCanvasView canvas)
         {
             var targets = new List<SnapTarget>();
+            Collect(canvas, targets);
+            return targets;
+        }
+
+        /// <summary>Fills <paramref name="targets"/> (cleared first) — lets a drag reuse one list across refreshes.</summary>
+        public static void Collect(ProgramCanvasView canvas, List<SnapTarget> targets)
+        {
+            targets.Clear();
 
             foreach (var stackView in canvas.StackViews.Values)
             {
@@ -184,8 +201,6 @@ namespace Blocky.Editor
 
                 CollectSequence(blocks, stackView.StackId, null, -1, targets);
             }
-
-            return targets;
         }
 
         private static void CollectSequence(List<VisualElement> blocks, string stackId, string parentNodeId, int branchIndex, List<SnapTarget> targets)
@@ -212,7 +227,8 @@ namespace Blocky.Editor
             }
         }
 
-        private static List<VisualElement> BlockChildren(VisualElement container)
+        /// <summary>The blocks in a sequence container or C-mouth, in order — skipping anything that isn't a block (e.g. the Editor window's "+ Add" row).</summary>
+        internal static List<VisualElement> BlockChildren(VisualElement container)
         {
             var result = new List<VisualElement>();
             foreach (var child in container.Children())

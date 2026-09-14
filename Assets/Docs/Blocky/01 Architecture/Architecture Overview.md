@@ -7,7 +7,7 @@ tags: [architecture]
 Source: [[Welcome|TDD §3]]. Four layers, dependency direction strictly downward — the data model knows nothing about views, compilation, or the VM; the VM never mutates authored data.
 
 ```
-Editor UI (UI Toolkit)          BlockView · PaletteView · ProgramCanvasView · BlockDragManipulator · DragLayer · ViewPool
+Editor UI (UI Toolkit)          BlockView · HatView · ConditionView · ProgramCanvasView · TableDragManipulator · ChainDragSession · DragLayer
         │  IProgramCommand (only write path)
         ▼
 Data Model (plain C#)           ProgramStore · ObjectProgram · BlockStack · BlockNode — no MonoBehaviour, no UnityEngine.Object refs
@@ -16,7 +16,7 @@ Data Model (plain C#)           ProgramStore · ObjectProgram · BlockStack · B
 Compiled Program (immutable)     int[] instructions · ParamTable · jump targets
         │
         ▼
-Runtime (VM)                    VmScheduler · Thread pool · IBlockOp[] opTable · TriggerBroker · ObjectProgramRunner (MonoBehaviour)
+Runtime (VM)                    VmScheduler · Thread pool · IBlockOp[] + IConditionOp[] op tables · TriggerBroker · ObjectProgramRunner (MonoBehaviour)
 ```
 
 ## Layer notes

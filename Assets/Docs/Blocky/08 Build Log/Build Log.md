@@ -6,6 +6,21 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-14 — Fix: dragging broken by the pointer-capture follow-up
+User report: "You broke dragging". The follow-up below made the drag layer capture the pointer once a drag started, and made the per-frame poll step aside while it held the capture. But a captured pointer's events are delivered to the capturing element, not through the panel-root TrickleDown callbacks the drag listens on — so after capture nothing moved the ghost (no follow, no snap glow) until the release was caught by `ForceEnd`. This was shipped without a Play-mode test, which is how it got through.
+- Reverted to the tracking already proven in Play mode: root TrickleDown callbacks + the host's per-frame `Poll`, with the "an event already moved it since the last poll" flag, and no capture of our own. The shared `TableDragManipulator` base and every other cleanup stay.
+- Compiled clean in Unity (and offline); 122/122 EditMode tests pass. The EditMode tests don't exercise real pointer dragging — confirming the fix needs a Play-mode drag.
+
+## 2026-09-14 — Cleanup pass (/simplify) and its follow-ups
+A four-angle review (reuse, simplification, efficiency, altitude) of every commit since the initial one, then the fixes — first the safe ones, then, at the user's request, the ones first held back.
+
+- **Shared pieces instead of copies:** `TableDragManipulator` (the press/drag/release lifecycle both manipulators duplicated), `IBlockElement` (one "is this a block?" check instead of type lists in ~7 places), `BlockClasses` (category USS class cached per enum value), `BlockNodes.Instantiate` in Blocky.Compiler (one way to create a node; `PaletteView.InstantiatePrototype` delegates), `ProgramEdits.AppendStack`, `SnapTargetCollector.BlockChildren` reused, `HatView` uses `BlockParams.Create`, the Editor window's ✕ uses `DeleteBlock`.
+- **Leaner:** `OpTableBuilder` scans once for both tables (`BuildBoth`); `OpContext` always has its evaluator; dead `_painter` fields and a dead `Reporter` chip case removed; the tab rail and palette share one category grouping; Unity's public USS-class constants instead of string literals.
+- **Fixed a leak:** every edit created a new `BlockProgramAsset` that was never freed — now one per edited object.
+- **Old checkbox conditions** are upgraded at every load point (runner, in-game editor, Editor window), so the compiler's legacy branch is gone (ADR-011 updated).
+- **Follow-ups:** the unused old drag system deleted (`BlockDragManipulator`, `BlockDragController`, `DragState`, `DropCandidate*` + 3 test files); `CanvasMode` enum; undo snapshots are a direct deep copy instead of a JSON round trip; `ChainShape` derived from the model; snap targets cached per drag with transform/layout invalidation; one long-lived `DragContext` so the palette is built once (browsable before an object is picked); the drag layer captures the pointer once a drag starts, leaving the per-frame poll only for the pre-threshold stretch and for releases outside the window. See [[05 Editor UI/Editor UI|Editor UI]].
+- **Verified:** the first round compiled clean in Unity. After the follow-ups the Unity MCP bridge stopped answering (Unity itself was responsive, no dialog open), so the whole project was **compiled offline** instead — scratch copies of the generated `.csproj` files with glob-based sources, built with the .NET SDK: all 10 assemblies (runtime, editor, game, tooling and the 4 test assemblies) build with no errors. Once the bridge came back (bringing the Unity window to the foreground revived it), Unity's own compile was clean and **122/122 EditMode tests pass** — 13 fewer than before, exactly the tests of the three deleted old-drag-system files. The pointer-capture change still needs a manual Play-mode drag test (from a checkbox, from a text box, releasing over the game view).
+
 ## 2026-09-14 — Condition blocks: hexagonal slots, a Conditions tab, click-to-pick
 User request (with a screenshot of Scratch's hexagonal `mouse down?`): a new **Conditions** tab whose blocks have that shape; the condition part of control blocks should be the same hexagon so it's obvious what goes there; conditions for now: mouse down, mouse up, true, false; clicking the empty hexagon should offer a dropdown to pick one.
 
