@@ -64,6 +64,9 @@ sysinfo.txt
 *.unitypackage.meta
 *.app
 
+# Personal Claude Code instructions for this project (not shared)
+CLAUDE.local.md
+
 # Crashlytics generated file
 crashlytics-build.properties
 
