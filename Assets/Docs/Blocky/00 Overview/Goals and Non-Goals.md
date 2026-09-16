@@ -18,7 +18,7 @@ Deferred, but the data model is shaped so none of these need a schema break:
 - Variables and lists
 - Custom procedures ("define" blocks)
 - Expression (reporter) blocks
-- Undo/redo UI (plumbing built, stack capped at 0 entries)
+- ~~Undo/redo UI~~ — **undo shipped in the in-game editor** (2026-09-14, [[09 Decisions/Decisions#ADR-012|ADR-012]]); redo and the Editor window's undo are still open
 - Multi-object copy/paste of stacks
 - Live collaborative editing
 

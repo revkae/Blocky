@@ -64,8 +64,7 @@ namespace Blocky.Data
 
             try
             {
-                PickUp(program, out var chain, out var trigger, out var triggerParameters, out var reusedStackId);
-                Place(program, chain, trigger, triggerParameters, reusedStackId);
+                Execute(program);
             }
             catch
             {
@@ -83,6 +82,13 @@ namespace Blocky.Data
         }
 
         public string Describe() => $"Drop chain ({_source} -> {_target.Kind})";
+
+        /// <summary>The pick-up and placement alone — no snapshot, no rollback, no change event. <see cref="MoveBlocks"/> runs several under one snapshot.</summary>
+        internal void Execute(ObjectProgram program)
+        {
+            PickUp(program, out var chain, out var trigger, out var triggerParameters, out var reusedStackId);
+            Place(program, chain, trigger, triggerParameters, reusedStackId);
+        }
 
         private void PickUp(ObjectProgram program, out BlockNode[] chain, out string trigger, out BlockParam[] triggerParameters, out string reusedStackId)
         {

@@ -23,39 +23,52 @@ namespace Blocky.Data
         public void Do(ProgramStore store)
         {
             var program = store.Program;
-            var stack = ProgramQuery.FindStack(program, _stackId)
-                ?? throw new InvalidOperationException($"Stack '{_stackId}' not found.");
+            if (ProgramQuery.FindStack(program, _stackId) == null)
+                throw new InvalidOperationException($"Stack '{_stackId}' not found.");
             _before = ProgramEdits.Snapshot(program);
 
-            if (_nodeId == null)
+            if (!TryDelete(program, _stackId, _nodeId))
+                throw new InvalidOperationException($"Node '{_nodeId}' not found in stack '{_stackId}'.");
+
+            store.RaiseChanged(new StructureChange(_stackId, _nodeId, StructureChangeKind.NodeRemoved));
+        }
+
+        /// <summary>The deletion itself, without history or change events — shared with <see cref="DeleteBlocks"/>. False if the block isn't there.</summary>
+        internal static bool TryDelete(ObjectProgram program, string stackId, string nodeId)
+        {
+            var stack = ProgramQuery.FindStack(program, stackId);
+            if (stack == null) return false;
+
+            if (nodeId == null)
             {
                 if (stack.sequence.Length == 0)
                 {
-                    ProgramEdits.RemoveStack(program, _stackId);
+                    ProgramEdits.RemoveStack(program, stackId);
                 }
                 else
                 {
                     stack.triggerBlockType = string.Empty;
                     stack.triggerParameters = Array.Empty<BlockParam>();
                 }
+                return true;
             }
-            else if (ProgramQuery.FindLocation(program, _stackId, _nodeId) is { } location)
+
+            if (ProgramQuery.FindLocation(program, stackId, nodeId) is { } location)
             {
                 var container = ProgramQuery.Resolve(program, location);
                 container.Set(ArrayUtil.RemoveAt(container.Get(), location.Index, out _));
 
-                if (ProgramQuery.IsLoose(stack) && stack.sequence.Length == 0) ProgramEdits.RemoveStack(program, _stackId);
-            }
-            else if (ProgramQuery.TryFindConditionOwner(program, _stackId, _nodeId, out var owner, out var paramKey))
-            {
-                ProgramQuery.SetCondition(owner, paramKey, null); // a condition in a slot: the slot goes back to empty
-            }
-            else
-            {
-                throw new InvalidOperationException($"Node '{_nodeId}' not found in stack '{_stackId}'.");
+                if (ProgramQuery.IsLoose(stack) && stack.sequence.Length == 0) ProgramEdits.RemoveStack(program, stackId);
+                return true;
             }
 
-            store.RaiseChanged(new StructureChange(_stackId, _nodeId, StructureChangeKind.NodeRemoved));
+            if (ProgramQuery.TryFindConditionOwner(program, stackId, nodeId, out var owner, out var paramKey))
+            {
+                ProgramQuery.SetCondition(owner, paramKey, null); // a condition in a slot: the slot goes back to empty
+                return true;
+            }
+
+            return false;
         }
 
         public void Undo(ProgramStore store)

@@ -6,6 +6,109 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-16 (later) — Step walks every script whatever its hat; the workspace chrome redesigned
+User request: "Step still not working — when I press step it should play these blocks connected to event play one by one. All events not just when play clicked. And also search for all these type of apps like code blocks and make this one beautiful editor. Make it cleannnnn." Design in [[09 Decisions/Decisions#ADR-015|ADR-015]] and [[09 Decisions/Decisions#ADR-016|ADR-016]].
+
+- **Why Step still did nothing, found by reading the demo scene.** Yesterday's fix started the scripts only when *the whole scene* was idle (`if (!_scheduler.HasWork)`). SpinnerCube runs `repeat forever`, so the scene is never idle — the branch never ran, and each press advanced the spinner alone. And a script under `when key pressed` / `when collided` / `when looked at` could never be stepped at all: between steps everything is frozen, so the learner can't produce the trigger it waits for.
+- **The fix: a hat-independent channel.** `TriggerBroker.OnStepAll` + `FireStepAll`; every compiled, non-loose stack subscribes to it in `ObjectProgramRunner.SubscribeTriggers`. `Playback.StepForward` fires it on every press, so each press advances every running script by one block *and* starts every script that isn't running. `ObjectProgramRunner.FireForStep` starts a stack only when `FindLive` says nothing is running it — stepping deliberately ignores `RetriggerPolicy` (every event hat is `RestartOnRetrigger`, which would restart a script mid-walk). `FirePlayClicked` still runs on each press to keep the once-per-session flag honest; `FireGoClicked` was dropped from Step, since `OnStepAll` covers those stacks. Go is unchanged.
+- **Chrome redesign** (`blocky-ingame.uss` rewritten, `BlockyInGamePanel`'s builders only — no drag, pan, zoom or snap code was touched):
+  - `:root` design tokens (`--bk-*`) for every surface, ink, line and accent; one dark band (the header), light surfaces below it, the Scratch/Blockly rule that leaves the blocks as the only saturated color.
+  - Header: wordmark tile, the edited object as a pill whose dot lights green, the toggle key as a key cap at the far end.
+  - Run bar: white with a hairline; Go / Stop / Reset in one recessed tray, Pause / Step ◀ / Step ▶ in a second, speed as a segmented control; paused shows a warm tint and a "Paused" flag rather than an amber bar.
+  - **A dot grid on the table**, painted with `Painter2D` onto the viewport itself (`PaintGrid`) and stepped by the pan and zoom; one path, one `Fill`, 2px squares rather than arcs.
+  - The 30-word how-to sentence became four chips plus a "?" that opens the full list as a card — including a line that explains what Step ▶ now does.
+  - Tab rail marks the category you're on; the zoom cluster is one card with a percentage readout; seams got grips; slim scrollbars kept.
+  - **The workspace opens at 900px** when the screen allows (`ComfortableWidth`): the scene's serialized `panelWidth` is 420, which left the table at its 120px floor with the footer and zoom cluster overlapping. The right-hand seam still resizes it.
+  - The palette scrolls sideways now (widest prototype 344px vs a 250px column); `SelectCategory` zeroes the horizontal offset afterwards, because `ScrollTo` otherwise scrolls sideways and clips every block on its left (seen live, then fixed).
+- **Verified:**
+  - Compiles clean in Unity; the stylesheet reimports with no USS errors; no new warnings.
+  - **171/171 EditMode tests pass** (3 new in `PlaybackTests`: a script under a non-Play hat is stepped; an idle script starts while another is still running; repeated presses advance rather than restart).
+  - **In Play mode, on the demo scene, through eval** — and, this time, **seen**: `capture_game_view` with `source=screen` *does* include the UI Toolkit panel (the note that it doesn't was wrong).
+    - Step ▶ with SpinnerCube's forever-loop running moved **KeyMover from z = 0 to z = 2 with no key ever pressed** — the exact case that used to do nothing — and started IfElseSign, WaiterCube, SquareWalker and IfDemo too, each parked on its next block, scene paused.
+    - A second press advanced SquareWalker one block (z = 0 → 3) instead of restarting it; ◀ Step put SquareWalker back to z = 0 and KeyMover back to z = 2, still paused.
+    - Layout measured at 900px wide: rail 72, palette 250, table 563, run bar on one row (49px), footer and tips on one row, nothing overlapping. At the old 420 it was rail 64 / palette 221 / table 120.
+    - The dot grid renders (proved by attaching the same drawing code with a loud color through eval, then reading the real one back at its intended subtlety), and sits under the blocks.
+    - Paused state: warm run bar, "Paused" flag, tips card opens from the "?", the rail lights the category picked (Conditions scrolled the palette 509px down with the horizontal offset still 0).
+- **Not verified:**
+  - A person using a real mouse on any of it: the new buttons, the "?" toggle, the tab rail, the seam grips, dragging blocks (unchanged code, but the chrome around it moved).
+  - How it looks on the user's own screen at their own panel width, and whether the light theme is what they want — the whole thing is token-driven, so it can be re-themed from the `:root` block.
+  - Stepping a `when collided` or `when looked at` script specifically (covered for `when key pressed` live and by tests; the channel is the same for all hats).
+
+## 2026-09-16 — Pause only after Go, Step fixed, multi-select + selection box, resizable palette, slim scrollbars
+User request: "Make sure that pause button on editor only appears if I pressed go. Also step should work, it doesn't work right now. Also add multiple choice feature to blocks where I can choose one and shift and choice another one and now I can move both of em. Also choosing multiple blocks on coding environment by clicking on empty place on coding enviroment and dragging to choose multiples. Also make tabs part where blocks are resizeable window. And make those scrolls smaller they are large wide." Design in [[09 Decisions/Decisions#ADR-014|ADR-014]].
+
+- **Step: two causes, both reproduced live.**
+  - Once the demo script ran to its end, Step ▶ paused the scene and recorded a step but started nothing: "when Play clicked" fires once per session, and only Stop/Reset re-armed it. Now Step and Go re-arm it whenever nothing is running. Step with no script at all doesn't pause the scene for nothing.
+  - **Enter Play Mode has domain reload off** (`DisableDomainReload, DisableSceneReload`), and `BlockyRuntime`'s statics were never reset, so a Pause or Step leaked into the next Play session. Seen live: a session began with `IsRunning` true but an empty thread list, because a new script sat forever in the paused scheduler's pending list. `BlockyRuntime` now resets through `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`.
+- **Pause only after Go.** `Playback.IsGoing` (Go pressed, its scripts still running; clears when they finish, on Stop and Reset; a Step-started run doesn't count) replaces `IsRunning` for the button. The demo's scripts start themselves at scene load, which is why Pause used to show before anything was pressed.
+- **Multi-select.** `BlockRef` (Blocky.Data). `ProgramCanvasView` keeps a selection list (`Select`/`AddToSelection`/`ToggleSelected`/`SetSelection`/`IsSelected`/`FindBlockView`/`FindBlocksIn`). Shift or Ctrl+click toggles a block. Dragging one of several selected blocks starts a `GroupDragSession` (new `IDragSession`, also implemented by `ChainDragSession`), applied as one `MoveBlocks` (a single snapshot, one Undo). `MoveBlocks.Outermost` leaves out blocks another selected block carries. Groups land loose; they don't snap. Dropped on the palette, a group is deleted (`MoveBlocks.Discard`). Delete removes the whole selection (`DeleteBlocks`). `DropChain.Execute` and `DeleteBlock.TryDelete` were split out so the group commands reuse them.
+- **Selection box.** Left-drag on empty table draws `.blocky-selection-box` and selects every block it touches, live. Shift/Ctrl adds to the selection. **Pan moved to right or middle drag** (the old left-drag pan was the gesture the user asked for). The wheel still zooms. A release the UI never saw ends a box or a pan from `Update`. The how-to line teaches the new gestures.
+- **Resizable palette.** A 6px seam between the palette and the table. The palette also needed `flex-grow: 0`: a ScrollView grows by default, and it was measured at 443px instead of its 250px basis, splitting spare width with the table.
+- **Slim scrollbars** (USS, scoped to the workspace): an 8px bar, 6px rounded thumb, no arrow buttons, horizontal scroller hidden on the palette. Unity's track measured 24px inside the 8px bar, so it's pinned to 8px too.
+- **Verified:**
+  - Compiles clean in Unity.
+  - **168/168 EditMode tests pass**: 10 new — `PlaybackTests` 4, `MoveBlocksTests` 5, `ProgramCanvasViewTests` 1. Re-run after the last code change (the runtime reset).
+  - **In Play mode, through eval**, on the demo scene:
+    - **Pause:** hidden while the auto-started scripts ran. After Go, `IsGoing` was true and Pause showed ("Pause").
+    - **Step after the scripts finished (before the fix):** confirmed doing nothing.
+    - **Fresh session after the reset:** not paused, even though the previous session ended paused on purpose, and "when Play clicked" ran. Step ▶ while SpinnerCube ran paused the scene and finished its timed turn (86.64° → 90°), with a step recorded.
+    - **Palette scroller:** 8px, no arrow buttons, thumb 6px, track 8px, horizontal scroller hidden.
+    - **Seam:** through its real handler, clamps at 140px minimum and at the table's 120px floor.
+    - **Selection box:** `FindBlocksIn` over SquareWalker's script found all 4 blocks.
+    - **Group drag on a throwaway object:** `GroupDragSession.Start` → `Drop` 30,50px away moved two loose stacks from (20,20)/(20,140) to (50,70)/(50,190). The selection was kept, the ghost cleared, and one Undo put both back. The save file it wrote was deleted and the object destroyed.
+- **Not verified:**
+  - How any of it *looks*: the selection box, the seam, the slim scrollbars, several outlined blocks, and the group ghost. A game-view capture doesn't include the UI Toolkit panel.
+  - A person using a real mouse: Shift+click, dragging a box, right-drag pan, dragging the seam, and dragging a group with the pointer.
+  - One oddity in the group-drag eval: the lifted views' `worldBound` read before a layout pass, so the drop point shouldn't have counted as over the table, yet the drop landed. Whole loose stacks move from their stored positions, so the result was right. The ghost's placement during a real drag, and a group that includes a block taken from the middle of a stack, are untested live.
+  - Step back across a group move, and deleting a mixed selection (hat + blocks + condition) in the live game (covered only by `MoveBlocksTests`).
+
+  All of this needs a manual Play-mode pass.
+
+## 2026-09-15 — Run bar: Pause only while running, Step back / Step forward, speed 1x–4x
+User feedback on the first version: "pause resume should be seen if we already pressed go and it is going. Also step front and step back for going back and forth. Also speed should be 1x 2x 3x 4x not slider." Design in [[09 Decisions/Decisions#ADR-013|ADR-013]].
+
+- **Step back from snapshots.** New `Playback` class (`BlockyRuntime.Playback`) owns the run bar's commands. Before each Step forward it saves every script's progress (`VmScheduler.SaveMoment` → a `ThreadMoment` per thread), every programmed object (`WorldSnapshot.SaveMoment`: transform, visibility, material and color, body motion) and whether "when Play clicked" had fired. Step back restores the last one and stays paused. It keeps up to 200 steps, and forgets them on Resume, Go, Stop, Reset or any program edit. Step forward is ignored while a timed step is still finishing.
+- **Runners ask the scheduler for their threads** (`FindLive` / `StopWhere`) instead of keeping a dictionary, so a thread brought back by Step back is still "the" thread for its stack. `Shutdown` now also stops `AllowConcurrent` threads, which the old dictionary never tracked.
+- **Colors on step back** are restored only on the per-object material copy, never on the original, which in the Editor is the project asset.
+- **Speed 1x 2x 3x 4x** buttons replace the slider. Slow motion and `BlockLinger` are removed.
+- **Pause/Resume** is hidden unless a script is running. ◀ Step is disabled with nothing to go back to. Step ▶ is disabled while a step finishes.
+- **Found live and fixed: Stop now re-arms "when Play clicked".** After Stop, Step ▶ (and Go) started nothing, because the demo's scripts are "when Play clicked", which only Reset used to re-arm. A child would see "the buttons do nothing".
+- **Verified:** compiles clean in Unity. **158/158 EditMode tests pass** (10 new: `PlaybackTests` 7, 3 more in `VmPlaybackTests` minus the removed linger test, 1 more in `WorldSnapshotTests`), re-run after the Stop fix. **In Play mode, through eval** on the demo scene:
+  - Pause is shown while SquareWalker runs and hidden after Stop
+  - ◀ Step is disabled until there's a step to undo
+  - Pause reads "Resume" while paused mid-program, and the bar turns amber
+  - choosing 3x lights that button and sets script time ×3
+  - Reset → Step ▶ (the Repeat block is lit) → Step ▶ (the Move block is lit, SquareWalker moves from z = 0 to z = 3) → ◀ Step puts SquareWalker back at z = 0 with the Repeat block lit again, still paused, with one more step to undo
+
+  Note: Unity ran the game only 2 frames while it wasn't the focused app. The check worked after setting `Application.runInBackground = true` for that Play session (no project setting changed, no window focused).
+- **Not verified:**
+  - how the new buttons look
+  - a person clicking them
+  - step back across a collision (the Bumper hitting the painter), or a color change being undone in the live game (covered only by `WorldSnapshotTests`)
+  - Stop → Go in the live game (covered by `PlaybackTests`, not re-checked live after the fix)
+
+## 2026-09-14 — Learning aids: Reset, running-block glow, Pause/Step/speed, Undo, friendly advice
+User request, written as a teacher with no coding background, "when it goes wrong, I need to see why, and get back quickly": a Reset that puts every object back, the running block lighting up, a speed slider and a one-step button, Undo, and friendly messages like "This script has no ▶ block on top, so it won't start". Design and reasons in [[09 Decisions/Decisions#ADR-012|ADR-012]].
+
+- **Runtime.** `VmScheduler`: `Pause`/`Resume` (the clock stops too), `Step` (each script finishes or starts exactly one block, then parks), `TimeScale`, `BlockLinger` (instant blocks stay lit in slow motion), `HasWork`. Finished threads are now dropped each tick (they used to pile up). `VmThread`: `ActivePc`/`ActiveNodeId`, `ResumePc`/`IsMidBlock`, `StepBudget`/`StepParked`. New `RunningBlocks` (allocation-free "which block is running on this object") and `WorldSnapshot` (captured on a runner's first `Initialize`). `BlockyRuntime.Go`/`Stop`/`ResetWorld`/`StepOnce`: Reset re-arms `when Play clicked`, so Reset → Go replays the scene.
+- **Compiler.** `ProgramAdvice`: plain-language hints (loose blocks, empty event, empty C-block, empty ⬡ hole) and problems (number out of range, bad choice, missing value, unknown block), plus a catch-all for any other compiler error. `BlockDefinition.DisplayName` (the view helper now uses it).
+- **Editor.** `BlockOutline.RunningClass` (4px yellow stroke, same single paint pass). `ProgramCanvasView.SetRunning` / `SetAdvice` (badges "!" / "?"), and a node-id → view index that selection now uses too.
+- **In-game panel.** A run bar under the title (Go, Stop, Reset, Pause/Resume, Step, Slow–Fast slider; amber while paused). The Go button moved there. Undo button and Ctrl/Cmd+Z (50 steps per object). Advice rows above the how-to line; clicking one selects its block.
+- **Layout bug found by measuring, then fixed:** the workspace root is a flex column, and the body was squeezing the title bar (44 → 31px, a bug that predates this change) and the new run bar, whose wrapped slider row spilled out of it. Both now have `flex-shrink: 0`. Measured again after the fix: title 44px, run bar 66px with the slider inside it.
+- **Verified:** compiles clean in Unity. **148/148 EditMode tests pass** (26 new: `VmPlaybackTests` 11, `WorldSnapshotTests` 4, `ProgramAdviceTests` 9, and 2 in `ProgramCanvasViewTests`), re-run after the last code change. The one new analyzer warning (a static predicate in `VmScheduler`) was removed. **In Play mode, through eval** on the demo scene:
+  - the run bar and its buttons are built and laid out
+  - SquareWalker's running block carries the glow class
+  - SquareWalker gets no advice (correct: its script works)
+  - Undo is disabled with no edits
+  - Stop left SquareWalker at (3, 0.5, 3), and Reset put it back at (0, 0.5, 0)
+  - Reset → Step started the scripts paused, mid-step, and Go un-paused them
+- **Not verified:**
+  - How any of it *looks*. A game-view capture doesn't include the UI Toolkit panel, so the glow, badges, colors and the ▶ glyph were never seen (the Go button measures 27px tall vs 24 for the others, possibly a fallback font for ▶).
+  - A person actually clicking the buttons, dragging the slider, or pressing Ctrl+Z.
+  - Advice rows and Undo end to end in the live game. Skipped on purpose: SquareWalker has no save file, and the test edit would have created one.
+
+  All of this needs a manual Play-mode pass.
+
 ## 2026-09-14 — Fix: dragging broken by the pointer-capture follow-up
 User report: "You broke dragging". The follow-up below made the drag layer capture the pointer once a drag started, and made the per-frame poll step aside while it held the capture. But a captured pointer's events are delivered to the capturing element, not through the panel-root TrickleDown callbacks the drag listens on — so after capture nothing moved the ghost (no follow, no snap glow) until the release was caught by `ForceEnd`. This was shipped without a Play-mode test, which is how it got through.
 - Reverted to the tracking already proven in Play mode: root TrickleDown callbacks + the host's per-frame `Poll`, with the "an event already moved it since the last poll" flag, and no capture of our own. The shared `TableDragManipulator` base and every other cleanup stay.

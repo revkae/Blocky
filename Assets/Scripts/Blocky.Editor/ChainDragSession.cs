@@ -25,6 +25,19 @@ namespace Blocky.Editor
         void ForceEnd(Vector2 panelPointer);
     }
 
+    /// <summary>One drag of blocks in progress — a single chain (<see cref="ChainDragSession"/>) or a selected group (<see cref="GroupDragSession"/>).</summary>
+    public interface IDragSession
+    {
+        /// <param name="pointer">Panel (world) coordinates.</param>
+        void Move(Vector2 pointer);
+
+        /// <summary>Applies the outcome as one command.</summary>
+        void Drop(Vector2 pointer);
+
+        /// <summary>Abandons the drag; blocks lifted off the table go back.</summary>
+        void Cancel();
+    }
+
     /// <summary>
     /// Everything a drag on the table needs to know about its workspace. One per workspace for its whole life:
     /// <see cref="SetTarget"/> points it at the object being edited, so long-lived drag sources (the palette)
@@ -78,7 +91,7 @@ namespace Blocky.Editor
     /// The table is unbounded and can be zoomed, so every position here is worked out in two spaces: world
     /// (screen pixels, what the pointer and snap points use) and table-local (unscaled, what the program stores).
     /// </summary>
-    public sealed class ChainDragSession
+    public sealed class ChainDragSession : IDragSession
     {
         private const float SlotGlowPadding = 3f;
 

@@ -6,10 +6,12 @@ using UnityEngine.UIElements;
 namespace Blocky.Editor
 {
     /// <summary>
-    /// Picks up blocks already on the table, and selects them on a click (a second click on the same block
-    /// unselects it). Grabbing a block takes it and every block attached below it (Scratch's rule); grabbing a hat,
-    /// or the first block of a loose stack, takes the whole stack; grabbing a condition takes it out of its slot.
-    /// Drop it loose anywhere, snap it onto another block, or drop it on the palette to delete it.
+    /// Picks up blocks already on the table, and selects them on a click (a second click on the only selected block
+    /// unselects it; Shift- or Ctrl-click adds or removes a block, to pick several). Grabbing a block takes it and
+    /// every block attached below it (Scratch's rule); grabbing a hat, or the first block of a loose stack, takes the
+    /// whole stack; grabbing a condition takes it out of its slot. Grabbing one of several selected blocks moves
+    /// them all (<see cref="GroupDragSession"/>). Drop it loose anywhere, snap it onto another block, or drop it on
+    /// the palette to delete it.
     /// The press is heard in the TrickleDown phase — before any field inside the block gets it — so the whole
     /// block is a handle, fields included; only moving past the threshold turns a press into a drag. Pointer
     /// tracking itself lives in <see cref="TableDragManipulator"/>.
@@ -20,7 +22,8 @@ namespace Blocky.Editor
 
         private Vector2 _downPosition;
         private bool _pressedOnControl;
-        private ChainDragSession _session;
+        private bool _additive; // Shift or Ctrl/Cmd held on press: add to the selection instead of replacing it
+        private IDragSession _session;
 
         /// <param name="blockElement">A view implementing <see cref="IBlockElement"/> (block, hat or condition).</param>
         public CanvasDragManipulator(VisualElement blockElement, DragContext context) : base(blockElement, context)
@@ -42,6 +45,7 @@ namespace Blocky.Editor
 
             _downPosition = evt.position;
             _pressedOnControl = IsOnControl(hit);
+            _additive = evt.shiftKey || evt.actionKey;
             BeginTracking(evt.pointerId);
         }
 
@@ -68,13 +72,12 @@ namespace Blocky.Editor
         {
             var session = _session;
             var pressedOnControl = _pressedOnControl;
+            var additive = _additive;
             StopTracking(); // before Drop: the drop rebuilds the canvas, which replaces this manipulator's block
 
             if (session == null)
             {
-                // Clicking a checkbox or a number box edits it — that must never unselect the block around it.
-                if (pressedOnControl || !IsSelected()) SelectTarget();
-                else Context.Canvas.ClearSelection();
+                Click(pressedOnControl, additive);
                 return false;
             }
 
@@ -93,19 +96,33 @@ namespace Blocky.Editor
         {
             EndTracking();
             _pressedOnControl = false;
+            _additive = false;
             _session = null;
+        }
+
+        /// <summary>
+        /// Shift/Ctrl+click adds or removes this block. A plain click selects only this block, or unselects it when
+        /// it's the only one selected. Clicking a checkbox or number box edits it — that never unselects anything.
+        /// </summary>
+        private void Click(bool pressedOnControl, bool additive)
+        {
+            var canvas = Context.Canvas;
+            if (additive)
+            {
+                if (pressedOnControl) canvas.AddToSelection(Block.StackId, Block.NodeId);
+                else canvas.ToggleSelected(Block.StackId, Block.NodeId);
+            }
+            else if (pressedOnControl)
+            {
+                if (!IsSelected()) SelectTarget();
+            }
+            else if (IsSelected() && canvas.Selection.Count == 1) canvas.ClearSelection();
+            else SelectTarget();
         }
 
         private void SelectTarget() => Context.Canvas.Select(Block.StackId, Block.NodeId);
 
-        private bool IsSelected()
-        {
-            var canvas = Context.Canvas;
-            if (!canvas.HasSelection) return false;
-            return Block.NodeId == null
-                ? canvas.SelectedNodeId == null && canvas.SelectedStackId == Block.StackId // a hat
-                : canvas.SelectedNodeId == Block.NodeId;
-        }
+        private bool IsSelected() => Context.Canvas.IsSelected(Block.StackId, Block.NodeId);
 
         /// <summary>
         /// The press landed on this block itself and not on a block nested inside it (that one's own manipulator
@@ -133,13 +150,19 @@ namespace Blocky.Editor
             return false;
         }
 
-        private ChainDragSession StartSession(Vector2 pointer)
+        private IDragSession StartSession(Vector2 pointer)
         {
             var stackView = target.GetFirstAncestorOfType<StackView>();
             if (stackView == null) return null;
 
+            var canvas = Context.Canvas;
+            canvas.panel?.focusController?.focusedElement?.Blur(); // a field pressed on the way in must not keep focus
+
+            // Shift-dragging an unselected block adds it; dragging one of several selected blocks moves them all.
+            if (_additive && !IsSelected()) canvas.AddToSelection(Block.StackId, Block.NodeId);
+            if (IsSelected() && canvas.Selection.Count > 1) return GroupDragSession.Start(Context, canvas.Selection, pointer);
+
             SelectTarget(); // the block being moved is the selected one
-            Context.Canvas.panel?.focusController?.focusedElement?.Blur(); // a field pressed on the way in must not keep focus
             var zoom = Context.CanvasZoom();
             var program = Context.Store.Program;
 

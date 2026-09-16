@@ -36,15 +36,21 @@ namespace Blocky.Editor
         /// <summary>Class that marks the block the user clicked; drawn as a white outline around the real silhouette.</summary>
         public const string SelectedClass = "blocky-selected";
 
-        public void Draw(Painter2D p, Color fill, bool selected = false)
+        /// <summary>Class that marks the block a script is running right now; drawn as a thick yellow outline, like Scratch's glow.</summary>
+        public const string RunningClass = "blocky-running";
+
+        private static readonly Color RunningStroke = new(1f, 0.86f, 0.1f);
+
+        public void Draw(Painter2D p, Color fill, bool selected = false, bool running = false)
         {
             if (float.IsNaN(Width) || float.IsNaN(Height) || Width <= 0f || Height <= 0f) return;
 
             // One path, one Fill, one Stroke — the only sequence verified to render. Re-tracing the path for
-            // extra strokes produced no visible geometry, so "selected" changes colors, not the number of passes.
+            // extra strokes produced no visible geometry, so "selected" and "running" change colors, not the number
+            // of passes. Running wins the outline (it's the live signal); selected still lightens the fill.
             p.fillColor = selected ? Color.Lerp(fill, Color.white, 0.18f) : fill;
-            p.strokeColor = selected ? Color.white : new Color(fill.r * 0.78f, fill.g * 0.78f, fill.b * 0.78f, 1f);
-            p.lineWidth = selected ? 3f : 1f;
+            p.strokeColor = running ? RunningStroke : selected ? Color.white : new Color(fill.r * 0.78f, fill.g * 0.78f, fill.b * 0.78f, 1f);
+            p.lineWidth = running ? 4f : selected ? 3f : 1f;
             Trace(p);
             p.Fill();
             p.Stroke();
@@ -172,7 +178,8 @@ namespace Blocky.Editor
         private void Draw(MeshGenerationContext mgc)
         {
             var fill = new Color(_fill.r * _shade, _fill.g * _shade, _fill.b * _shade, 1f);
-            _outline().Draw(mgc.painter2D, fill, _element.ClassListContains(BlockOutline.SelectedClass));
+            _outline().Draw(mgc.painter2D, fill, _element.ClassListContains(BlockOutline.SelectedClass),
+                _element.ClassListContains(BlockOutline.RunningClass));
         }
     }
 }

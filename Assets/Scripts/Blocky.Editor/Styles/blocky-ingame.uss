@@ -1,54 +1,286 @@
-/* Chrome for BlockyInGamePanel's Scratch-like layout. Deliberately neutral (grays/off-white) — the only
-   saturated color in the whole workspace is each block's category tint (blocky-base.uss / blocky-*.uss),
-   plus the green Go button, so the UI reads as "colorful where it matters" rather than noisy. */
+/* Chrome for BlockyInGamePanel.
+   One dark band (the header), then light surfaces all the way down — the Scratch/Blockly rule: the only
+   saturated color on screen belongs to the blocks (blocky-base.uss / blocky-*.uss), plus the green Go and the
+   red Stop. Everything else is built from the tokens below, so the whole workspace can be re-themed from one
+   place. UI Toolkit has no box-shadow, so "floating" is a white surface with a hairline border. */
 
-.blocky-ingame-root {
-    background-color: rgb(230, 231, 236);
+:root {
+    --bk-header: rgb(26, 30, 42);
+    --bk-header-soft: rgba(255, 255, 255, 0.10);
+    --bk-surface: rgb(255, 255, 255);
+    --bk-surface-2: rgb(246, 247, 251);
+    --bk-surface-3: rgb(238, 240, 246);
+    --bk-canvas: rgb(243, 245, 249);
+    --bk-line: rgb(225, 228, 237);
+    --bk-line-soft: rgb(236, 238, 244);
+    --bk-ink: rgb(26, 31, 44);
+    --bk-ink-2: rgb(92, 101, 120);
+    --bk-ink-3: rgb(146, 154, 172);
+    --bk-on-dark: rgb(240, 242, 248);
+    --bk-on-dark-2: rgb(163, 171, 191);
+    --bk-accent: rgb(76, 151, 255);
+    --bk-accent-soft: rgb(232, 240, 255);
+    --bk-go: rgb(58, 186, 106);
+    --bk-go-hover: rgb(70, 202, 118);
+    --bk-stop: rgb(233, 91, 82);
+    --bk-stop-hover: rgb(244, 110, 101);
+    --bk-warn: rgb(196, 132, 18);
+    --bk-warn-soft: rgb(255, 246, 228);
+    --bk-warn-line: rgb(243, 206, 134);
 }
 
-/* Responsive top bar: title and Go keep their size; the status text takes what's left and ends in "…"
-   instead of pushing the Go button out of the panel when the workspace is narrow. */
+.blocky-ingame-root {
+    background-color: var(--bk-canvas);
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────────────────────────────────── */
+
 .blocky-ingame-topbar {
+    flex-shrink: 0; /* the root is a column: without this the body squeezes the bar below its height */
     flex-direction: row;
     align-items: center;
-    height: 44px;
-    padding: 0 10px;
+    height: 52px;
+    padding: 0 14px;
     overflow: hidden;
-    background-color: rgb(64, 68, 82);
+    background-color: var(--bk-header);
+}
+
+/* The wordmark: a rounded tile with a "B", the one place the accent color appears in the chrome. */
+.blocky-ingame-mark {
+    width: 24px;
+    height: 24px;
+    margin-right: 9px;
+    border-radius: 7px;
+    background-color: var(--bk-accent);
+    color: rgb(255, 255, 255);
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
 }
 
 .blocky-ingame-title {
     flex-shrink: 0;
-    color: rgb(235, 235, 240);
+    margin-right: 14px;
+    font-size: 15px;
+    color: var(--bk-on-dark);
     -unity-font-style: bold;
-    margin-right: 12px;
 }
 
+/* The object being edited, as a lit pill — a state, not a sentence. */
 .blocky-ingame-status {
-    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+    flex-grow: 0; /* hugs the name — a spacer after it pushes the key hint to the far end */
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 45%;
+    height: 26px;
+    padding: 0 11px 0 9px;
+    border-radius: 13px;
+    overflow: hidden;
+    background-color: var(--bk-header-soft);
+}
+
+.blocky-ingame-status__dot {
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-right: 7px;
+    border-radius: 4px;
+    background-color: var(--bk-ink-3);
+}
+
+/* Lit once an object is being edited. */
+.blocky-ingame-status--live .blocky-ingame-status__dot {
+    background-color: var(--bk-go);
+}
+
+.blocky-ingame-status__label {
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    color: rgb(190, 192, 200);
+    font-size: 12px;
+    color: var(--bk-on-dark-2);
     -unity-text-align: middle-left;
 }
 
-.blocky-ingame-go-button {
-    flex-shrink: 0;
-    background-color: rgb(76, 191, 86);
-    color: rgb(255, 255, 255);
+.blocky-ingame-status--live .blocky-ingame-status__label {
+    color: var(--bk-on-dark);
     -unity-font-style: bold;
-    border-radius: 16px;
-    border-width: 0;
-    padding: 4px 18px;
-    margin-left: 8px;
 }
 
-.blocky-ingame-go-button:hover {
-    background-color: rgb(92, 209, 102);
+.blocky-ingame-keyhint {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 12px;
 }
+
+/* A key cap, so "Tab" reads as a key and not as a word. */
+.blocky-ingame-key {
+    min-width: 30px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.22);
+    background-color: rgba(255, 255, 255, 0.07);
+    font-size: 10px;
+    color: var(--bk-on-dark-2);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.blocky-ingame-keyhint__label {
+    margin-left: 6px;
+    font-size: 11px;
+    color: rgb(124, 133, 154);
+}
+
+/* ─── Run bar ────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* White, with one hairline under it. Wraps onto a second line in a narrow workspace rather than pushing
+   controls out of the panel. */
+.blocky-runbar {
+    flex-shrink: 0; /* keep every wrapped row — the body below takes what's left */
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 7px 12px;
+    border-bottom-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
+    transition-property: background-color;
+    transition-duration: 120ms;
+}
+
+/* Paused (or between steps): a warm tint and a "Paused" flag, so it's obvious why nothing moves. */
+.blocky-runbar--paused {
+    background-color: var(--bk-warn-soft);
+    border-color: var(--bk-warn-line);
+}
+
+/* Controls that belong together sit in one recessed tray, the way a transport bar groups play/stop. */
+.blocky-runbar__group {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-right: 8px;
+    padding: 3px;
+    border-radius: 11px;
+    background-color: var(--bk-surface-2);
+}
+
+.blocky-runbar--paused .blocky-runbar__group {
+    background-color: rgba(255, 255, 255, 0.7);
+}
+
+.blocky-runbar__button {
+    flex-shrink: 0;
+    height: 28px;
+    margin: 0 1px;
+    padding: 0 13px;
+    border-radius: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: 12px;
+    color: var(--bk-ink);
+    -unity-font-style: bold;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
+}
+
+.blocky-runbar__button:hover {
+    background-color: var(--bk-surface-3);
+}
+
+.blocky-runbar__button:disabled {
+    opacity: 0.35;
+}
+
+.blocky-runbar__go {
+    background-color: var(--bk-go);
+    color: rgb(255, 255, 255);
+}
+
+.blocky-runbar__go:hover {
+    background-color: var(--bk-go-hover);
+}
+
+.blocky-runbar__stop {
+    background-color: var(--bk-stop);
+    color: rgb(255, 255, 255);
+}
+
+.blocky-runbar__stop:hover {
+    background-color: var(--bk-stop-hover);
+}
+
+/* Step ◀ / Step ▶: square-ish, the glyph doing the work. */
+.blocky-runbar__step {
+    min-width: 40px;
+    padding: 0 10px;
+}
+
+.blocky-runbar__flag {
+    flex-shrink: 0;
+    margin: 0 6px;
+    padding: 3px 10px;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: var(--bk-warn-line);
+    background-color: rgb(255, 255, 255);
+    font-size: 11px;
+    color: var(--bk-warn);
+    -unity-font-style: bold;
+}
+
+/* Speed: a segmented control, the chosen one lit. */
+.blocky-runbar__speed {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-right: 0;
+    padding: 3px;
+    border-radius: 11px;
+    background-color: var(--bk-surface-2);
+}
+
+.blocky-runbar__speed-label {
+    margin: 0 7px 0 6px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--bk-ink-3);
+    -unity-font-style: bold;
+}
+
+.blocky-runbar__speed-button {
+    min-width: 30px;
+    height: 24px;
+    margin: 0 1px;
+    padding: 0 6px;
+    border-radius: 7px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: 11px;
+    color: var(--bk-ink-2);
+    -unity-font-style: bold;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
+}
+
+.blocky-runbar__speed-button:hover {
+    background-color: var(--bk-surface-3);
+}
+
+.blocky-runbar__speed-button--active,
+.blocky-runbar__speed-button--active:hover {
+    background-color: var(--bk-accent);
+    color: rgb(255, 255, 255);
+}
+
+/* ─── Body: rail · palette · table ───────────────────────────────────────────────────────────────────── */
 
 .blocky-ingame-body {
     flex-direction: row;
@@ -56,8 +288,12 @@
 }
 
 .blocky-ingame-tabrail {
-    width: 64px;
-    background-color: rgb(64, 68, 82);
+    flex-shrink: 0; /* the body is a row: the rail keeps its width, the palette and the table share what is left */
+    width: 72px;
+    padding: 8px 6px;
+    border-right-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface-2);
 }
 
 /* Scratch-style tab: a colored dot with the category name underneath. */
@@ -65,112 +301,332 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 54px;
-    margin: 2px 0;
+    height: 56px;
+    margin: 1px 0;
     padding: 4px 0;
     border-width: 0;
-    border-radius: 0;
+    border-radius: 12px;
     background-color: rgba(0, 0, 0, 0);
+    transition-property: background-color;
+    transition-duration: 90ms;
 }
 
 .blocky-ingame-tab:hover {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: var(--bk-surface-3);
+}
+
+.blocky-ingame-tab--active {
+    background-color: var(--bk-surface);
+    border-width: 1px;
+    border-color: var(--bk-line);
 }
 
 .blocky-ingame-tab__dot {
     width: 20px;
     height: 20px;
     border-radius: 10px;
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.6);
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.85);
 }
 
 .blocky-ingame-tab__label {
-    margin-top: 3px;
+    margin-top: 5px;
     font-size: 10px;
     white-space: nowrap;
-    color: rgb(215, 217, 225);
+    color: var(--bk-ink-2);
     -unity-text-align: middle-center;
 }
 
-/* Shrinks with a narrow workspace instead of squeezing the table to nothing. */
+.blocky-ingame-tab--active .blocky-ingame-tab__label {
+    color: var(--bk-ink);
+    -unity-font-style: bold;
+}
+
+/* Shrinks with a narrow workspace instead of squeezing the table to nothing. Its width (flex-basis) is set
+   from code and changed by dragging the seam on its right. */
 .blocky-ingame-palette {
     flex-basis: 250px;
+    flex-grow: 0; /* a ScrollView grows by default — the palette would split spare width with the table and ignore the seam */
     flex-shrink: 1;
     min-width: 140px;
-    background-color: rgb(246, 247, 250);
-    border-right-width: 1px;
-    border-right-color: rgb(210, 211, 216);
+    background-color: var(--bk-surface);
+}
+
+/* The seam between the palette and the table: drag it to resize the palette. */
+.blocky-ingame-palette-handle {
+    flex-shrink: 0;
+    width: 7px;
+    align-items: center;
+    justify-content: center;
+    border-left-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface-2);
+    transition-property: background-color;
+    transition-duration: 90ms;
+}
+
+.blocky-ingame-palette-handle:hover {
+    background-color: var(--bk-accent-soft);
+}
+
+/* A grip, so the seam looks draggable instead of looking like a gap. */
+.blocky-ingame-palette-handle__grip {
+    width: 3px;
+    height: 28px;
+    border-radius: 2px;
+    background-color: var(--bk-line);
+}
+
+.blocky-ingame-palette-handle:hover .blocky-ingame-palette-handle__grip {
+    background-color: var(--bk-accent);
 }
 
 /* Each prototype keeps its own width, like Scratch's palette — never stretched to the column. */
 .blocky-palette__section {
     align-items: flex-start;
-    padding-bottom: 6px;
+    padding-bottom: 10px;
 }
 
+/* A caption, not a heading: small, spaced, with the category's dot in front of it. */
 .blocky-palette__section-title {
+    flex-direction: row;
+    align-items: center;
+    margin: 14px 0 8px 12px;
+}
+
+.blocky-palette__section-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 7px;
+    border-radius: 4px;
+}
+
+.blocky-palette__section-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--bk-ink-3);
     -unity-font-style: bold;
-    margin: 10px 0 6px 10px;
-    color: rgb(70, 72, 80);
 }
 
 /* Bottom margin leaves room for the tab hanging under each block. */
 .blocky-palette__prototype {
-    margin: 0 10px 14px 10px;
+    margin: 0 12px 14px 12px;
 }
 
 /* The table: an unbounded surface seen through this clipped viewport — drag empty space to move around,
-   scroll to zoom. The canvas inside is moved and scaled with translate/scale, never resized. */
+   scroll to zoom. The canvas inside is moved and scaled with translate/scale, never resized; the dot grid is
+   painted straight onto this element (BlockyInGamePanel.PaintGrid) so it follows the pan and the zoom. */
 .blocky-ingame-canvas-viewport {
     flex-grow: 1;
     min-width: 120px;
     overflow: hidden;
-    background-color: rgb(238, 239, 243);
+    background-color: var(--bk-canvas);
 }
 
-/* How-to line along the bottom of the table; wraps rather than overflowing, and stays clear of the zoom buttons. */
-.blocky-ingame-hint {
+/* ─── Floating table furniture ───────────────────────────────────────────────────────────────────────── */
+
+/* Undo, top-right of the table. */
+.blocky-table-tools {
     position: absolute;
-    left: 10px;
-    right: 56px;
-    bottom: 8px;
-    font-size: 11px;
-    white-space: normal;
-    color: rgb(140, 142, 152);
+    top: 12px;
+    right: 12px;
+    flex-direction: row;
 }
 
+.blocky-table-tools__button {
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
+    font-size: 12px;
+    color: var(--bk-ink-2);
+    -unity-font-style: bold;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
+}
+
+.blocky-table-tools__button:hover {
+    background-color: var(--bk-accent-soft);
+    color: var(--bk-accent);
+}
+
+.blocky-table-tools__button:disabled {
+    opacity: 0.4;
+}
+
+/* One card, bottom-right: zoom in, zoom out, fit, and what the zoom currently is. */
 .blocky-zoom-controls {
     position: absolute;
     right: 12px;
     bottom: 12px;
+    align-items: center;
+    padding: 4px;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
 }
 
 .blocky-zoom-button {
-    width: 32px;
-    height: 32px;
-    margin: 3px 0;
+    width: 30px;
+    height: 30px;
+    margin: 1px 0;
     padding: 0;
-    border-radius: 16px;
-    border-width: 1px;
-    border-color: rgb(200, 202, 210);
-    background-color: rgb(255, 255, 255);
-    color: rgb(70, 72, 80);
-    font-size: 16px;
+    border-radius: 9px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: 15px;
+    color: var(--bk-ink-2);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
 }
 
 .blocky-zoom-button:hover {
-    background-color: rgb(232, 236, 245);
+    background-color: var(--bk-accent-soft);
+    color: var(--bk-accent);
 }
 
+.blocky-zoom-level {
+    margin: 2px 0 1px 0;
+    font-size: 9px;
+    color: var(--bk-ink-3);
+    -unity-text-align: middle-center;
+}
+
+/* ─── Footer: advice, then the tips line ─────────────────────────────────────────────────────────────── */
+
+.blocky-table-footer {
+    position: absolute;
+    left: 12px;
+    right: 58px;
+    bottom: 10px;
+    align-items: flex-start;
+}
+
+.blocky-advice-list {
+    margin-bottom: 8px;
+    align-items: flex-start;
+}
+
+/* One advice message; click it to select the block it's about. */
+.blocky-advice {
+    white-space: normal;
+    -unity-text-align: middle-left;
+    margin: 0 0 4px 0;
+    padding: 7px 12px;
+    border-radius: 10px;
+    border-width: 1px;
+    font-size: 12px;
+    transition-property: background-color;
+    transition-duration: 90ms;
+}
+
+.blocky-advice--hint {
+    background-color: rgb(255, 250, 233);
+    border-color: var(--bk-warn-line);
+    color: rgb(124, 92, 18);
+}
+
+.blocky-advice--hint:hover {
+    background-color: rgb(255, 245, 214);
+}
+
+.blocky-advice--problem {
+    background-color: rgb(255, 238, 236);
+    border-color: rgb(244, 168, 160);
+    color: rgb(150, 44, 36);
+}
+
+.blocky-advice--problem:hover {
+    background-color: rgb(255, 228, 225);
+}
+
+.blocky-advice-more {
+    margin-left: 2px;
+    font-size: 11px;
+    color: var(--bk-ink-3);
+}
+
+/* The tips line: a few chips and a "?" that opens the full list, instead of one long sentence. */
+.blocky-tips {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.blocky-tips__toggle {
+    width: 22px;
+    height: 22px;
+    margin: 0 7px 0 0;
+    padding: 0;
+    border-radius: 11px;
+    border-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
+    font-size: 11px;
+    color: var(--bk-ink-2);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
+}
+
+.blocky-tips__toggle:hover,
+.blocky-tips__toggle--open {
+    background-color: var(--bk-accent);
+    border-color: var(--bk-accent);
+    color: rgb(255, 255, 255);
+}
+
+.blocky-tip {
+    margin: 2px 5px 2px 0;
+    padding: 3px 9px;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: var(--bk-line-soft);
+    background-color: rgba(255, 255, 255, 0.72);
+    font-size: 10px;
+    color: var(--bk-ink-2);
+}
+
+/* The full list, opened from the "?". */
+.blocky-tips-card {
+    margin-bottom: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
+}
+
+.blocky-tips-card__line {
+    margin: 2px 0;
+    font-size: 11px;
+    white-space: normal;
+    color: var(--bk-ink-2);
+}
+
+/* ─── Drag, selection, seams ─────────────────────────────────────────────────────────────────────────── */
+
 .blocky-drag-ghost {
-    opacity: 0.9;
+    opacity: 0.92;
 }
 
 .blocky-drag-chain {
     align-items: flex-start;
+}
+
+/* The box dragged over empty table to select several blocks at once. */
+.blocky-selection-box {
+    position: absolute;
+    background-color: rgba(76, 151, 255, 0.10);
+    border-width: 1px;
+    border-color: var(--bk-accent);
+    border-radius: 4px;
 }
 
 /* Sits in the root's right padding strip — the seam between the workspace and the live game view. */
@@ -179,11 +635,26 @@
     right: 0;
     top: 0;
     bottom: 0;
-    background-color: rgb(64, 68, 82);
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bk-surface-3);
+    transition-property: background-color;
+    transition-duration: 90ms;
 }
 
 .blocky-ingame-resize-handle:hover {
-    background-color: rgb(110, 116, 136);
+    background-color: var(--bk-accent);
+}
+
+.blocky-ingame-resize-handle__grip {
+    width: 3px;
+    height: 34px;
+    border-radius: 2px;
+    background-color: var(--bk-ink-3);
+}
+
+.blocky-ingame-resize-handle:hover .blocky-ingame-resize-handle__grip {
+    background-color: rgb(255, 255, 255);
 }
 
 /* A condition about to drop into a slot: a glowing ring around the hole (drawn under the ghost). */
@@ -200,4 +671,67 @@
     border-radius: 3px;
     border-width: 1px;
     border-color: rgb(255, 255, 255);
+}
+
+/* ─── Slim scrollbars ────────────────────────────────────────────────────────────────────────────────── */
+
+/* A thin rounded thumb and no arrow buttons, instead of Unity's wide default with arrows. */
+.blocky-ingame-root .unity-scroller--vertical {
+    width: 8px;
+    min-width: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.blocky-ingame-root .unity-scroller--horizontal {
+    height: 8px;
+    min-height: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.blocky-ingame-root .unity-scroller__low-button,
+.blocky-ingame-root .unity-scroller__high-button {
+    display: none;
+}
+
+.blocky-ingame-root .unity-scroller .unity-scroller__slider {
+    margin: 0;
+}
+
+.blocky-ingame-root .unity-scroller .unity-base-slider__tracker {
+    border-width: 0;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.blocky-ingame-root .unity-scroller .unity-base-slider__dragger {
+    border-width: 0;
+    border-radius: 3px;
+    background-color: rgba(26, 31, 44, 0.20);
+}
+
+.blocky-ingame-root .unity-scroller .unity-base-slider__dragger:hover {
+    background-color: rgba(26, 31, 44, 0.36);
+}
+
+.blocky-ingame-root .unity-scroller--vertical .unity-base-slider__dragger {
+    left: 1px;
+    width: 6px;
+}
+
+/* Unity's track is wider than the whole slim bar (measured 24px) — keep it inside the 8px. */
+.blocky-ingame-root .unity-scroller--vertical .unity-base-slider__tracker {
+    left: 0;
+    width: 8px;
+}
+
+.blocky-ingame-root .unity-scroller--horizontal .unity-base-slider__dragger {
+    top: 1px;
+    height: 6px;
+}
+
+.blocky-ingame-root .unity-scroller--horizontal .unity-base-slider__tracker {
+    top: 0;
+    height: 8px;
 }

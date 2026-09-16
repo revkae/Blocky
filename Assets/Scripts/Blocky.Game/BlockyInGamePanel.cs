@@ -15,39 +15,80 @@ namespace Blocky.Game
     /// In-game program authoring, Scratch-style: press <see cref="toggleKey"/> to open a left-hand workspace
     /// (the live game stays visible to its right, like Scratch's stage), click any object in the scene to select
     /// it. The workspace has an icon rail (one tab per <see cref="BlockCategory"/>), a palette of real block
-    /// shapes — clicking a tab scrolls to that category — and the table: an unbounded surface you pan by
-    /// dragging empty space and zoom with the wheel or the +/−/= buttons. Blocks are dragged from anywhere on
-    /// them, snap when connectors come close (the matching edge glows), are selected with a click (outlined) and
-    /// deleted with Delete/Backspace or by dropping them on the palette. A green "Go" button fires
-    /// <c>event.when_go_clicked</c>. Every edit autosaves to <see cref="RuntimeProgramStorage"/> and hot-reloads
-    /// the live <see cref="ObjectProgramRunner"/>. The right edge resizes the workspace. Never touches
-    /// <c>UnityEditor</c>, so it works the same in Play mode and in a real build.
+    /// shapes — clicking a tab scrolls to that category; drag the seam on its right to resize it — and the table:
+    /// an unbounded surface you pan by dragging empty space with the right (or middle) button and zoom with the
+    /// wheel or the +/−/= buttons. Blocks are dragged from anywhere on them, snap when connectors come close (the
+    /// matching edge glows), are selected with a click (outlined) and deleted with Delete/Backspace or by dropping
+    /// them on the palette. Several are picked with Shift/Ctrl+click or by dragging a box over empty table with
+    /// the left button, then move, or are deleted, together. Every edit autosaves to
+    /// <see cref="RuntimeProgramStorage"/> and hot-reloads the live <see cref="ObjectProgramRunner"/>. The right
+    /// edge resizes the workspace. Never touches <c>UnityEditor</c>, so it works the same in Play mode and in a
+    /// real build.
+    /// Made for learning: the run bar drives every script in the scene at once through <see cref="Playback"/> —
+    /// Go, Stop, Reset (every programmed object back to where it started), Pause/Resume (shown only after Go,
+    /// while its scripts run), Step back / Step forward (one block per script — and any script that isn't
+    /// running starts, whatever hat it has, so a "when key pressed" script can be walked through too) and a
+    /// 1x–4x speed — and the block a script is on lights up while it runs.
+    /// Undo (button or Ctrl+Z) takes back the last edit, and plain-language advice under the table, with a badge
+    /// on the block, says why a script won't do anything.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public sealed class BlockyInGamePanel : MonoBehaviour
     {
         private const float MinPanelWidth = 360f;
+        // A Scratch-like workspace needs a palette (~250) and a table wide enough to drop a script onto, side by
+        // side. Narrower than this and the table hits its 120px floor the moment the panel opens, which is what
+        // the serialized 420 used to do. Treated as the width to open at when the screen has the room; the seam
+        // on the right still resizes it to anything from MinPanelWidth up.
+        private const float ComfortableWidth = 900f;
         private const float MinGameStrip = 160f; // always leave this much of the game view clickable for object-picking
         private const float ResizeHandleWidth = 8f;
         private const float MinZoom = 0.3f;
         private const float MaxZoom = 2.5f;
         private const float ZoomStep = 1.2f;
         private const float ContentMargin = 16f; // gap kept between the blocks and the table's edges when panning stops
+        private const int UndoSteps = 50;
+        private const int MaxAdviceShown = 3;
+        private const float MinPaletteWidth = 140f;
+        private const float MinTableWidth = 120f; // the palette never grows past the point where the table would be narrower
+        private const float BoxSelectThreshold = 4f; // pointer travel before a press on empty table becomes a selection box
+        private const string ActiveSpeedClass = "blocky-runbar__speed-button--active";
+        private const string ActiveTabClass = "blocky-ingame-tab--active";
+        private const float GridSpacing = 28f;    // table units between the dots on the table
+        private const float MinGridSpacing = 16f; // zoomed out below this, the grid drops a level instead of smearing
+        private const float GridDotSize = 2f;
         private static readonly Vector2 DefaultPan = new(24f, 24f);
 
         [SerializeField] private Key toggleKey = Key.Tab;
         [SerializeField] private StyleSheet[] styleSheets;
         [SerializeField] private float panelWidth = 820f;
+        [SerializeField] private float paletteWidth = 280f; // enough for the widest prototype's last parameter
 
         private UIDocument _uiDocument;
         private BlockRegistry _registry;
 
         private VisualElement _root;
+        private VisualElement _statusChip;
         private Label _statusLabel;
+        private VisualElement _runBar;
+        private Label _pausedFlag;
+        private Button _pauseButton;
+        private Button _stepBackButton;
+        private Button _stepButton;
+        private readonly List<Button> _speedButtons = new(); // index 0 = 1x
+        private Button _undoButton;
+        private VisualElement _adviceList;
+        private VisualElement _tipsCard;
+        private Button _tipsToggle;
+        private bool _tipsOpen;
+        private Label _zoomLabel;
         private VisualElement _tabRail;
+        private readonly List<(BlockCategory category, Button tab)> _tabs = new();
         private ScrollView _paletteScroll;
         private VisualElement _canvasViewport;
         private VisualElement _resizeHandle;
+        private VisualElement _paletteHandle;
+        private VisualElement _selectionBox;
         private DragLayer _dragLayer;
         private readonly Dictionary<BlockCategory, VisualElement> _paletteSections = new();
         private readonly List<(BlockCategory category, List<BlockDefinition> blocks)> _blocksByCategory = new();
@@ -62,6 +103,18 @@ namespace Blocky.Game
         private int _panPointerId;
         private Vector2 _panLastPointer;
 
+        private bool _resizingPalette;
+        private float _paletteResizeStartX;
+        private float _paletteResizeStartWidth;
+
+        private bool _selectingBox;
+        private bool _boxShown;     // moved far enough to be a box, not a click
+        private bool _boxAdditive;  // Shift/Ctrl held: the box adds to what was selected
+        private int _boxPointerId;
+        private Vector2 _boxStart;
+        private readonly List<BlockRef> _boxBase = new(); // the selection the box adds to
+        private readonly List<BlockRef> _boxHits = new(); // reused every move
+
         private GameObject _target;
         private ObjectProgramRunner _runner;
         private ProgramStore _store;
@@ -74,10 +127,21 @@ namespace Blocky.Game
         private int _pointerOverEditorFrame = -1;
         private bool _pointerOverEditor;
 
+        // What the run bar currently shows, so it's only touched when the playback state changes.
+        private bool _runStateShown;
+        private bool _shownPaused;
+        private bool _shownRunning;
+        private bool _shownCanStepBack;
+        private bool _shownStepping;
+
+        private readonly List<string> _runningNow = new();      // filled every frame, never reallocated
+        private readonly HashSet<string> _runningShown = new(); // what the table currently lights up
+
         private void Awake()
         {
             _uiDocument = GetComponent<UIDocument>();
             _registry = BlockyRuntime.Registry;
+            panelWidth = Mathf.Clamp(Mathf.Max(panelWidth, ComfortableWidth), MinPanelWidth, Mathf.Max(MinPanelWidth, Screen.width - MinGameStrip));
             GroupBlocksByCategory();
             BuildChrome();
             SetVisible(false);
@@ -108,14 +172,21 @@ namespace Blocky.Game
                 SetVisible(!_visible);
 
             DriveActiveDrag(mouse);
+            EndStaleTableGestures(mouse);
 
             if (!_visible) return;
 
             KeepContentInView();
+            RefreshRunState();
+            RefreshUndoButton();
+            UpdateRunningHighlight();
 
             var deletePressed = keyboard != null && (keyboard.deleteKey.wasPressedThisFrame || keyboard.backspaceKey.wasPressedThisFrame);
             if (deletePressed && _dragContext?.ActiveDrag == null && !IsTyping())
                 DeleteSelection();
+
+            if (IsUndoShortcut(keyboard) && !IsTyping()) // inside a text box, Ctrl+Z undoes the typing instead
+                UndoLastEdit();
 
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
 
@@ -129,6 +200,10 @@ namespace Blocky.Game
             if (Physics.Raycast(ray, out var hit))
                 SetTarget(hit.collider.gameObject);
         }
+
+        private static bool IsUndoShortcut(Keyboard keyboard) =>
+            keyboard != null && keyboard.zKey.wasPressedThisFrame &&
+            (keyboard.ctrlKey.isPressed || keyboard.leftCommandKey.isPressed || keyboard.rightCommandKey.isPressed);
 
         /// <summary>
         /// Real panel hit-testing instead of a fixed pixel guess — correct regardless of resizing or DPI scaling,
@@ -180,14 +255,23 @@ namespace Blocky.Game
             return false;
         }
 
+        /// <summary>Deletes every selected block in one step (one Undo brings them all back).</summary>
         private void DeleteSelection()
         {
             if (_canvasView == null || !_canvasView.HasSelection) return;
 
-            var stackId = _canvasView.SelectedStackId;
-            var nodeId = _canvasView.SelectedNodeId;
+            var blocks = new List<BlockRef>(_canvasView.Selection);
             _canvasView.ClearSelection();
-            _store.Apply(new DeleteBlock(stackId, nodeId));
+            _store.Apply(new DeleteBlocks(blocks));
+        }
+
+        /// <summary>Takes back the last edit to the selected object's program (history is per object and starts when it's picked).</summary>
+        private void UndoLastEdit()
+        {
+            if (_store == null || !_store.CanUndo || _dragContext?.ActiveDrag != null) return;
+
+            _canvasView.ClearSelection();
+            _store.Undo(); // raises OnChanged like any edit: the table rebuilds, the program saves and hot-reloads
         }
 
         private void BuildChrome()
@@ -208,20 +292,10 @@ namespace Blocky.Game
             _root.style.paddingRight = ResizeHandleWidth; // reserves the strip the absolutely-positioned handle sits in
             _root.style.flexDirection = FlexDirection.Column;
 
-            var topBar = new VisualElement();
-            topBar.AddToClassList("blocky-ingame-topbar");
-            var titleLabel = new Label("Blocky");
-            titleLabel.AddToClassList("blocky-ingame-title");
-            topBar.Add(titleLabel);
+            _root.Add(BuildHeader());
 
-            _statusLabel = new Label("Press Tab, then click an object to code it.");
-            _statusLabel.AddToClassList("blocky-ingame-status");
-            topBar.Add(_statusLabel);
-
-            var goButton = new Button(() => BlockyRuntime.Triggers.FireGoClicked()) { text = "▶ Go" };
-            goButton.AddToClassList("blocky-ingame-go-button");
-            topBar.Add(goButton);
-            _root.Add(topBar);
+            _runBar = BuildRunBar();
+            _root.Add(_runBar);
 
             var body = new VisualElement();
             body.AddToClassList("blocky-ingame-body");
@@ -231,9 +305,21 @@ namespace Blocky.Game
             BuildTabRail();
             body.Add(_tabRail);
 
-            _paletteScroll = new ScrollView(ScrollViewMode.Vertical);
+            // Auto, not Hidden: the widest prototypes are wider than a 250px palette, and a slim bar that appears
+            // only when something is cut off beats text that is simply unreachable.
+            _paletteScroll = new ScrollView(ScrollViewMode.VerticalAndHorizontal) { horizontalScrollerVisibility = ScrollerVisibility.Auto };
             _paletteScroll.AddToClassList("blocky-ingame-palette");
+            _paletteScroll.style.flexBasis = paletteWidth;
             body.Add(_paletteScroll);
+
+            // The seam between the palette and the table: drag it to make the palette wider or narrower.
+            _paletteHandle = new VisualElement();
+            _paletteHandle.AddToClassList("blocky-ingame-palette-handle");
+            _paletteHandle.RegisterCallback<PointerDownEvent>(OnPaletteResizeDown);
+            _paletteHandle.RegisterCallback<PointerMoveEvent>(OnPaletteResizeMove);
+            _paletteHandle.RegisterCallback<PointerUpEvent>(OnPaletteResizeUp);
+            _paletteHandle.Add(Grip("blocky-ingame-palette-handle__grip"));
+            body.Add(_paletteHandle);
 
             _canvasViewport = new VisualElement();
             _canvasViewport.AddToClassList("blocky-ingame-canvas-viewport");
@@ -241,11 +327,15 @@ namespace Blocky.Game
             _canvasViewport.RegisterCallback<PointerMoveEvent>(OnViewportPointerMove);
             _canvasViewport.RegisterCallback<PointerUpEvent>(OnViewportPointerUp);
             _canvasViewport.RegisterCallback<WheelEvent>(OnViewportWheel);
+            _canvasViewport.generateVisualContent += PaintGrid; // the table's dot grid, under everything on it
 
-            var hint = new Label("Drag blocks anywhere · click an empty ⬡ slot to pick a condition · click to select, again to unselect · Delete removes · drag empty space to move · scroll to zoom");
-            hint.AddToClassList("blocky-ingame-hint");
-            hint.pickingMode = PickingMode.Ignore;
-            _canvasViewport.Add(hint);
+            _selectionBox = new VisualElement { pickingMode = PickingMode.Ignore };
+            _selectionBox.AddToClassList("blocky-selection-box");
+            _selectionBox.style.display = DisplayStyle.None;
+            _canvasViewport.Add(_selectionBox); // the table is inserted under it once an object is picked
+
+            _canvasViewport.Add(BuildTableFooter());
+            _canvasViewport.Add(BuildTableTools());
             _canvasViewport.Add(BuildZoomControls());
             body.Add(_canvasViewport);
 
@@ -257,6 +347,7 @@ namespace Blocky.Game
             _resizeHandle.RegisterCallback<PointerDownEvent>(OnResizeDown);
             _resizeHandle.RegisterCallback<PointerMoveEvent>(OnResizeMove);
             _resizeHandle.RegisterCallback<PointerUpEvent>(OnResizeUp);
+            _resizeHandle.Add(Grip("blocky-ingame-resize-handle__grip"));
             _root.Add(_resizeHandle);
 
             _dragLayer = new DragLayer();
@@ -271,6 +362,337 @@ namespace Blocky.Game
             BuildPalette();
         }
 
+        /// <summary>
+        /// The title bar: the wordmark, then what's being edited as a lit pill — a state, not a sentence — and the
+        /// key that hides the workspace, drawn as a key cap so it reads as one.
+        /// </summary>
+        private VisualElement BuildHeader()
+        {
+            var bar = new VisualElement();
+            bar.AddToClassList("blocky-ingame-topbar");
+
+            var mark = new Label("B");
+            mark.AddToClassList("blocky-ingame-mark");
+            bar.Add(mark);
+
+            var title = new Label("Blocky");
+            title.AddToClassList("blocky-ingame-title");
+            bar.Add(title);
+
+            _statusChip = new VisualElement();
+            _statusChip.AddToClassList("blocky-ingame-status");
+            var dot = new VisualElement();
+            dot.AddToClassList("blocky-ingame-status__dot");
+            _statusChip.Add(dot);
+            _statusLabel = new Label("Click an object in the game to code it");
+            _statusLabel.AddToClassList("blocky-ingame-status__label");
+            _statusChip.Add(_statusLabel);
+            bar.Add(_statusChip);
+
+            var spacer = new VisualElement { pickingMode = PickingMode.Ignore };
+            spacer.style.flexGrow = 1f; // the pill hugs the object's name; this pushes the key hint to the far end
+            bar.Add(spacer);
+
+            var keyHint = new VisualElement();
+            keyHint.AddToClassList("blocky-ingame-keyhint");
+            var key = new Label(toggleKey.ToString());
+            key.AddToClassList("blocky-ingame-key");
+            keyHint.Add(key);
+            var hides = new Label("hides this");
+            hides.AddToClassList("blocky-ingame-keyhint__label");
+            keyHint.Add(hides);
+            bar.Add(keyHint);
+
+            return bar;
+        }
+
+        /// <summary>The little bar inside a seam that says "drag me".</summary>
+        private static VisualElement Grip(string className)
+        {
+            var grip = new VisualElement { pickingMode = PickingMode.Ignore };
+            grip.AddToClassList(className);
+            return grip;
+        }
+
+        /// <summary>
+        /// The table's dot grid, painted straight onto the viewport — so it sits under the canvas and its blocks —
+        /// and stepped by the pan and the zoom, which is what makes moving around feel like moving over a surface
+        /// instead of sliding a picture. One path and one Fill, the single-pass rule <see cref="BlockOutline"/>
+        /// follows; the dots are tiny squares rather than arcs, so a screenful is a few thousand triangles instead
+        /// of tens of thousands.
+        /// </summary>
+        private void PaintGrid(MeshGenerationContext ctx)
+        {
+            var size = _canvasViewport.layout.size;
+            if (float.IsNaN(size.x) || float.IsNaN(size.y) || size.x <= 0f || size.y <= 0f) return;
+
+            var spacing = GridSpacing * _zoom;
+            while (spacing < MinGridSpacing) spacing *= 2f; // zoomed out: drop every other dot rather than smear them
+
+            var painter = ctx.painter2D;
+            painter.fillColor = new Color(0.08f, 0.12f, 0.20f, 0.14f);
+            painter.BeginPath();
+
+            const float half = GridDotSize / 2f;
+            for (var x = Mathf.Repeat(_pan.x, spacing); x < size.x; x += spacing)
+                for (var y = Mathf.Repeat(_pan.y, spacing); y < size.y; y += spacing)
+                {
+                    painter.MoveTo(new Vector2(x - half, y - half));
+                    painter.LineTo(new Vector2(x + half, y - half));
+                    painter.LineTo(new Vector2(x + half, y + half));
+                    painter.LineTo(new Vector2(x - half, y + half));
+                    painter.ClosePath();
+                }
+
+            painter.Fill();
+        }
+
+        /// <summary>
+        /// Run controls for the whole scene: Go / Stop / Reset, Pause (only while something runs), Step back / Step
+        /// forward, and the speed. Words rather than icons, so a child (or a teacher) doesn't have to guess.
+        /// Commands go through <see cref="BlockyRuntime.Playback"/> each click, never a cached copy — it is rebuilt
+        /// between play sessions.
+        /// </summary>
+        private VisualElement BuildRunBar()
+        {
+            var bar = new VisualElement();
+            bar.AddToClassList("blocky-runbar");
+
+            var transport = Tray(bar);
+            transport.Add(RunButton("▶ Go", () => BlockyRuntime.Playback.Go(), "blocky-runbar__go"));
+            transport.Add(RunButton("Stop", () => BlockyRuntime.Playback.Stop(), "blocky-runbar__stop"));
+            transport.Add(RunButton("Reset", () => BlockyRuntime.Playback.ResetWorld(), null));
+
+            var stepping = Tray(bar);
+            _pauseButton = RunButton("Pause", TogglePause, null);
+            stepping.Add(_pauseButton);
+            _stepBackButton = RunButton("◀ Step", () => BlockyRuntime.Playback.StepBack(), "blocky-runbar__step");
+            stepping.Add(_stepBackButton);
+            _stepButton = RunButton("Step ▶", () => BlockyRuntime.Playback.StepForward(), null);
+            stepping.Add(_stepButton);
+
+            _pausedFlag = new Label("Paused") { pickingMode = PickingMode.Ignore };
+            _pausedFlag.AddToClassList("blocky-runbar__flag");
+            _pausedFlag.style.display = DisplayStyle.None;
+            bar.Add(_pausedFlag);
+
+            var speed = new VisualElement();
+            speed.AddToClassList("blocky-runbar__speed");
+            var speedLabel = new Label("SPEED");
+            speedLabel.AddToClassList("blocky-runbar__speed-label");
+            speed.Add(speedLabel);
+            for (var value = 1; value <= Playback.MaxSpeed; value++)
+            {
+                var chosen = value;
+                var button = new Button(() => SetSpeed(chosen)) { text = $"{value}x" };
+                button.AddToClassList("blocky-runbar__speed-button");
+                _speedButtons.Add(button);
+                speed.Add(button);
+            }
+            bar.Add(speed);
+            ShowSpeed(BlockyRuntime.Playback.Speed);
+
+            return bar;
+        }
+
+        /// <summary>A recessed tray for controls that belong together, the way a transport bar groups play and stop.</summary>
+        private static VisualElement Tray(VisualElement parent)
+        {
+            var tray = new VisualElement();
+            tray.AddToClassList("blocky-runbar__group");
+            parent.Add(tray);
+            return tray;
+        }
+
+        private static Button RunButton(string text, Action onClick, string modifierClass)
+        {
+            var button = new Button(onClick) { text = text };
+            button.AddToClassList("blocky-runbar__button");
+            if (modifierClass != null) button.AddToClassList(modifierClass);
+            return button;
+        }
+
+        private static void TogglePause()
+        {
+            var playback = BlockyRuntime.Playback;
+            if (playback.IsPaused) playback.Resume();
+            else playback.Pause();
+        }
+
+        private void SetSpeed(int speed)
+        {
+            var playback = BlockyRuntime.Playback;
+            playback.SetSpeed(speed);
+            ShowSpeed(playback.Speed);
+        }
+
+        private void ShowSpeed(int speed)
+        {
+            for (var i = 0; i < _speedButtons.Count; i++)
+                _speedButtons[i].EnableInClassList(ActiveSpeedClass, i + 1 == speed);
+        }
+
+        /// <summary>
+        /// Keeps the run bar in step with the playback state, which Go, Step and scripts finishing also change: Pause
+        /// shows only after Go, while the scripts are still running (as Resume while paused) — not for scripts that
+        /// started on their own at scene start — Step back only has something to go back to after a step forward,
+        /// Step forward waits for a timed block to finish, and the bar turns amber while paused.
+        /// </summary>
+        private void RefreshRunState()
+        {
+            var playback = BlockyRuntime.Playback;
+            var paused = playback.IsPaused;
+            var running = playback.IsGoing;
+            var canStepBack = playback.CanStepBack;
+            var stepping = playback.IsStepping;
+            if (_runStateShown && paused == _shownPaused && running == _shownRunning && canStepBack == _shownCanStepBack && stepping == _shownStepping)
+                return;
+
+            _runStateShown = true;
+            _shownPaused = paused;
+            _shownRunning = running;
+            _shownCanStepBack = canStepBack;
+            _shownStepping = stepping;
+
+            _pauseButton.text = paused ? "Resume" : "Pause";
+            _pauseButton.style.display = running ? DisplayStyle.Flex : DisplayStyle.None;
+            _pausedFlag.style.display = paused ? DisplayStyle.Flex : DisplayStyle.None;
+            _stepBackButton.SetEnabled(canStepBack);
+            _stepButton.SetEnabled(!stepping);
+            _runBar.EnableInClassList("blocky-runbar--paused", paused);
+        }
+
+        private void RefreshUndoButton()
+        {
+            var canUndo = _store != null && _store.CanUndo;
+            if (_undoButton.enabledSelf != canUndo) _undoButton.SetEnabled(canUndo);
+        }
+
+        /// <summary>Lights up the block each of this object's scripts is on. Touches the table only when that set changes.</summary>
+        private void UpdateRunningHighlight()
+        {
+            if (_canvasView == null) return;
+
+            RunningBlocks.Collect(BlockyRuntime.Scheduler, _target, _runningNow);
+            if (IsShownAlready(_runningNow)) return;
+
+            _runningShown.Clear();
+            foreach (var nodeId in _runningNow) _runningShown.Add(nodeId);
+            _canvasView.SetRunning(_runningNow);
+        }
+
+        private bool IsShownAlready(List<string> nodeIds)
+        {
+            if (nodeIds.Count != _runningShown.Count) return false;
+            foreach (var nodeId in nodeIds)
+                if (!_runningShown.Contains(nodeId)) return false;
+            return true;
+        }
+
+        /// <summary>Advice rows (filled per edit) above the how-to line, along the bottom of the table. Empty space in it still pans the table.</summary>
+        private VisualElement BuildTableFooter()
+        {
+            var footer = new VisualElement { pickingMode = PickingMode.Ignore };
+            footer.AddToClassList("blocky-table-footer");
+
+            _adviceList = new VisualElement { pickingMode = PickingMode.Ignore };
+            _adviceList.AddToClassList("blocky-advice-list");
+            _adviceList.style.display = DisplayStyle.None;
+            footer.Add(_adviceList);
+
+            _tipsCard = new VisualElement { pickingMode = PickingMode.Ignore };
+            _tipsCard.AddToClassList("blocky-tips-card");
+            _tipsCard.style.display = DisplayStyle.None;
+            foreach (var line in TipLines)
+            {
+                var row = new Label(line) { pickingMode = PickingMode.Ignore };
+                row.AddToClassList("blocky-tips-card__line");
+                _tipsCard.Add(row);
+            }
+            footer.Add(_tipsCard);
+
+            var tips = new VisualElement();
+            tips.AddToClassList("blocky-tips");
+            _tipsToggle = new Button(ToggleTips) { text = "?", tooltip = "How the table works" };
+            _tipsToggle.AddToClassList("blocky-tips__toggle");
+            tips.Add(_tipsToggle);
+            foreach (var chip in TipChips)
+            {
+                var label = new Label(chip) { pickingMode = PickingMode.Ignore };
+                label.AddToClassList("blocky-tip");
+                tips.Add(label);
+            }
+            footer.Add(tips);
+            return footer;
+        }
+
+        /// <summary>Always on show, one glance each — the whole list is behind the "?".</summary>
+        private static readonly string[] TipChips =
+        {
+            "Drag to build", "Shift+click for several", "Right-drag to move", "Scroll to zoom"
+        };
+
+        private static readonly string[] TipLines =
+        {
+            "Drag a block out of the palette onto the table. Bring two blocks close and the edge they will join glows - let go to snap them together.",
+            "Click a block to pick it. Shift+click, or drag a box over empty table, to pick several and move them as one.",
+            "Delete or Backspace throws away what's picked, and so does dropping it back on the palette. Ctrl+Z undoes the last change.",
+            "Click an empty ⬡ hole to choose a condition, or drag one into it.",
+            "Right-drag (or middle-drag) empty table to move around it, scroll to zoom, or use + - = in the corner.",
+            "Step ▶ runs one block of every script - including scripts that wait for a key press, a bump or a look, which can't happen while everything is frozen."
+        };
+
+        private void ToggleTips()
+        {
+            _tipsOpen = !_tipsOpen;
+            _tipsCard.style.display = _tipsOpen ? DisplayStyle.Flex : DisplayStyle.None;
+            _tipsToggle.EnableInClassList("blocky-tips__toggle--open", _tipsOpen);
+        }
+
+        private VisualElement BuildTableTools()
+        {
+            var tools = new VisualElement { pickingMode = PickingMode.Ignore };
+            tools.AddToClassList("blocky-table-tools");
+
+            _undoButton = new Button(UndoLastEdit) { text = "Undo" };
+            _undoButton.AddToClassList("blocky-table-tools__button");
+            _undoButton.SetEnabled(false);
+            tools.Add(_undoButton);
+            return tools;
+        }
+
+        /// <summary>Problems (a script won't run) first, then hints; each row selects its block when clicked. The rest stay as badges on the blocks.</summary>
+        private void ShowAdvice(List<Advice> advice)
+        {
+            _adviceList.Clear();
+
+            var shown = 0;
+            foreach (var kind in new[] { AdviceKind.Problem, AdviceKind.Hint })
+                foreach (var item in advice)
+                {
+                    if (item.Kind != kind || shown == MaxAdviceShown) continue;
+                    _adviceList.Add(AdviceRow(item));
+                    shown++;
+                }
+
+            if (advice.Count > shown)
+            {
+                var more = new Label($"…and {advice.Count - shown} more — look for the ! and ? badges on the blocks.") { pickingMode = PickingMode.Ignore };
+                more.AddToClassList("blocky-advice-more");
+                _adviceList.Add(more);
+            }
+
+            _adviceList.style.display = advice.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private Button AdviceRow(Advice item)
+        {
+            var row = new Button(() => _canvasView?.Select(item.StackId, item.NodeId)) { text = item.Message };
+            row.AddToClassList("blocky-advice");
+            row.AddToClassList(item.Kind == AdviceKind.Problem ? "blocky-advice--problem" : "blocky-advice--hint");
+            return row;
+        }
+
         private VisualElement BuildZoomControls()
         {
             var controls = new VisualElement();
@@ -278,6 +700,10 @@ namespace Blocky.Game
             controls.Add(ZoomButton("+", () => ZoomAround(ViewportCenter, _zoom * ZoomStep)));
             controls.Add(ZoomButton("−", () => ZoomAround(ViewportCenter, _zoom / ZoomStep)));
             controls.Add(ZoomButton("=", ResetView));
+
+            _zoomLabel = new Label("100%") { pickingMode = PickingMode.Ignore };
+            _zoomLabel.AddToClassList("blocky-zoom-level");
+            controls.Add(_zoomLabel);
             return controls;
         }
 
@@ -298,11 +724,20 @@ namespace Blocky.Game
             return true;
         }
 
+        /// <summary>
+        /// Empty table: the left button draws a selection box (a plain click clears the selection; with Shift/Ctrl the
+        /// box adds to it), the right or middle button pans.
+        /// </summary>
         private void OnViewportPointerDown(PointerDownEvent evt)
         {
-            if (_canvasView == null || _panning || !IsTableBackground(evt.target as VisualElement)) return;
+            if (_canvasView == null || _panning || _selectingBox || !IsTableBackground(evt.target as VisualElement)) return;
 
-            _canvasView.ClearSelection();
+            if (evt.button == 0) BeginBoxSelect(evt);
+            else if (evt.button == 1 || evt.button == 2) BeginPan(evt);
+        }
+
+        private void BeginPan(PointerDownEvent evt)
+        {
             _panning = true;
             _panPointerId = evt.pointerId;
             _panLastPointer = evt.position;
@@ -311,6 +746,11 @@ namespace Blocky.Game
 
         private void OnViewportPointerMove(PointerMoveEvent evt)
         {
+            if (_selectingBox && evt.pointerId == _boxPointerId)
+            {
+                UpdateBoxSelect(evt.position);
+                return;
+            }
             if (!_panning || evt.pointerId != _panPointerId) return;
 
             var pointer = (Vector2)evt.position;
@@ -321,10 +761,73 @@ namespace Blocky.Game
 
         private void OnViewportPointerUp(PointerUpEvent evt)
         {
+            if (_selectingBox && evt.pointerId == _boxPointerId)
+            {
+                UpdateBoxSelect(evt.position);
+                EndBoxSelect();
+                return;
+            }
             if (!_panning || evt.pointerId != _panPointerId) return;
 
+            EndPan();
+        }
+
+        private void EndPan()
+        {
             _panning = false;
-            _canvasViewport.ReleasePointer(evt.pointerId);
+            if (_canvasViewport.HasPointerCapture(_panPointerId)) _canvasViewport.ReleasePointer(_panPointerId);
+        }
+
+        private void BeginBoxSelect(PointerDownEvent evt)
+        {
+            _selectingBox = true;
+            _boxShown = false;
+            _boxPointerId = evt.pointerId;
+            _boxStart = evt.position;
+            _boxAdditive = evt.shiftKey || evt.actionKey;
+            _boxBase.Clear();
+            if (_boxAdditive) _boxBase.AddRange(_canvasView.Selection);
+            _canvasViewport.CapturePointer(evt.pointerId);
+        }
+
+        /// <summary>Selects every block the box touches (plus, with Shift/Ctrl, what was selected before), live as it's drawn.</summary>
+        private void UpdateBoxSelect(Vector2 pointer)
+        {
+            if (_canvasView == null) return;
+            if (!_boxShown && Vector2.Distance(pointer, _boxStart) < BoxSelectThreshold) return; // still a click
+            _boxShown = true;
+
+            var world = Rect.MinMaxRect(Mathf.Min(_boxStart.x, pointer.x), Mathf.Min(_boxStart.y, pointer.y),
+                Mathf.Max(_boxStart.x, pointer.x), Mathf.Max(_boxStart.y, pointer.y));
+            var min = _canvasViewport.WorldToLocal(world.min);
+            var max = _canvasViewport.WorldToLocal(world.max);
+            _selectionBox.style.left = min.x;
+            _selectionBox.style.top = min.y;
+            _selectionBox.style.width = max.x - min.x;
+            _selectionBox.style.height = max.y - min.y;
+            _selectionBox.style.display = DisplayStyle.Flex;
+
+            _boxHits.Clear();
+            _boxHits.AddRange(_boxBase);
+            _canvasView.FindBlocksIn(world, _boxHits);
+            _canvasView.SetSelection(_boxHits);
+        }
+
+        private void EndBoxSelect()
+        {
+            if (!_boxShown && !_boxAdditive) _canvasView?.ClearSelection(); // a plain click on empty table
+            _selectingBox = false;
+            _boxShown = false;
+            _selectionBox.style.display = DisplayStyle.None;
+            if (_canvasViewport.HasPointerCapture(_boxPointerId)) _canvasViewport.ReleasePointer(_boxPointerId);
+        }
+
+        /// <summary>A release the UI never saw (over the game view, outside the window) must still end a selection box or a pan.</summary>
+        private void EndStaleTableGestures(Mouse mouse)
+        {
+            if (mouse == null) return;
+            if (_selectingBox && !mouse.leftButton.isPressed) EndBoxSelect();
+            if (_panning && !mouse.rightButton.isPressed && !mouse.middleButton.isPressed) EndPan();
         }
 
         private void OnViewportWheel(WheelEvent evt)
@@ -356,6 +859,8 @@ namespace Blocky.Game
 
         private void ApplyCanvasTransform()
         {
+            _canvasViewport.MarkDirtyRepaint(); // the dot grid is painted from _pan and _zoom
+            if (_zoomLabel != null) _zoomLabel.text = $"{Mathf.RoundToInt(_zoom * 100f)}%";
             if (_canvasView == null) return;
             if (_dragContext?.ActiveDrag == null) _pan = ClampPan(_pan); // mid-drag, the grabbed stack isn't on the table — don't clamp to what's left
             _canvasView.style.translate = new Translate(new Length(_pan.x), new Length(_pan.y), 0f);
@@ -436,6 +941,34 @@ namespace Blocky.Game
             _resizeHandle.ReleasePointer(evt.pointerId);
         }
 
+        private void OnPaletteResizeDown(PointerDownEvent evt)
+        {
+            if (evt.button != 0) return;
+
+            _resizingPalette = true;
+            _paletteResizeStartX = evt.position.x;
+            _paletteResizeStartWidth = _paletteScroll.layout.width; // what's on screen — a narrow workspace may have shrunk it below paletteWidth
+            _paletteHandle.CapturePointer(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        /// <summary>Widens or narrows the palette, never below <see cref="MinPaletteWidth"/> nor so far the table gets narrower than <see cref="MinTableWidth"/>.</summary>
+        private void OnPaletteResizeMove(PointerMoveEvent evt)
+        {
+            if (!_resizingPalette) return;
+
+            var bodyWidth = _paletteScroll.parent.layout.width;
+            var maxWidth = Mathf.Max(MinPaletteWidth, bodyWidth - _tabRail.layout.width - _paletteHandle.layout.width - MinTableWidth);
+            paletteWidth = Mathf.Clamp(_paletteResizeStartWidth + evt.position.x - _paletteResizeStartX, MinPaletteWidth, maxWidth);
+            _paletteScroll.style.flexBasis = paletteWidth;
+        }
+
+        private void OnPaletteResizeUp(PointerUpEvent evt)
+        {
+            _resizingPalette = false;
+            _paletteHandle.ReleasePointer(evt.pointerId);
+        }
+
         /// <summary>The registry's blocks by category, in enum order, empty categories left out — shared by the tab rail and the palette so they always agree.</summary>
         private void GroupBlocksByCategory()
         {
@@ -456,8 +989,9 @@ namespace Blocky.Game
         {
             foreach (var (category, _) in _blocksByCategory)
             {
-                var tab = new Button(() => ScrollToCategory(category));
+                var tab = new Button(() => SelectCategory(category));
                 tab.AddToClassList("blocky-ingame-tab");
+                _tabs.Add((category, tab));
 
                 var dot = new VisualElement();
                 dot.AddToClassList("blocky-ingame-tab__dot");
@@ -470,12 +1004,24 @@ namespace Blocky.Game
 
                 _tabRail.Add(tab);
             }
+
+            // The palette opens scrolled to the top, so the first category is the one on show.
+            if (_tabs.Count > 0) _tabs[0].tab.AddToClassList(ActiveTabClass);
         }
 
-        private void ScrollToCategory(BlockCategory category)
+        /// <summary>Scrolls the palette to that category and lights its tab, so the rail says where you are.</summary>
+        private void SelectCategory(BlockCategory category)
         {
             if (_paletteSections.TryGetValue(category, out var section))
+            {
                 _paletteScroll.ScrollTo(section);
+                // ScrollTo also scrolls sideways to fit the widest block in the section, which would leave every
+                // block clipped on its left. The category is what was asked for, so only the vertical move counts.
+                _paletteScroll.scrollOffset = new Vector2(0f, _paletteScroll.scrollOffset.y);
+            }
+
+            foreach (var (candidate, tab) in _tabs)
+                tab.EnableInClassList(ActiveTabClass, candidate == category);
         }
 
         private void BuildPalette()
@@ -485,8 +1031,17 @@ namespace Blocky.Game
                 var section = new VisualElement();
                 section.AddToClassList("blocky-palette__section");
 
-                var title = new Label(category.ToString());
+                // A caption with the category's own dot in front of it - USS has no text-transform, so the
+                // capitals are made here.
+                var title = new VisualElement { pickingMode = PickingMode.Ignore };
                 title.AddToClassList("blocky-palette__section-title");
+                var dot = new VisualElement();
+                dot.AddToClassList("blocky-palette__section-dot");
+                dot.AddToClassList(BlockClasses.Category(category));
+                title.Add(dot);
+                var caption = new Label(category.ToString().ToUpperInvariant());
+                caption.AddToClassList("blocky-palette__section-label");
+                title.Add(caption);
                 section.Add(title);
 
                 foreach (var def in defs)
@@ -501,12 +1056,19 @@ namespace Blocky.Game
             }
         }
 
-        /// <summary>The canvas rebuilds its views on every change, so the fresh ones need their drag handles again.</summary>
-        private void AttachCanvasDrag()
+        /// <summary>
+        /// The canvas rebuilds its views on every change (undo included), so the fresh ones need their drag handles
+        /// again, and the advice is worked out anew for the changed program.
+        /// </summary>
+        private void OnCanvasRebuilt()
         {
             foreach (var stackView in _canvasView.StackViews.Values)
                 foreach (var element in stackView.Query<VisualElement>().Where(e => e is IBlockElement).ToList())
                     element.AddManipulator(new CanvasDragManipulator(element, _dragContext));
+
+            var advice = ProgramAdvice.Collect(_store.Program, _registry);
+            _canvasView.SetAdvice(advice);
+            ShowAdvice(advice);
         }
 
         private void SetVisible(bool value)
@@ -528,11 +1090,12 @@ namespace Blocky.Game
                 : _runner.ProgramAsset != null ? _runner.ProgramAsset.Load() : new ObjectProgram { targetObjectUid = go.name };
             ProgramUpgrades.UpgradeCheckboxConditions(program, _registry); // old checkbox conditions become condition blocks (saved with the next edit)
 
-            _store = new ProgramStore(program);
+            _store = new ProgramStore(program) { UndoCapacity = UndoSteps };
             _store.OnChanged += _ => OnProgramChanged();
             _liveAsset = null; // the previous object's runner keeps its own live asset; this object gets a fresh one on its first edit
 
-            _statusLabel.text = $"Editing '{go.name}'";
+            _statusLabel.text = go.name; // the lit dot in front of it already says "this is what you're editing"
+            _statusChip.AddToClassList("blocky-ingame-status--live");
 
             _canvasView?.RemoveFromHierarchy();
             _canvasView = new ProgramCanvasView(_store, _registry, CanvasMode.Table);
@@ -542,22 +1105,24 @@ namespace Blocky.Game
             _canvasView.style.width = Length.Percent(100);
             _canvasView.style.height = Length.Percent(100);
             _canvasView.style.transformOrigin = new TransformOrigin(new Length(0f), new Length(0f), 0f);
-            _canvasViewport.Insert(0, _canvasView); // under the zoom controls
+            _canvasViewport.Insert(0, _canvasView); // under the advice, the tools and the zoom controls
 
             _pan = DefaultPan;
             _zoom = 1f;
             ApplyCanvasTransform();
 
             _dragContext.SetTarget(_store, _canvasView);
+            _runningShown.Clear(); // a fresh canvas lights nothing up yet
 
-            _canvasView.Rebuilt += AttachCanvasDrag;
-            AttachCanvasDrag(); // the first build happened inside the constructor, before we could subscribe
+            _canvasView.Rebuilt += OnCanvasRebuilt;
+            OnCanvasRebuilt(); // the first build happened inside the constructor, before we could subscribe
         }
 
         /// <summary>
         /// Saves to the player's save file, then hot-reloads the runner so the edit takes effect immediately —
         /// the object's own <c>OnEnable</c>/<c>Initialize</c> already ran once at scene start, so a fresh
-        /// compile must be forced explicitly for a change made mid-session to actually run.
+        /// compile must be forced explicitly for a change made mid-session to actually run. The step history is
+        /// dropped first: its saved scripts belong to the program as it was before this edit.
         /// </summary>
         private void OnProgramChanged()
         {
@@ -565,6 +1130,7 @@ namespace Blocky.Game
 
             if (_liveAsset == null) _liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
             _liveAsset.Save(_store.Program);
+            BlockyRuntime.Playback.ForgetSteps();
             _runner.Shutdown();
             _runner.SetProgramAsset(_liveAsset);
             _runner.Initialize();

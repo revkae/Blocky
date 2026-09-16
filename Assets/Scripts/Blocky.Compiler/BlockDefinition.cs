@@ -19,5 +19,8 @@ namespace Blocky.Compiler
         public ParamSpec[] parameters = Array.Empty<ParamSpec>();
         public string executorKey;
         public RetriggerPolicy retrigger = RetriggerPolicy.RestartOnRetrigger;
+
+        /// <summary>The name a player sees on the block ("Repeat", "when Go clicked"); the block type if none is set.</summary>
+        public string DisplayName => string.IsNullOrEmpty(displayNameKey) ? blockType : displayNameKey;
     }
 }

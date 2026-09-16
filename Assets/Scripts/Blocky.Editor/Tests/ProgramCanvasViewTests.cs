@@ -111,6 +111,55 @@ namespace Blocky.Editor.Tests
         }
 
         [Test]
+        public void MultiSelection_HighlightsEveryBlock_SurvivesARebuild_AndTogglesOneOut()
+        {
+            var registry = BlockRegistry.Build(new[]
+            {
+                Def("event.when_play_clicked", BlockShape.Trigger),
+                Def("motion.move_forward", BlockShape.Statement)
+            });
+            var program = new ObjectProgram
+            {
+                stacks = new[]
+                {
+                    new BlockStack
+                    {
+                        id = "stk_1",
+                        triggerBlockType = "event.when_play_clicked",
+                        sequence = new[]
+                        {
+                            new BlockNode { id = "n1", blockType = "motion.move_forward" },
+                            new BlockNode { id = "n2", blockType = "motion.move_forward" }
+                        }
+                    }
+                }
+            };
+            var store = new ProgramStore(program);
+            var canvas = new ProgramCanvasView(store, registry, CanvasMode.Table);
+            BlockView View(string nodeId) => canvas.Query<BlockView>().ToList().Find(v => v.NodeId == nodeId);
+
+            canvas.Select("stk_1", "n1");
+            canvas.AddToSelection("stk_1", "n2");
+            canvas.AddToSelection("stk_1", null); // the hat
+            Assert.AreEqual(3, canvas.Selection.Count);
+
+            store.Apply(new MoveStack("stk_1", new Vector2(50, 50))); // rebuilds every view
+            Assert.AreEqual(3, canvas.Selection.Count);
+            Assert.IsTrue(View("n1").ClassListContains(BlockOutline.SelectedClass));
+            Assert.IsTrue(View("n2").ClassListContains(BlockOutline.SelectedClass));
+            Assert.IsTrue(canvas.StackViews["stk_1"].Hat.ClassListContains(BlockOutline.SelectedClass));
+
+            canvas.ToggleSelected("stk_1", "n1");
+            Assert.IsFalse(canvas.IsSelected("stk_1", "n1"));
+            Assert.IsFalse(View("n1").ClassListContains(BlockOutline.SelectedClass));
+            Assert.IsTrue(canvas.IsSelected("stk_1", "n2"));
+
+            canvas.Select("stk_1", "n1"); // a plain select replaces the group
+            Assert.AreEqual(1, canvas.Selection.Count);
+            Assert.IsFalse(View("n2").ClassListContains(BlockOutline.SelectedClass));
+        }
+
+        [Test]
         public void SetViewport_OnlyInstantiatesStacksNearIt()
         {
             var registry = BuildRegistry();
@@ -151,6 +200,66 @@ namespace Blocky.Editor.Tests
 
             canvas.SetViewport(null);
             Assert.AreEqual(2, canvas.StackViews.Count);
+        }
+
+        private static (ProgramStore store, ProgramCanvasView canvas) OneBlockScript()
+        {
+            var registry = BlockRegistry.Build(new[]
+            {
+                Def("event.when_play_clicked", BlockShape.Trigger),
+                Def("motion.move_forward", BlockShape.Statement)
+            });
+            var program = new ObjectProgram
+            {
+                stacks = new[]
+                {
+                    new BlockStack
+                    {
+                        id = "stk_1",
+                        triggerBlockType = "event.when_play_clicked",
+                        sequence = new[] { new BlockNode { id = "n1", blockType = "motion.move_forward" } }
+                    }
+                }
+            };
+            var store = new ProgramStore(program);
+            return (store, new ProgramCanvasView(store, registry, CanvasMode.Table));
+        }
+
+        [Test]
+        public void SetRunning_LightsTheBlock_KeepsItThroughARebuild_AndClears()
+        {
+            var (store, canvas) = OneBlockScript();
+
+            canvas.SetRunning(new[] { "n1" });
+            Assert.IsTrue(canvas.Query<BlockView>().First().ClassListContains(BlockOutline.RunningClass));
+
+            store.Apply(new MoveStack("stk_1", new Vector2(50, 50))); // rebuilds every view
+            Assert.IsTrue(canvas.Query<BlockView>().First().ClassListContains(BlockOutline.RunningClass));
+
+            canvas.SetRunning(new string[0]);
+            Assert.IsFalse(canvas.Query<BlockView>().First().ClassListContains(BlockOutline.RunningClass));
+        }
+
+        [Test]
+        public void SetAdvice_PinsOneBadgePerBlock_ProblemOutranksHint_AndReplacesOldBadges()
+        {
+            var (_, canvas) = OneBlockScript();
+
+            canvas.SetAdvice(new[]
+            {
+                new Advice(AdviceKind.Hint, "stk_1", null, "hat hint"),
+                new Advice(AdviceKind.Hint, "stk_1", "n1", "block hint"),
+                new Advice(AdviceKind.Problem, "stk_1", "n1", "block problem")
+            });
+
+            var hatBadge = canvas.StackViews["stk_1"].Hat.Q<Label>(className: ProgramCanvasView.AdviceBadgeClass);
+            Assert.AreEqual("?", hatBadge.text);
+            var blockBadges = canvas.Query<BlockView>().First().Query<Label>(className: ProgramCanvasView.AdviceBadgeClass).ToList();
+            Assert.AreEqual(1, blockBadges.Count);
+            Assert.AreEqual("!", blockBadges[0].text);
+
+            canvas.SetAdvice(new Advice[0]);
+            Assert.AreEqual(0, canvas.Query<Label>(className: ProgramCanvasView.AdviceBadgeClass).ToList().Count);
         }
     }
 }

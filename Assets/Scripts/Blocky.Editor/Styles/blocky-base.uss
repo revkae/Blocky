@@ -102,6 +102,31 @@
     height: 18px;
 }
 
+/* Advice badge pinned to a block's top-right corner: "!" = this script won't run, "?" = a hint. The table
+   (ProgramCanvasView.SetAdvice) adds them; the message itself is listed under the table. */
+.blocky-advice-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: rgb(255, 255, 255);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+}
+
+.blocky-advice-badge--hint {
+    background-color: rgb(240, 180, 30);
+}
+
+.blocky-advice-badge--problem {
+    background-color: rgb(214, 60, 50);
+}
+
 .blocky-block--error {
     background-color: var(--blocky-color-error);
     border-width: 1px;

@@ -22,7 +22,6 @@ namespace Blocky.Runtime
 
         private CompiledProgram _compiled;
         private readonly List<(BlockStack stack, BlockDefinition trigger, int entryPc)> _stacks = new();
-        private readonly Dictionary<string, VmThread> _activeThreads = new();
         private readonly List<Action> _unsubscribe = new();
 
         /// <summary>Assign before enabling — Unity runs <c>OnEnable</c> the instant an inactive object with this component becomes active.</summary>
@@ -42,6 +41,8 @@ namespace Blocky.Runtime
         /// </summary>
         public void Initialize()
         {
+            BlockyRuntime.World.Capture(gameObject); // first start only: where this object began, for the editor's Reset
+
             var registry = BlockyRuntime.Registry;
             var program = programAsset != null ? programAsset.Load() : new ObjectProgram();
             ProgramUpgrades.UpgradeCheckboxConditions(program, registry); // assets saved before condition blocks existed
@@ -71,8 +72,7 @@ namespace Blocky.Runtime
             foreach (var unsubscribe in _unsubscribe) unsubscribe();
             _unsubscribe.Clear();
 
-            foreach (var thread in _activeThreads.Values) thread.State = ThreadState.Done;
-            _activeThreads.Clear();
+            if (_compiled != null) BlockyRuntime.Scheduler.StopWhere(gameObject, _compiled);
         }
 
         private void SubscribeTriggers()
@@ -81,18 +81,23 @@ namespace Blocky.Runtime
 
             foreach (var (stack, triggerDef, entryPc) in _stacks)
             {
+                // Any stack can also be started by hand from the run bar's Step forward, whatever hat it has.
+                void StepHandler() => FireForStep(entryPc);
+                broker.OnStepAll += StepHandler;
+                _unsubscribe.Add(() => broker.OnStepAll -= StepHandler);
+
                 switch (triggerDef.blockType)
                 {
                     case "event.when_play_clicked":
                     {
-                        void Handler() => Fire(stack, triggerDef, entryPc);
+                        void Handler() => Fire(triggerDef, entryPc);
                         broker.OnPlayClicked += Handler;
                         _unsubscribe.Add(() => broker.OnPlayClicked -= Handler);
                         break;
                     }
                     case "event.when_go_clicked":
                     {
-                        void Handler() => Fire(stack, triggerDef, entryPc);
+                        void Handler() => Fire(triggerDef, entryPc);
                         broker.OnGoClicked += Handler;
                         _unsubscribe.Add(() => broker.OnGoClicked -= Handler);
                         break;
@@ -101,7 +106,7 @@ namespace Blocky.Runtime
                     {
                         void Handler(Key key)
                         {
-                            if (MatchesKey(stack, key)) Fire(stack, triggerDef, entryPc);
+                            if (MatchesKey(stack, key)) Fire(triggerDef, entryPc);
                         }
                         broker.OnKeyPressed += Handler;
                         _unsubscribe.Add(() => broker.OnKeyPressed -= Handler);
@@ -111,7 +116,7 @@ namespace Blocky.Runtime
                     {
                         void Handler(GameObject source, Collision collision)
                         {
-                            if (source == gameObject && MatchesTag(stack, collision)) Fire(stack, triggerDef, entryPc);
+                            if (source == gameObject && MatchesTag(stack, collision)) Fire(triggerDef, entryPc);
                         }
                         broker.OnCollided += Handler;
                         _unsubscribe.Add(() => broker.OnCollided -= Handler);
@@ -124,7 +129,7 @@ namespace Blocky.Runtime
 
                         void Handler(GameObject target)
                         {
-                            if (target == gameObject) Fire(stack, triggerDef, entryPc);
+                            if (target == gameObject) Fire(triggerDef, entryPc);
                         }
                         broker.OnLookedAt += Handler;
                         _unsubscribe.Add(() =>
@@ -142,8 +147,10 @@ namespace Blocky.Runtime
         /// Applies <see cref="RetriggerPolicy"/> then starts a thread (TDD §6.4). RestartOnRetrigger kills the
         /// existing thread and starts a fresh one rather than resetting its pc in place — equivalent for v1
         /// since there is no thread pooling yet to make in-place reset actually cheaper (deferred to Milestone 7).
+        /// The stack's current thread is looked up in the scheduler rather than remembered here, so a thread brought
+        /// back by Step back still counts as the one running.
         /// </summary>
-        private void Fire(BlockStack stack, BlockDefinition triggerDef, int entryPc)
+        private void Fire(BlockDefinition triggerDef, int entryPc)
         {
             var scheduler = BlockyRuntime.Scheduler;
 
@@ -153,13 +160,23 @@ namespace Blocky.Runtime
                 return;
             }
 
-            _activeThreads.TryGetValue(stack.id, out var existing);
-            var stillRunning = existing != null && existing.State != ThreadState.Done;
+            var existing = scheduler.FindLive(gameObject, _compiled, entryPc);
+            if (triggerDef.retrigger == RetriggerPolicy.IgnoreWhileRunning && existing != null) return;
+            if (triggerDef.retrigger == RetriggerPolicy.RestartOnRetrigger && existing != null) existing.State = ThreadState.Done;
 
-            if (triggerDef.retrigger == RetriggerPolicy.IgnoreWhileRunning && stillRunning) return;
-            if (triggerDef.retrigger == RetriggerPolicy.RestartOnRetrigger && stillRunning) existing.State = ThreadState.Done;
+            scheduler.Start(_compiled, gameObject, entryPc);
+        }
 
-            _activeThreads[stack.id] = scheduler.Start(_compiled, gameObject, entryPc);
+        /// <summary>
+        /// Starts this stack for a Step forward, unless it is already running. Deliberately ignores the trigger's
+        /// <see cref="RetriggerPolicy"/>: every event hat is <c>RestartOnRetrigger</c>, and restarting a script the
+        /// learner is halfway through walking, one block per press, would be the opposite of stepping.
+        /// </summary>
+        private void FireForStep(int entryPc)
+        {
+            var scheduler = BlockyRuntime.Scheduler;
+            if (scheduler.FindLive(gameObject, _compiled, entryPc) != null) return;
+            scheduler.Start(_compiled, gameObject, entryPc);
         }
 
         private static bool MatchesKey(BlockStack stack, Key firedKey)

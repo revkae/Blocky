@@ -51,8 +51,7 @@ namespace Blocky.Editor
         public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
             new(PaletteView.InstantiatePrototype(definition), definition, registry, null, null, buttons: false, prototype: true);
 
-        internal static string DisplayName(BlockDefinition definition) =>
-            string.IsNullOrEmpty(definition.displayNameKey) ? definition.blockType : definition.displayNameKey;
+        internal static string DisplayName(BlockDefinition definition) => definition.DisplayName;
 
         private BlockView(BlockNode node, BlockDefinition definition, BlockRegistry registry, string stackId, ProgramStore store, bool buttons, bool prototype)
         {

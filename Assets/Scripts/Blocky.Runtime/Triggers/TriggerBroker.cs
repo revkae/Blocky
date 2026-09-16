@@ -27,10 +27,23 @@ namespace Blocky.Runtime.Triggers
         /// <summary>Call when a new play session starts, so <see cref="FirePlayClicked"/> can fire again.</summary>
         public void ResetPlaySession() => _playClickedFired = false;
 
+        /// <summary>Whether "when Play clicked" has already fired this session (Step back saves it, to re-arm it when stepping back past the start).</summary>
+        public bool PlayClickedFired => _playClickedFired;
+
         /// <summary>The in-game "Go" button (TDD-equivalent of Scratch's green flag) — click it as many times as you like, each fires this again.</summary>
         public event Action OnGoClicked;
 
         public void FireGoClicked() => OnGoClicked?.Invoke();
+
+        /// <summary>
+        /// "Start every script in the scene, whatever hat it has" — the channel Step forward uses. A learner walking
+        /// a program block by block cannot produce a key press, a collision or a look while the scene is frozen
+        /// between steps, so without this only "when Play clicked" and "when Go clicked" scripts could ever be
+        /// stepped. Listeners leave a script that is already running exactly where it is.
+        /// </summary>
+        public event Action OnStepAll;
+
+        public void FireStepAll() => OnStepAll?.Invoke();
 
         private readonly HashSet<Key> _keysDownLastPoll = new();
 

@@ -16,8 +16,14 @@ Data Model (plain C#)           ProgramStore · ObjectProgram · BlockStack · B
 Compiled Program (immutable)     int[] instructions · ParamTable · jump targets
         │
         ▼
-Runtime (VM)                    VmScheduler · Thread pool · IBlockOp[] + IConditionOp[] op tables · TriggerBroker · ObjectProgramRunner (MonoBehaviour)
+Runtime (VM)                    VmScheduler (+ pause/step/speed) · Thread pool · IBlockOp[] + IConditionOp[] op tables · TriggerBroker · ObjectProgramRunner (MonoBehaviour) · WorldSnapshot · RunningBlocks · Playback
 ```
+
+`ProgramAdvice` (Compiler layer) reads the data model and the registry to produce plain-language hints and problems; the in-game editor shows them. It never feeds the VM. The editor reads the VM only through `RunningBlocks` (which block is running) and the run bar's `BlockyRuntime` commands. See [[09 Decisions/Decisions#ADR-012|ADR-012]].
+
+**Shared runtime state is per Play session.** The project enters Play mode with domain reload *off* (Enter Play Mode Options: `DisableDomainReload, DisableSceneReload`), so statics survive from one Play session to the next. `BlockyRuntime` therefore resets itself (scheduler, triggers, world snapshot, playback) through `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`. Any new static state needs the same treatment. See [[09 Decisions/Decisions#ADR-014|ADR-014]].
+
+Editor multi-select adds `BlockRef` and the group commands `MoveBlocks` / `DeleteBlocks` to the data layer, and `GroupDragSession` (an `IDragSession`, like `ChainDragSession`) to the editor layer.
 
 ## Layer notes
 - [[02 Data Model/Data Model|Data Model]] — the only layer with serialized state
