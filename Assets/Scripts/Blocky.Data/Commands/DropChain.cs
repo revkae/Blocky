@@ -5,7 +5,8 @@ namespace Blocky.Data
     /// <summary>
     /// The single command behind every drag on the table (TDD §8.3: exactly one command per drag). A chain is
     /// picked up from one of four sources — a new block or a new hat from the palette, a node plus everything
-    /// below it in its container, or a whole stack — and placed at a <see cref="ChainTarget"/>.
+    /// below it in its container, or a whole stack — and placed at a <see cref="ChainTarget"/>: loose, inserted,
+    /// in place of a block that was there (<see cref="ChainTargetKind.Replace"/>), or thrown away.
     /// Picking up a node takes the whole tail under it, because that's what grabbing a block does in Scratch.
     /// A loose stack left empty by the pick-up is removed; a triggered stack is kept even when empty, since a
     /// lone hat on the table is still something the user placed.
@@ -170,6 +171,22 @@ namespace Blocky.Data
                         throw new InvalidOperationException("A hat block can only start a stack; it can't be inserted into one.");
                     var container = ProgramQuery.Resolve(program, _target.InsertAt);
                     container.Set(ArrayUtil.InsertRange(container.Get(), _target.InsertAt.Index, chain));
+                    return;
+                }
+
+                case ChainTargetKind.Replace:
+                {
+                    if (hasTrigger)
+                        throw new InvalidOperationException("A hat block can only start a stack; it can't replace a block in one.");
+                    var container = ProgramQuery.Resolve(program, _target.InsertAt);
+                    var blocks = container.Get();
+                    var index = _target.InsertAt.Index;
+                    if (index < 0 || index >= blocks.Length)
+                        throw new InvalidOperationException($"Nothing to replace at index {index}.");
+
+                    // Out with the old block, in with the chain, at the same slot. What followed the replaced block
+                    // stays put: only that one block — and whatever was nested inside it — goes.
+                    container.Set(ArrayUtil.InsertRange(ArrayUtil.RemoveAt(blocks, index, out _), index, chain));
                     return;
                 }
 

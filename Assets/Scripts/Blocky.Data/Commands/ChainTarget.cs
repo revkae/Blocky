@@ -6,6 +6,7 @@ namespace Blocky.Data
     {
         Free,
         Insert,
+        Replace,
         AttachAbove,
         Discard,
         ConditionSlot
@@ -13,15 +14,16 @@ namespace Blocky.Data
 
     /// <summary>
     /// Where a dragged chain of blocks lands (<see cref="DropChain"/>): loose on the table at a canvas position,
-    /// inserted into a sequence, attached on top of a loose stack (the chain's bottom connects to that stack's
-    /// top block), dropped into a block's condition slot (a single condition block only), or thrown away
-    /// (dropped back on the palette).
+    /// inserted into a sequence, put in place of the block already at that slot (the strict column's "swap":
+    /// the block there is taken out and the chain goes in where it was), attached on top of a loose stack (the
+    /// chain's bottom connects to that stack's top block), dropped into a block's condition slot (a single
+    /// condition block only), or thrown away (dropped back on the palette).
     /// </summary>
     public readonly struct ChainTarget
     {
         public readonly ChainTargetKind Kind;
         public readonly Vector2 Position;      // Free: the new stack's position. AttachAbove: the merged stack's new top-left. ConditionSlot: where a displaced condition is put.
-        public readonly NodeLocation InsertAt; // Insert only
+        public readonly NodeLocation InsertAt; // Insert, Replace
         public readonly string StackId;        // AttachAbove, ConditionSlot
         public readonly string NodeId;         // ConditionSlot: the block that owns the slot
         public readonly string ParamKey;       // ConditionSlot: which of its params the slot is
@@ -39,6 +41,9 @@ namespace Blocky.Data
         public static ChainTarget Free(Vector2 position) => new(ChainTargetKind.Free, position, default, null);
 
         public static ChainTarget Insert(NodeLocation at) => new(ChainTargetKind.Insert, default, at, null);
+
+        /// <summary>The chain takes the place of the block at <paramref name="at"/>; that block (and anything nested inside it) goes.</summary>
+        public static ChainTarget Replace(NodeLocation at) => new(ChainTargetKind.Replace, default, at, null);
 
         public static ChainTarget AttachAbove(string stackId, Vector2 newTopPosition) =>
             new(ChainTargetKind.AttachAbove, newTopPosition, default, stackId);

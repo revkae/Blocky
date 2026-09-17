@@ -28,6 +28,9 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 ## In-game program editor
 `BlockyInGamePanel` (GameObject in this scene) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it.
 
+- **Free / Simple** (title bar) — two ways to work, on the same program:
+  - **Free** is the Scratch table described below: blocks go anywhere, several scripts side by side, blocks may lie loose, and the table pans and zooms.
+  - **Simple** is the strict one, like Delightex's CoBlocks: every script flows down **one numbered column**, a block dropped anywhere joins the end of the nearest script instead of lying loose, a condition dropped outside a ⬡ hole goes back where it came from, and the table only scrolls up and down (no zoom, no selection box, no multi-select). Switching back and forth changes nothing in the program — the positions blocks had on the free table are waiting when you return.
 - **Left icon rail** — one tab per `BlockCategory` present in the registry, each a colored dot with its name. Clicking a tab scrolls the palette to that category and lights the tab, so the rail says where you are.
 - **Palette** — visible as soon as the workspace opens, so you can browse it before picking an object (dragging from it starts working once an object is selected). Drag the **seam between the palette and the table** to make it wider or narrower. Every block drawn in its real shape: events are hats (rounded top, nothing can go above), ordinary blocks have a notch on top and a tab underneath (connect both ways), C-blocks have a mouth (`if`, `repeat`; `if else` has two), and `forever` is a cap (no tab — nothing can follow it).
 - **The table** (canvas) — an unbounded surface with no buttons:

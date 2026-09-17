@@ -38,6 +38,13 @@ namespace Blocky.Editor
 
         public const string AdviceBadgeClass = "blocky-advice-badge";
 
+        /// <summary>On the canvas while it is a single strict column (<see cref="WorkspaceMode.Simple"/>).</summary>
+        public const string SimpleClass = "blocky-canvas--simple";
+
+        public const string RowLayerClass = "blocky-canvas__rows";
+        public const string RowClass = CanvasRow.UssClassName;
+        public const string RowNumberClass = CanvasRow.NumberUssClassName;
+
         private readonly ProgramStore _store;
         private readonly BlockRegistry _registry;
         private readonly bool _live;
@@ -53,7 +60,51 @@ namespace Blocky.Editor
         private readonly List<VisualElement> _runningElements = new();
         private readonly List<VisualElement> _adviceBadges = new();
 
+        private readonly EventCallback<GeometryChangedEvent> _onStackLaidOut;
+
+        private WorkspaceMode _mode = WorkspaceMode.Free;
+        private VisualElement _rowLayer;                              // Simple mode: the numbered bands, behind the blocks
+        private readonly List<CanvasRow> _rowPool = new();             // reused across layout passes
+        private readonly List<RowBand> _rows = new();
+        private readonly List<CanvasRow> _shownRows = new();            // the bands in use right now, in reading order
+
+        // Reading order: down the column, and a block that contains another comes first — so a nested band is added
+        // after the band around it and therefore sits on top of it, both to click and to paint.
+        // Cached: sorting on every layout pass must not allocate.
+        private readonly System.Comparison<RowBand> _inReadingOrder = (a, b) =>
+            Mathf.Approximately(a.Y, b.Y) ? b.Height.CompareTo(a.Height) : a.Y.CompareTo(b.Y);
+
+        /// <summary>A block's strip on the column while rows are being measured.</summary>
+        private readonly struct RowBand
+        {
+            public readonly float Y;
+            public readonly float Height;
+            public readonly BlockRef Block;
+
+            public RowBand(float y, float height, BlockRef block)
+            {
+                Y = y;
+                Height = height;
+                Block = block;
+            }
+        }
+
         public IReadOnlyDictionary<string, StackView> StackViews => _stackViews;
+
+        /// <summary>
+        /// Free table or one strict column — see <see cref="WorkspaceMode"/>. Changing it re-lays out every stack;
+        /// the program is not touched, so the same object can be opened either way.
+        /// </summary>
+        public WorkspaceMode Mode
+        {
+            get => _mode;
+            set
+            {
+                if (_mode == value) return;
+                _mode = value;
+                Rebuild();
+            }
+        }
 
         /// <summary>Raised after every rebuild, so a host can decorate the fresh block views (e.g. attach drag manipulators).</summary>
         public event Action Rebuilt;
@@ -77,6 +128,8 @@ namespace Blocky.Editor
             _buttons = mode == CanvasMode.Buttons;
             AddToClassList("blocky-canvas");
             style.position = Position.Relative;
+            _onStackLaidOut = _ => UpdateRows();
+            RegisterCallback(_onStackLaidOut); // a block's place in the column is only known once measured
 
             Rebuild();
             _store.OnChanged += _ => Rebuild();
@@ -213,16 +266,51 @@ namespace Blocky.Editor
             _runningElements.Clear();
             _adviceBadges.Clear();
 
+            var simple = _mode == WorkspaceMode.Simple;
+            EnableInClassList(SimpleClass, simple);
+            _shownRows.Clear();
+
             foreach (var stack in _store.Program.stacks)
             {
-                if (_viewport.HasValue && !IntersectsViewport(stack.canvasPosition)) continue;
+                // Simple mode ignores stored positions — a column has none — so it can't cull by them either.
+                if (!simple && _viewport.HasValue && !IntersectsViewport(stack.canvasPosition)) continue;
 
                 var view = new StackView(stack, _registry, _live ? _store : null, _buttons);
-                view.style.position = Position.Absolute;
-                view.style.left = stack.canvasPosition.x;
-                view.style.top = stack.canvasPosition.y;
+                if (simple)
+                {
+                    view.style.position = Position.Relative; // the column flows: each script under the one before it
+                    // A script stretches across the column, so its empty right-hand side would swallow presses meant
+                    // for the band behind it. Nothing needs the script itself as a hit target — every block inside it
+                    // is picked on its own — so the script steps out of the way and only its blocks are hit.
+                    view.pickingMode = PickingMode.Ignore;
+                }
+                else
+                {
+                    view.style.position = Position.Absolute;
+                    view.style.left = stack.canvasPosition.x;
+                    view.style.top = stack.canvasPosition.y;
+                }
+                // Each script re-measures the column under it, and the bands are drawn from those measurements.
+                // Stacks are rebuilt every time, so the callback goes with them — nothing to unregister.
+                if (simple) view.RegisterCallback<GeometryChangedEvent>(_onStackLaidOut);
                 _stackViews[stack.id] = view;
                 Add(view);
+            }
+
+            if (simple)
+            {
+                // The layer and its pooled bands outlive the rebuild: Clear() above dropped it from the hierarchy,
+                // not from this field. Putting the same one back keeps the numbers on screen through an edit
+                // instead of blanking the gutter until the next layout pass.
+                _rowLayer ??= BuildRowLayer();
+                Insert(0, _rowLayer); // absolute, so it doesn't join the column — the bands sit behind the blocks
+                // The canvas fills the viewport, so its own rect never changes and its GeometryChangedEvent never
+                // fires on a rebuild. Measure once this rebuild has been laid out.
+                schedule.Execute(UpdateRows);
+            }
+            else if (_rowLayer != null)
+            {
+                _rowLayer.RemoveFromHierarchy();
             }
 
             this.Query<VisualElement>().Where(e => e is IBlockElement { NodeId: not null })
@@ -264,6 +352,8 @@ namespace Blocky.Editor
                 found.MarkDirtyRepaint();
                 _selectedElements.Add(found);
             }
+
+            ApplyRowSelection();
         }
 
         private void ApplyRunning()
@@ -305,6 +395,81 @@ namespace Blocky.Editor
             container.Add(addButton);
             container.Add(popup);
             return container;
+        }
+
+        /// <summary>
+        /// Numbers the blocks down the column and gives each one a band the height of the block, so the script
+        /// reads like the lines of a program and every block has an area you can click (Simple mode only).
+        /// Runs after layout: a block's place in the column isn't known until it has been measured. One column
+        /// means top-to-bottom order *is* reading order, nested blocks included.
+        /// </summary>
+        private void UpdateRows()
+        {
+            if (_rowLayer == null || _rowLayer.parent != this) return; // Free mode: the layer is off the table
+
+            _rows.Clear();
+            this.Query<VisualElement>().Where(e => e is BlockView or HatView).ForEach(CollectRow);
+            _rows.Sort(_inReadingOrder);
+
+            _shownRows.Clear();
+            for (var i = 0; i < _rows.Count; i++)
+            {
+                var row = RowAt(i);
+                row.Set(_rows[i].Block, i + 1, _rows[i].Y, _rows[i].Height);
+                _shownRows.Add(row);
+            }
+            for (var i = _rows.Count; i < _rowPool.Count; i++) _rowPool[i].Hide();
+            ApplyRowSelection();
+        }
+
+        private void CollectRow(VisualElement element)
+        {
+            var y = CanvasY(element);
+            var height = element.layout.height;
+            if (float.IsNaN(y) || float.IsNaN(height)) return;
+            _rows.Add(new RowBand(y, height, new BlockRef(((IBlockElement)element).StackId, ((IBlockElement)element).NodeId)));
+        }
+
+        /// <summary>Tints the band of every selected block, so a pick shows across the whole line and not just on the block.</summary>
+        private void ApplyRowSelection()
+        {
+            foreach (var row in _shownRows)
+                row.EnableInClassList(CanvasRow.SelectedUssClassName, _selection.Contains(row.Block));
+        }
+
+        /// <summary>A press anywhere on a block's band picks that block — the row *is* the block, as far as choosing goes.</summary>
+        private void OnRowPointerDown(PointerDownEvent evt)
+        {
+            if (evt.button != 0 || evt.currentTarget is not CanvasRow row || row.Block.StackId == null) return;
+            Select(row.Block.StackId, row.Block.NodeId);
+            // Deliberately not stopped: the table still starts its scroll from here, so a band can be dragged to
+            // move up and down the column exactly like the empty space around it.
+        }
+
+        /// <summary>A block's top edge in canvas coordinates, walked up through its parents — no world transform needed.</summary>
+        private float CanvasY(VisualElement element)
+        {
+            var y = 0f;
+            for (var el = element; el != null && el != this; el = el.parent) y += el.layout.y;
+            return y;
+        }
+
+        private VisualElement BuildRowLayer()
+        {
+            var layer = new VisualElement { pickingMode = PickingMode.Ignore }; // only the bands inside it are clickable
+            layer.AddToClassList(RowLayerClass);
+            return layer;
+        }
+
+        private CanvasRow RowAt(int index)
+        {
+            if (index < _rowPool.Count) return _rowPool[index];
+
+            var row = new CanvasRow();
+            row.RegisterCallback<PointerDownEvent>(OnRowPointerDown);
+            _rowLayer.Add(row);
+            _rowPool.Add(row);
+            return row;
         }
 
         private bool IntersectsViewport(Vector2 canvasPosition)

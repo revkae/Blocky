@@ -74,6 +74,60 @@ namespace Blocky.Data.Tests
         }
 
         [Test]
+        public void Redo_PutsBackWhatUndoTookAway()
+        {
+            var store = BuildStore();
+            var node = new BlockNode { id = "n_1", blockType = "motion.move_forward" };
+            store.Apply(new InsertNode(NodeLocation.InStack("stk_1", 0), node));
+
+            store.Undo();
+            Assert.IsFalse(store.CanUndo);
+            Assert.IsTrue(store.CanRedo);
+
+            store.Redo();
+            Assert.AreEqual(1, store.Program.stacks[0].sequence.Length);
+            Assert.AreEqual("n_1", store.Program.stacks[0].sequence[0].id);
+            Assert.IsFalse(store.CanRedo, "nothing left to put back");
+            Assert.IsTrue(store.CanUndo, "and it can be taken away again");
+        }
+
+        [Test]
+        public void ARedoneEditCanBeUndoneAgain()
+        {
+            var store = BuildStore();
+            store.Apply(new InsertNode(NodeLocation.InStack("stk_1", 0), new BlockNode { id = "n_1", blockType = "motion.move_forward" }));
+            store.Undo();
+            store.Redo();
+            store.Undo();
+
+            Assert.AreEqual(0, store.Program.stacks[0].sequence.Length);
+        }
+
+        /// <summary>History has branched: what was undone can no longer be reached from what's on the table.</summary>
+        [Test]
+        public void AFreshEdit_ClearsWhatCouldBeRedone()
+        {
+            var store = BuildStore();
+            store.Apply(new InsertNode(NodeLocation.InStack("stk_1", 0), new BlockNode { id = "n_1", blockType = "motion.move_forward" }));
+            store.Undo();
+
+            store.Apply(new InsertNode(NodeLocation.InStack("stk_1", 0), new BlockNode { id = "n_2", blockType = "motion.turn" }));
+
+            Assert.IsFalse(store.CanRedo);
+            Assert.AreEqual("n_2", store.Program.stacks[0].sequence[0].id);
+        }
+
+        [Test]
+        public void RedoWithNothingUndone_DoesNothing()
+        {
+            var store = BuildStore();
+
+            Assert.IsFalse(store.CanRedo);
+            Assert.DoesNotThrow(() => store.Redo());
+            Assert.AreEqual(0, store.Program.stacks[0].sequence.Length);
+        }
+
+        [Test]
         public void IdGenerator_ProducesUniqueSixteenCharIds()
         {
             var a = IdGenerator.NewId();

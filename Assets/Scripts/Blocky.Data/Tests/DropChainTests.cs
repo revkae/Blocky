@@ -103,6 +103,46 @@ namespace Blocky.Data.Tests
             CollectionAssert.AreEqual(new[] { "a", "b", "c" }, Ids(Stack(store, "stk_hat").sequence));
         }
 
+        /// <summary>The strict column's "swap": the block at that slot goes, the chain takes its place, the rest stays.</summary>
+        [Test]
+        public void ReplaceTarget_PutsTheChainWhereTheBlockWas_AndTakesThatBlockOut()
+        {
+            var store = BuildStore();
+            store.Apply(DropChain.FromNewNode(Node("n"), ChainTarget.Replace(NodeLocation.InStack("stk_hat", 1))));
+
+            CollectionAssert.AreEqual(new[] { "a", "n", "c" }, Ids(Stack(store, "stk_hat").sequence));
+        }
+
+        [Test]
+        public void ReplacingWithAChain_PutsEveryBlockOfItInThatOneSlot()
+        {
+            var store = BuildStore();
+            store.Apply(DropChain.FromNodes(NodeLocation.InStack("stk_loose", 0), ChainTarget.Replace(NodeLocation.InStack("stk_hat", 0))));
+
+            CollectionAssert.AreEqual(new[] { "x", "y", "b", "c" }, Ids(Stack(store, "stk_hat").sequence));
+            Assert.IsNull(Stack(store, "stk_loose"), "the loose stack it came from is left empty and removed");
+        }
+
+        [Test]
+        public void ReplacingABlockThatIsNoLongerThere_LeavesTheProgramUntouched()
+        {
+            var store = BuildStore();
+
+            Assert.Throws<InvalidOperationException>(() => store.Apply(
+                DropChain.FromNewNode(Node("n"), ChainTarget.Replace(NodeLocation.InStack("stk_hat", 7)))));
+            CollectionAssert.AreEqual(new[] { "a", "b", "c" }, Ids(Stack(store, "stk_hat").sequence));
+        }
+
+        [Test]
+        public void AReplaceIsOneStep_SoUndoBringsTheReplacedBlockBack()
+        {
+            var store = BuildStore();
+            store.Apply(DropChain.FromNewNode(Node("n"), ChainTarget.Replace(NodeLocation.InStack("stk_hat", 1))));
+            store.Undo();
+
+            CollectionAssert.AreEqual(new[] { "a", "b", "c" }, Ids(Stack(store, "stk_hat").sequence));
+        }
+
         [Test]
         public void Undo_RestoresTheProgramExactly()
         {

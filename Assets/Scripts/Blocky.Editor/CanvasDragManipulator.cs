@@ -45,7 +45,8 @@ namespace Blocky.Editor
 
             _downPosition = evt.position;
             _pressedOnControl = IsOnControl(hit);
-            _additive = evt.shiftKey || evt.actionKey;
+            // Simple mode picks one block at a time: no multi-selection, so no group drag either.
+            _additive = (evt.shiftKey || evt.actionKey) && Context.Mode == WorkspaceMode.Free;
             BeginTracking(evt.pointerId);
         }
 

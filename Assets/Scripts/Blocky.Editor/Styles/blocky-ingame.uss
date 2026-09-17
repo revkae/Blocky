@@ -111,6 +111,42 @@
     -unity-font-style: bold;
 }
 
+/* Free / Simple: which kind of table you are working on. */
+.blocky-ingame-mode {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 10px;
+    padding: 3px;
+    border-radius: 10px;
+    background-color: var(--bk-header-soft);
+}
+
+.blocky-ingame-mode__button {
+    height: 22px;
+    margin: 0 1px;
+    padding: 0 11px;
+    border-radius: 7px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: 11px;
+    color: var(--bk-on-dark-2);
+    -unity-font-style: bold;
+    transition-property: background-color, color;
+    transition-duration: 90ms;
+}
+
+.blocky-ingame-mode__button:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    color: var(--bk-on-dark);
+}
+
+.blocky-ingame-mode__button--active,
+.blocky-ingame-mode__button--active:hover {
+    background-color: var(--bk-accent);
+    color: rgb(255, 255, 255);
+}
+
 .blocky-ingame-keyhint {
     flex-direction: row;
     align-items: center;
@@ -423,18 +459,84 @@
     background-color: var(--bk-canvas);
 }
 
+/* ─── Simple mode: one numbered column ───────────────────────────────────────────────────────────────── */
+
+/* Every script flows down one column, indented past the gutter the line numbers sit in. The indent is a margin
+   on the scripts rather than padding on the canvas, because an absolutely positioned child (the row layer) is
+   laid out from the padding edge — with padding here, the numbers would start after their own gutter. */
+.blocky-canvas--simple > .blocky-stack {
+    margin: 10px 0 18px 44px;
+}
+
+.blocky-canvas__rows {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* One band per block, the height of the block and the width of the table, ruled off and numbered in the gutter:
+   the script reads as the lines of a program, and the whole line is the block's area — click it to pick that
+   block. Top and height are set from the measured layout; everything else is here.
+   A band nested inside another is added after it, so it paints and picks on top of the one around it. */
+.blocky-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    border-top-width: 1px;
+    border-color: var(--bk-line-soft);
+    background-color: rgba(0, 0, 0, 0);
+    transition-property: background-color;
+    transition-duration: 90ms;
+}
+
+.blocky-row:hover {
+    background-color: rgba(76, 151, 255, 0.07);
+}
+
+/* The picked line, highlighted the way an editor highlights the line the caret is on. */
+.blocky-row--selected {
+    background-color: var(--bk-accent-soft);
+}
+
+/* The numbered strip down the left, with the rule that separates it from the code. */
+.blocky-row__gutter {
+    width: 36px;
+    flex-shrink: 0;
+    border-right-width: 1px;
+    border-color: var(--bk-line-soft);
+}
+
+.blocky-row__number {
+    width: 26px;
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--bk-ink-3);
+    -unity-text-align: middle-right;
+}
+
+.blocky-row--selected .blocky-row__number {
+    color: var(--bk-accent);
+    -unity-font-style: bold;
+}
+
 /* ─── Floating table furniture ───────────────────────────────────────────────────────────────────────── */
 
-/* Undo, top-right of the table. */
+/* Undo and, under it, Redo — top-right of the table. */
 .blocky-table-tools {
     position: absolute;
     top: 12px;
     right: 12px;
-    flex-direction: row;
+    flex-direction: column;
+    align-items: flex-end;
 }
+
 
 .blocky-table-tools__button {
     height: 30px;
+    margin-top: 6px;
     padding: 0 14px;
     border-radius: 10px;
     border-width: 1px;
@@ -665,12 +767,46 @@
     border-radius: 12px;
 }
 
-/* The glow on the edge a dragged block is about to connect to. */
+/* The glow on the edge a dragged block is about to connect to — and, on the strict column, the bar marking the
+   line it will go in on. */
 .blocky-drop-indicator {
     background-color: rgba(255, 236, 110, 0.85);
     border-radius: 3px;
     border-width: 1px;
     border-color: rgb(255, 255, 255);
+}
+
+/* The bar on the line a chain will go in on. Blue, not the snap glow's yellow: it is drawn along the edge of a
+   block, and the blocks themselves are warm — a yellow bar on an orange block is invisible. */
+.blocky-drop-indicator.blocky-drop-indicator--row {
+    background-color: var(--bk-accent);
+    border-color: rgb(255, 255, 255);
+    border-radius: 3px;
+}
+
+/* Letting go here puts the chain in place of the block underneath: the whole block is ringed rather than one edge. */
+.blocky-drop-indicator.blocky-drop-indicator--replace {
+    background-color: rgba(76, 151, 255, 0.22);
+    border-width: 2px;
+    border-color: var(--bk-accent);
+    border-radius: 10px;
+}
+
+/* "Above" / "Replace" / "Below": what letting go right now would do, said in a word. */
+.blocky-drop-indicator__caption {
+    position: absolute;
+    right: 6px;
+    top: -9px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background-color: var(--bk-header);
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: var(--bk-on-dark);
+}
+
+.blocky-drop-indicator--replace .blocky-drop-indicator__caption {
+    top: 6px;
 }
 
 /* ─── Slim scrollbars ────────────────────────────────────────────────────────────────────────────────── */
