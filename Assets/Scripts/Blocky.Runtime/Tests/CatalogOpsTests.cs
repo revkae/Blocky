@@ -57,7 +57,7 @@ namespace Blocky.Runtime.Tests
         private static BlockParam PText(string key, string text) => new() { key = key, kind = ParamKind.Text, text = text };
 
         [Test]
-        public void TurnDirection_Instant_RotatesAroundYByDegrees()
+        public void TurnDirection_Left_Instant_TurnsLeft_AroundY()
         {
             var def = Def("motion.turn_direction", new[]
             {
@@ -75,7 +75,9 @@ namespace Blocky.Runtime.Tests
             var thread = scheduler.Start(compiled, _target, compiled.StackEntryPoints[0]);
             scheduler.Tick(1f);
 
-            Assert.AreEqual(90f, _target.transform.eulerAngles.y, 1e-3f);
+            // Facing +Z, a left turn faces -X: in Unity a positive yaw turns right, so left is -90 (270).
+            Assert.AreEqual(270f, _target.transform.eulerAngles.y, 1e-3f);
+            Assert.Less(_target.transform.forward.x, -0.99f, "it faces -X, its left");
             Assert.AreEqual(ThreadState.Done, thread.State);
         }
 

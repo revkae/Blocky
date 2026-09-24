@@ -22,6 +22,7 @@ namespace Blocky.Runtime
         private const float CharacterSize = 0.08f;
         private const int FontSize = 64;
         private const float Padding = 0.12f;
+        private const int BubbleSortingOrder = 1000; // above the sprites of a 2D stage; no effect on the opaque 3D pass
 
         // Domain reload is off, so this outlives a Play session unless it is cleared — see ResetForNewPlaySession.
         private static readonly List<BlockySpeechBubble> Live = new();
@@ -112,7 +113,9 @@ namespace Blocky.Runtime
                 quad.transform.SetParent(holder.transform, false);
                 quad.transform.localPosition = new Vector3(0f, 0f, 0.01f);
                 var material = new Material(shader) { color = new Color(1f, 1f, 1f, 0.92f) };
-                quad.GetComponent<MeshRenderer>().sharedMaterial = material;
+                var quadRenderer = quad.GetComponent<MeshRenderer>();
+                quadRenderer.sharedMaterial = material;
+                quadRenderer.sortingOrder = BubbleSortingOrder; // on a 2D stage, drawn over the sprites rather than among them
                 _background = quad.transform;
             }
 
@@ -124,6 +127,8 @@ namespace Blocky.Runtime
             _text.anchor = TextAnchor.MiddleCenter;
             _text.alignment = TextAlignment.Center;
             _text.color = Color.black;
+            var textRenderer = textObject.GetComponent<MeshRenderer>();
+            if (textRenderer != null) textRenderer.sortingOrder = BubbleSortingOrder + 1;
 
             holder.transform.localPosition = new Vector3(0f, _topOfObject + HeightAboveObject, 0f);
             Clear();

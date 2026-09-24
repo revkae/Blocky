@@ -23,6 +23,9 @@ namespace Blocky.Runtime
     {
         [SerializeField] private BlockProgramAsset programAsset;
 
+        [Tooltip("Which way \"move\" and \"turn\" go. Auto: on the flat XY stage for an object with a SpriteRenderer, Collider2D or Rigidbody2D, in 3D otherwise.")]
+        [SerializeField] private MotionPlane motion = MotionPlane.Auto;
+
         private CompiledProgram _compiled;
         private bool _initialized;
         private bool _programChosen; // the save has been looked for, or code handed a program over — either way, don't look again
@@ -43,6 +46,13 @@ namespace Blocky.Runtime
 
         /// <summary>The asset this runner currently loads from, or null. Runtime-safe read (no <c>SerializedObject</c> needed).</summary>
         public BlockProgramAsset ProgramAsset => programAsset;
+
+        /// <summary>Which way this object's motion blocks move and turn it (<see cref="BlockyPlane"/>). Auto decides from its components.</summary>
+        public MotionPlane Motion
+        {
+            get => motion;
+            set => motion = value;
+        }
 
         /// <summary>
         /// What the in-game editor had saved for this object when the runner looked — <see cref="SavedProgramStatus.None"/>
@@ -164,13 +174,24 @@ namespace Blocky.Runtime
                 _stacks.Add((stack, triggerDef, entryPc));
             }
 
-            if (GetComponent<Collider>() != null && GetComponent<BlockCollisionRelay>() == null)
+            // 3D or 2D: both physics engines report through the same relay.
+            if (HasCollider() && GetComponent<BlockCollisionRelay>() == null)
                 gameObject.AddComponent<BlockCollisionRelay>();
 
             SubscribeTriggers();
 
             // Last, once this runner is complete: a new ticker gives runners back to other saved objects as it wakes.
             if (Application.isPlaying) BlockyRuntimeTicker.EnsureExists();
+        }
+
+        private bool HasCollider()
+        {
+            if (GetComponent<Collider>() != null) return true;
+#if BLOCKY_PHYSICS2D // set by Blocky.Runtime.asmdef when the project has Unity's 2D physics module
+            return GetComponent<Collider2D>() != null;
+#else
+            return false;
+#endif
         }
 
         /// <summary>Halts every thread this runner started and unsubscribes from triggers. See <see cref="Initialize"/> for why this is public.</summary>
@@ -226,9 +247,9 @@ namespace Blocky.Runtime
                     }
                     case "event.when_collided":
                     {
-                        void Handler(GameObject source, Collision collision)
+                        void Handler(GameObject source, GameObject other)
                         {
-                            if (source == gameObject && MatchesTag(stack, collision)) Fire(triggerDef, entryPc);
+                            if (source == gameObject && MatchesTag(stack, other)) Fire(triggerDef, entryPc);
                         }
                         broker.OnCollided += Handler;
                         _unsubscribe.Add(() => broker.OnCollided -= Handler);
@@ -342,10 +363,10 @@ namespace Blocky.Runtime
             return string.Equals((wanted ?? string.Empty).Trim(), (message ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool MatchesTag(BlockStack stack, Collision collision)
+        private static bool MatchesTag(BlockStack stack, GameObject other)
         {
             var tagParam = Array.Find(stack.triggerParameters, p => p.key == "tag_filter");
-            return tagParam == null || string.IsNullOrEmpty(tagParam.text) || collision.gameObject.CompareTag(tagParam.text);
+            return tagParam == null || string.IsNullOrEmpty(tagParam.text) || (other != null && other.CompareTag(tagParam.text));
         }
     }
 }

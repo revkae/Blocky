@@ -17,16 +17,22 @@ namespace Blocky.Runtime.Ops
             if (renderer == null) return OpResult.Continue;
             if (!ColorUtility.TryParseHtmlString(ctx.GetText(0), out var target)) return OpResult.Continue;
 
+            // A sprite is tinted through its own color: its material is shared by every sprite, and the 2D shaders
+            // may have no color property of their own to set.
+            var sprite = renderer as SpriteRenderer;
             var duration = ctx.GetNumber(1);
+
             if (duration <= 0f)
             {
-                renderer.material.color = target;
+                if (sprite != null) sprite.color = target;
+                else renderer.material.color = target;
                 return OpResult.Continue;
             }
 
             var remaining = duration - ctx.Scratch;
             var step = Mathf.Min(ctx.DeltaTime, remaining);
-            renderer.material.color = Color.Lerp(renderer.material.color, target, step / remaining);
+            if (sprite != null) sprite.color = Color.Lerp(sprite.color, target, step / remaining);
+            else renderer.material.color = Color.Lerp(renderer.material.color, target, step / remaining);
             ctx.Scratch += step;
 
             if (ctx.Scratch >= duration)

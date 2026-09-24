@@ -7,11 +7,11 @@ using UnityEngine;
 namespace Blocky.Runtime.Triggers
 {
     /// <summary>
-    /// Auto-added to targets with colliders; forwards to the broker, never runs blocks itself (TDD §6.7). It also
-    /// keeps the set of objects this one is currently in contact with, so <c>touching?</c> is a set lookup rather
-    /// than a physics query per condition per frame — a condition in a <c>repeat until</c> is evaluated every lap.
+    /// Auto-added to targets with colliders, 3D or 2D; forwards to the broker, never runs blocks itself (TDD §6.7).
+    /// It also keeps the set of objects this one is currently in contact with, so <c>touching?</c> is a set lookup
+    /// rather than a physics query per condition per frame — a condition in a <c>repeat until</c> is evaluated every
+    /// lap. No <c>RequireComponent(Collider)</c>: that would give a 2D sprite a 3D box it doesn't want.
     /// </summary>
-    [RequireComponent(typeof(Collider))]
     public sealed class BlockCollisionRelay : MonoBehaviour
     {
         // Domain reload is off in this project, so statics outlive a Play session — see ResetForNewPlaySession.
@@ -40,11 +40,7 @@ namespace Blocky.Runtime.Triggers
             if (Relays.TryGetValue(gameObject, out var relay) && relay == this) Relays.Remove(gameObject);
         }
 
-        private void OnCollisionEnter(Collision collision)
-        {
-            _contacts.Add(collision.gameObject);
-            BlockyRuntime.Triggers.RaiseCollided(gameObject, collision);
-        }
+        private void OnCollisionEnter(Collision collision) => Collided(collision.gameObject);
 
         private void OnCollisionExit(Collision collision) => _contacts.Remove(collision.gameObject);
 
@@ -53,6 +49,23 @@ namespace Blocky.Runtime.Triggers
         private void OnTriggerEnter(Collider other) => _contacts.Add(other.gameObject);
 
         private void OnTriggerExit(Collider other) => _contacts.Remove(other.gameObject);
+
+#if BLOCKY_PHYSICS2D // set by Blocky.Runtime.asmdef when the project has Unity's 2D physics module
+        // The same four, for 2D physics — a separate engine with messages of its own.
+        private void OnCollisionEnter2D(Collision2D collision) => Collided(collision.gameObject);
+
+        private void OnCollisionExit2D(Collision2D collision) => _contacts.Remove(collision.gameObject);
+
+        private void OnTriggerEnter2D(Collider2D other) => _contacts.Add(other.gameObject);
+
+        private void OnTriggerExit2D(Collider2D other) => _contacts.Remove(other.gameObject);
+#endif
+
+        private void Collided(GameObject other)
+        {
+            _contacts.Add(other);
+            BlockyRuntime.Triggers.RaiseCollided(gameObject, other);
+        }
 
         /// <summary>Whether <paramref name="target"/> is in contact with <paramref name="other"/> specifically.</summary>
         public static bool IsTouchingObject(GameObject target, GameObject other)

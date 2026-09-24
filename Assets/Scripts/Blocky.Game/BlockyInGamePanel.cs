@@ -309,12 +309,8 @@ namespace Blocky.Game
             var position = pointer.position.ReadValue();
             if (IsOverWorkspace(position)) return; // the press landed somewhere in the workspace, not the game
 
-            var cam = Camera.main;
-            if (cam == null) return;
-
-            var ray = cam.ScreenPointToRay(position);
-            if (Physics.Raycast(ray, out var hit))
-                SetTarget(hit.collider.gameObject);
+            var picked = BlockyPicking.ObjectAt(Camera.main, position); // a 3D or 2D collider, or a sprite without one
+            if (picked != null) SetTarget(picked);
         }
 
         private static bool IsUndoShortcut(Keyboard keyboard) =>

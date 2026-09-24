@@ -12,7 +12,7 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 
 | Object | Trigger | Blocks exercised |
 |---|---|---|
-| **SquareWalker** | when_play_clicked | `control.repeat` × `motion.move_forward` + `motion.turn_direction` — walks a square path |
+| **SquareWalker** | when_play_clicked | `control.repeat` × `motion.move_forward` + `motion.turn_direction` — walks a square path (the other way round since 2026-09-24, when "turn left" stopped turning right — [[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]]) |
 | **SpinnerCube** | when_play_clicked | `control.repeat_forever` × `motion.rotate_axis` — spins forever, never finishes |
 | **KeyMover** | when_key_pressed (Space) | `motion.move_forward` with duration — press Space repeatedly, each restarts the move (`RestartOnRetrigger`) |
 | **Bumper → CollisionPainter** | when_play_clicked / when_collided | Bumper drives into CollisionPainter; the impact fires `looks.change_color` on the painter |

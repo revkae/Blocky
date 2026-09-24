@@ -13,6 +13,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.modules.physics2d",
+            "expression": "1.0.0",
+            "define": "BLOCKY_PHYSICS2D"
+        }
+    ],
     "noEngineReferences": false
 }

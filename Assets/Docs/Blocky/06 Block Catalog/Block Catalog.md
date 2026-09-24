@@ -20,8 +20,10 @@ Broadcast names match case- and whitespace-insensitively, so "Jump" and "jump " 
 ## Motion
 `motion.move_forward`, `motion.turn_direction`, `motion.rotate_axis`, `motion.change_position` (`x`,`y`,`z`,`duration`,`space`) — all relative, so `duration = 0` is instant and otherwise the change is applied as a per-tick increment · `motion.glide_to` (`x`,`y`,`z`,`duration`) and `motion.set_position`, `motion.set_rotation` — absolute; glide converges by remaining fraction and the two setters are instant-only.
 
+**3D or a 2D stage, per object** ([[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]]): in 3D, forward is the object's Z axis and turning is around up; on a flat XY stage — an object with a SpriteRenderer, a Collider2D or a Rigidbody2D, or one whose runner says *2D* — forward is its X axis, the way a sprite faces (Scratch's direction 90), turning is around Z, and `point towards` aims the X axis. `turn left` turns left in both: anticlockwise on a 2D stage, and in 3D towards the object's left (until 2026-09-24 it turned right in 3D).
+
 ## Looks
-`looks.change_color` (`color`, `duration`) · `looks.set_visible` (`visible`) · `looks.set_scale` (`x`,`y`,`z`,`duration`) · `looks.say` (`message`, `seconds`, `style`)
+`looks.change_color` (`color`, `duration`; a sprite is tinted through its own color, and Reset puts it back) · `looks.set_visible` (`visible`) · `looks.set_scale` (`x`,`y`,`z`,`duration`) · `looks.say` (`message`, `seconds`, `style`)
 
 `say` is all four of Scratch's bubble blocks in one ([[09 Decisions/Decisions#ADR-027|ADR-027]]): `seconds = 0` leaves the bubble up until something changes it, any other value holds the script and clears it after, an empty message clears it, and the style dropdown is the difference between saying and thinking. The bubble is a `TextMesh` and a quad above the object, turned to face the camera — **not** TextMeshPro, which has no font assets in this project and would render nothing at all.
 

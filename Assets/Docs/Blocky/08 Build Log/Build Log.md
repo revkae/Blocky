@@ -6,6 +6,17 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (2D) — 2D scenes, and "turn left" turns left
+User request: "2D scenes". Design in [[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]].
+
+- **Motion plane per object** (`BlockyPlane`, `ObjectProgramRunner.Motion`): sprites and objects with 2D physics move along X and turn around Z; `point towards` aims X. The runner can overrule *Auto* for a 2.5D game.
+- **Bug fixed:** `turn left` turned right in 3D (a positive yaw is a right turn in Unity), and a test had pinned it. Left is now left in 3D and anticlockwise in 2D. The demo's square walker goes the other way round.
+- **Picking** (`BlockyPicking`): 3D raycast, 2D ray intersection, or the topmost sprite under the point with no collider at all — for choosing an object in the editor and for `when clicked`.
+- **Contacts:** the relay handles `OnCollisionEnter2D` / `OnTriggerEnter2D` and their exits, and no longer forces a 3D collider onto sprites; `TriggerBroker.OnCollided` carries the other object instead of a 3D `Collision` (signature change).
+- **Looks and Reset:** sprites are tinted through `SpriteRenderer.color`; Reset puts the tint and a `Rigidbody2D`'s motion back; speech bubbles draw above sprites.
+- **`BLOCKY_PHYSICS2D`:** the 2D physics code compiles only when the project has Unity's 2D physics module (a `versionDefines` entry); Blocky.Runtime was compiled both with and without it.
+- **Verified outside Unity only:** 7 `TwoDTests` (planes, sprite motion and turns, the 3D right turn, point towards, tint and Reset, a tagged bump reaching `when collided`) and the corrected turn test pass; the rest unchanged. **Not verified:** picking and real 2D physics messages need a 2D scene in Unity.
+
 ## 2026-09-24 (touch) — Tablets and touchscreens
 User request: "Touch and tablet support". Design in [[09 Decisions/Decisions#ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch|ADR-037]].
 

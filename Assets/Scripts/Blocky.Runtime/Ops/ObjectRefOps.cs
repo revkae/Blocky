@@ -44,6 +44,7 @@ namespace Blocky.Runtime.Ops
     /// <c>motion.point_towards</c> — turns to face another object. Yaw only: the direction is flattened onto the
     /// ground plane first, so an object pointing at something above or below it leans no further than a person
     /// turning to look would. Directly overhead leaves it as it was, since there is no direction to turn towards.
+    /// On a 2D stage (<see cref="BlockyPlane"/>) it turns around Z instead, so its X axis — a sprite's facing — points at the other.
     /// </summary>
     [BlockExecutor("motion.point_towards")]
     public sealed class PointTowardsOp : IBlockOp
@@ -55,6 +56,14 @@ namespace Blocky.Runtime.Ops
 
             var transform = ctx.Target.transform;
             var toOther = other.transform.position - transform.position;
+
+            if (BlockyPlane.IsFlat(ctx.Target))
+            {
+                if (toOther.x * toOther.x + toOther.y * toOther.y > 1e-6f)
+                    transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(toOther.y, toOther.x) * Mathf.Rad2Deg);
+                return OpResult.Continue;
+            }
+
             toOther.y = 0f;
             if (toOther.sqrMagnitude > 1e-6f) transform.rotation = Quaternion.LookRotation(toOther, Vector3.up);
 

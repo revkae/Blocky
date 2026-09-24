@@ -16,6 +16,9 @@ namespace Blocky.Runtime
             public GameObject GameObject;
             public Renderer Renderer;
             public Rigidbody Body;
+#if BLOCKY_PHYSICS2D // set by Blocky.Runtime.asmdef when the project has Unity's 2D physics module
+            public Rigidbody2D Body2D;
+#endif
             public ObjectState Start;
         }
 
@@ -29,8 +32,11 @@ namespace Blocky.Runtime
             public Material Material;
             public bool HasColor;
             public Color Color;
+            public Color SpriteColor; // a sprite is tinted through its own color, not its material (ChangeColorOp)
             public Vector3 Velocity;
             public Vector3 AngularVelocity;
+            public Vector2 Velocity2D;
+            public float AngularVelocity2D;
         }
 
         private readonly Dictionary<GameObject, Tracked> _tracked = new();
@@ -45,9 +51,14 @@ namespace Blocky.Runtime
             if (go == null || _tracked.ContainsKey(go)) return;
 
             var tracked = new Tracked { GameObject = go, Renderer = go.GetComponent<Renderer>(), Body = go.GetComponent<Rigidbody>() };
+#if BLOCKY_PHYSICS2D
+            tracked.Body2D = go.GetComponent<Rigidbody2D>();
+#endif
             tracked.Start = Read(tracked);
             tracked.Start.Velocity = Vector3.zero; // Reset leaves everything standing still
             tracked.Start.AngularVelocity = Vector3.zero;
+            tracked.Start.Velocity2D = Vector2.zero;
+            tracked.Start.AngularVelocity2D = 0f;
             _tracked.Add(go, tracked);
         }
 
@@ -102,6 +113,7 @@ namespace Blocky.Runtime
                 state.Material = renderer.sharedMaterial; // shared: reading .material would make a copy
                 state.HasColor = state.Material != null && (state.Material.HasProperty("_BaseColor") || state.Material.HasProperty("_Color"));
                 if (state.HasColor) state.Color = state.Material.color;
+                if (renderer is SpriteRenderer sprite) state.SpriteColor = sprite.color;
             }
 
             var body = tracked.Body;
@@ -110,6 +122,15 @@ namespace Blocky.Runtime
                 state.Velocity = body.linearVelocity;
                 state.AngularVelocity = body.angularVelocity;
             }
+
+#if BLOCKY_PHYSICS2D
+            var body2D = tracked.Body2D;
+            if (body2D != null && body2D.bodyType == RigidbodyType2D.Dynamic)
+            {
+                state.Velocity2D = body2D.linearVelocity;
+                state.AngularVelocity2D = body2D.angularVelocity;
+            }
+#endif
 
             return state;
         }
@@ -132,6 +153,7 @@ namespace Blocky.Runtime
                 if (renderer.sharedMaterial != state.Material) renderer.sharedMaterial = state.Material;
                 // Only a copy is ever recolored — never the object's original material, which in the Editor is the project asset itself.
                 if (state.HasColor && state.Material != tracked.Start.Material) state.Material.color = state.Color;
+                if (renderer is SpriteRenderer sprite) sprite.color = state.SpriteColor;
             }
 
             var body = tracked.Body;
@@ -145,6 +167,20 @@ namespace Blocky.Runtime
                     body.angularVelocity = state.AngularVelocity;
                 }
             }
+
+#if BLOCKY_PHYSICS2D
+            var body2D = tracked.Body2D;
+            if (body2D != null)
+            {
+                body2D.position = transform.position;
+                body2D.rotation = transform.eulerAngles.z;
+                if (body2D.bodyType == RigidbodyType2D.Dynamic)
+                {
+                    body2D.linearVelocity = state.Velocity2D;
+                    body2D.angularVelocity = state.AngularVelocity2D;
+                }
+            }
+#endif
         }
     }
 

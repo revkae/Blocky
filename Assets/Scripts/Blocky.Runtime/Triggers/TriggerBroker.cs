@@ -82,8 +82,8 @@ namespace Blocky.Runtime.Triggers
             if (!isDown || wasDown || camera == null) return;
             if (!BlockyInput.TryGetPointerPosition(out var position)) return; // mouse, pen or finger — the one just pressed
 
-            var ray = camera.ScreenPointToRay(position);
-            if (Physics.Raycast(ray, out var hit)) OnClicked?.Invoke(hit.collider.gameObject);
+            var clicked = BlockyPicking.ObjectAt(camera, position); // a 3D or 2D collider, or a sprite without one
+            if (clicked != null) OnClicked?.Invoke(clicked);
         }
 
         /// <summary>Test seam: fires <see cref="OnClicked"/> for <paramref name="target"/> without a camera or a mouse.</summary>
@@ -120,10 +120,14 @@ namespace Blocky.Runtime.Triggers
             }
         }
 
-        /// <summary>Forwarded by a <see cref="BlockCollisionRelay"/>, never raised by a block itself (TDD §9).</summary>
-        public event Action<GameObject, Collision> OnCollided;
+        /// <summary>
+        /// <paramref name="source"/> bumped into the other object — forwarded by a <see cref="BlockCollisionRelay"/>
+        /// from 3D or 2D physics, never raised by a block itself (TDD §9). The other object, not the physics engine's
+        /// collision record, so one channel serves both engines.
+        /// </summary>
+        public event Action<GameObject, GameObject> OnCollided;
 
-        public void RaiseCollided(GameObject source, Collision collision) => OnCollided?.Invoke(source, collision);
+        public void RaiseCollided(GameObject source, GameObject other) => OnCollided?.Invoke(source, other);
 
         private readonly Dictionary<GameObject, (float thresholdDegrees, bool wasLookedAt)> _lookedAtListeners = new();
 

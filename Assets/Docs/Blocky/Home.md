@@ -48,7 +48,7 @@ What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 trig
 ## Known gaps carried forward (not silently dropped)
 - The language pass has never been compiled or run inside Unity ([[09 Decisions/Decisions#ADR-030|ADR-030]])
 - No player build yet: IL2CPP/WebGL behaviour is untested. A `link.xml` now keeps the reflection-bound ops (TDD §14), but only a real build proves it
-- Touch is built but has never been tried on a touchscreen ([[09 Decisions/Decisions#ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch|ADR-037]]); the in-game editor is 3D only (picking objects, `when clicked` and collisions use 3D physics)
+- Touch and 2D scenes are built but have never been tried in Unity: touch on no touchscreen ([[09 Decisions/Decisions#ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch|ADR-037]]), 2D in no 2D scene ([[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]])
 - The Editor window (`Blocky/Program Editor`) has no undo
 - A real mouse dragging blocks in the running game can't be driven by automation (Play-mode automation stalls the player loop), so many Build Log entries end with it unverified — it needs checking by hand
 - Thread pooling / zero-allocation: the `ProfilerMarker`s can measure it (TDD §11.3), but the §11.1 budgets have never been measured
