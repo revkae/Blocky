@@ -4,30 +4,8 @@
     "type": "split",
     "children": [
       {
-        "id": "6a40ea5c4fed76ab",
+        "id": "83871e5761214469",
         "type": "tabs",
-        "dimension": 65.52346570397111,
-        "children": [
-          {
-            "id": "3f81b0b39405119f",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "Welcome.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "Welcome"
-            }
-          }
-        ]
-      },
-      {
-        "id": "cda06e743f720d0e",
-        "type": "tabs",
-        "dimension": 34.47653429602888,
         "children": [
           {
             "id": "c33690699bb02865",
@@ -35,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "00 Overview/Goals and Non-Goals.md",
+                "file": "11 Release/Release Readiness.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Goals and Non-Goals"
+              "title": "Release Readiness"
             }
           }
         ]
@@ -207,10 +185,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "e0a1790a99354069",
+  "active": "c33690699bb02865",
   "lastOpenFiles": [
-    "11 Release/Release Readiness.md.meta",
+    "10 Localization/Localization.md",
     "11 Release/Release Readiness.md",
+    "00 Overview/Goals and Non-Goals.md",
+    "11 Release/Release Readiness.md.meta",
     "11 Release",
     "11 Release.meta",
     "08 Build Log/Build Log.md.tmp.30180.1e0a37a12536",
@@ -221,7 +201,6 @@
     "08 Build Log/Demo Scene.md.tmp.30180.77d015924c6c",
     "Welcome.md",
     "08 Build Log/Build Log.md.tmp.30180.53a491c8d306",
-    "05 Editor UI/Editor UI.md.tmp.30180.1a9d6f1be9d6",
     "08 Build Log/Demo Scene.md",
     "07 Testing/Testing Strategy.md",
     "06 Block Catalog/Block Catalog.md",
@@ -232,7 +211,6 @@
     "08 Build Log/Build Log.md",
     "09 Decisions/Decisions.md",
     "01 Architecture/Architecture Overview.md",
-    "00 Overview/Goals and Non-Goals.md",
     "Home.md"
   ]
 }
