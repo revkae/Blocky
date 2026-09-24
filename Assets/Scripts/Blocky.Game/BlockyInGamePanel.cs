@@ -1241,7 +1241,8 @@ namespace Blocky.Game
 
             // Fingers on the free table: one pans, two pinch — a finger has no right button, and a selection box
             // is a mouse's gesture. (Simple mode below already pans with anything.)
-            if (evt.pointerType == PointerType.touch && workspaceMode == WorkspaceMode.Free)
+            // UI Toolkit's name in full: Unity 6.7 also has a UnityEngine.PointerType.
+            if (evt.pointerType == UnityEngine.UIElements.PointerType.touch && workspaceMode == WorkspaceMode.Free)
             {
                 TouchDown(evt);
                 return;
