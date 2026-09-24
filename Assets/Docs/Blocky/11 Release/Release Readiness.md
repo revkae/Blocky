@@ -61,7 +61,7 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
 - [ ] **Hand in and hand out.** Export a project as one file and import it back, so a teacher can collect work, mark it, return it, and share a starter project.
 - [ ] **Inputs a young child can fill in.** Color is typed as a hex code (`#FFFFFF` in `looks.change_color`) — give it a color picker or a short list of named colors. Object inputs want an exact name typed in — give them a dropdown of the scene's programmed objects (`BlockyObjects` already knows them).
 - [ ] **Say what it needs.** Until touch works, the store page and the teacher guide say *mouse and keyboard required*.
-- [ ] **Readable on classroom screens.** A UI size setting for projectors and small laptops; check the workspace at 1366×768.
+- [ ] **Readable on classroom screens.** A UI size setting for projectors and small laptops; check the workspace at 1366×768. (Light, Dark and High contrast themes exist since 2026-09-24 — look at all three on a projector.)
 - [ ] **Lesson material.** 5–10 short challenges on the demo scene (walk a triangle, jump on Space, count with a variable, a fountain of clones…), a one-page teacher guide, and a one-page block sheet for students — in English and Türkçe.
 
 ### Should have

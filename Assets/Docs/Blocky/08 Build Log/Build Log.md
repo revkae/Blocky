@@ -6,6 +6,16 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (themes) — Light, Dark and High contrast
+User request: "2–3 color themes". Design in [[09 Decisions/Decisions#ADR-035 — Three themes as classes on the workspace root; High contrast recolors the blocks too|ADR-035]].
+
+- **`BlockyTheme`** (`Light`, `Dark`, `HighContrast`): a class on the workspace root; `blocky-ingame.uss` redefines the `--bk-*` tokens under `.blocky-theme--dark` and `.blocky-theme--contrast`. The last literal colors in rules (advice rows, tips, the paused tray and flag, scrollbars) became tokens first.
+- **High contrast** also recolors the blocks: Scratch's high-contrast fills per category, black text, black outlines, a blue selection outline — `BlockOutline.Draw` / `BlockShapePainter` take `--blocky-stroke` and `--blocky-selected-stroke`.
+- **The grid's dot color** is a token now (`--bk-grid-dot` on the viewport), read when the style resolves, instead of a color in code.
+- **A theme button** in the title bar names the theme and moves to the next; the pick is kept in `PlayerPrefs`. `panel.Theme` and an Inspector default for code and scenes. Words in English and Türkçe (258 strings each).
+- **`StyleSheetTests`** (8) read the stylesheets as text: tokens used are defined, themes only redefine real tokens, every category has its colors in both looks, every look colors the grid. A misspelled token was caught when planted on purpose.
+- **Not verified:** nothing about these colors has been seen on screen. Check all three themes in Play mode — the header, the palette, a running block, advice rows, Simple mode's lines — and on a projector.
+
 ## 2026-09-24 (toolbox) — Per-level toolboxes and block limits
 User request: "Choose which blocks appear in each level. Limit the number of blocks ('solve it in 5 blocks')". Design in [[09 Decisions/Decisions#ADR-034|ADR-034]]; how to use it in [[12 Game Code/Blocky from CSharp#A level's toolbox and block limit|Blocky from C#]].
 

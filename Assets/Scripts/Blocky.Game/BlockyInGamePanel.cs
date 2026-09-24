@@ -42,6 +42,19 @@ namespace Blocky.Game
     /// Every word is in the language picked in the title bar (<see cref="BlockyLanguages"/>); switching it redraws
     /// the workspace in place, keeping the object, its undo history and the view.
     /// </summary>
+    /// <summary>The workspace's colors (<see cref="BlockyInGamePanel.Theme"/>).</summary>
+    public enum BlockyTheme
+    {
+        /// <summary>Light surfaces under one dark band — the default.</summary>
+        Light,
+
+        /// <summary>Dark surfaces, for dim rooms and long sessions; the blocks keep their colors.</summary>
+        Dark,
+
+        /// <summary>Black on white with strong lines, and lighter blocks with black text — for low vision and bright projectors.</summary>
+        HighContrast
+    }
+
     [RequireComponent(typeof(UIDocument))]
     public sealed class BlockyInGamePanel : MonoBehaviour
     {
@@ -81,6 +94,9 @@ namespace Blocky.Game
 
         [Tooltip("What this level lets the learner use: which blocks the palette offers, and a block limit. Empty: every block, no limit.")]
         [SerializeField] private BlockyToolbox toolbox;
+
+        [Tooltip("The workspace's colors until the learner picks others in the title bar; their pick is remembered on this computer.")]
+        [SerializeField] private BlockyTheme theme = BlockyTheme.Light;
 
         private UIDocument _uiDocument;
         private BlockRegistry _registry;
@@ -151,6 +167,8 @@ namespace Blocky.Game
         private DragContext _dragContext;
         private string _storageKey;
         private string _storageNoticeKey; // "storage.unreadable" / "storage.save_failed" while the edited object's save has a problem, else null
+        private Button _themeButton;
+        private Color _gridDot = new(0.08f, 0.12f, 0.20f, 0.14f); // the theme's --bk-grid-dot, read off the viewport
         private Label _limitChip;          // "Blocks 3 / 5", when the toolbox sets a limit
         private bool _limitRefused;        // a block was just refused at the limit: say why until the next edit
         private List<Advice> _advice = new(); // the advice on show, so a notice can be added without working it out again
@@ -192,6 +210,20 @@ namespace Blocky.Game
             }
         }
 
+        /// <summary>
+        /// The workspace's colors. Setting it from code changes them for this session; the learner's own pick in the
+        /// title bar is also remembered on this computer and wins the next time the workspace starts.
+        /// </summary>
+        public BlockyTheme Theme
+        {
+            get => theme;
+            set
+            {
+                theme = value;
+                ApplyTheme();
+            }
+        }
+
         /// <summary>How many blocks the edited object's program uses, the way the limit counts them (hats don't count); 0 with no object.</summary>
         public int BlocksUsed => _store != null ? ProgramQuery.CountBlocks(_store.Program) : 0;
 
@@ -203,6 +235,8 @@ namespace Blocky.Game
             panelWidth = Mathf.Clamp(Mathf.Max(panelWidth, ComfortableWidth), MinPanelWidth, Mathf.Max(MinPanelWidth, Screen.width - MinGameStrip));
             GroupBlocksByCategory();
             BuildChrome();
+            theme = SavedTheme(theme);
+            ApplyTheme();
             SetVisible(false);
             BlockyInput.IsPointerOverUi = IsPointerOverEditor; // presses on this workspace aren't "mouse down?" in the game
         }
@@ -417,6 +451,7 @@ namespace Blocky.Game
             _canvasViewport.RegisterCallback<PointerUpEvent>(OnViewportPointerUp);
             _canvasViewport.RegisterCallback<WheelEvent>(OnViewportWheel);
             _canvasViewport.generateVisualContent += PaintGrid; // the table's dot grid, under everything on it
+            _canvasViewport.RegisterCallback<CustomStyleResolvedEvent>(OnViewportStyleResolved);
 
             _selectionBox = new VisualElement { pickingMode = PickingMode.Ignore };
             _selectionBox.AddToClassList("blocky-selection-box");
@@ -499,6 +534,7 @@ namespace Blocky.Game
             bar.Add(mode);
 
             bar.Add(BuildLanguageButtons());
+            bar.Add(BuildThemeButton());
 
             var keyHint = new VisualElement();
             keyHint.AddToClassList("blocky-ingame-keyhint");
@@ -552,6 +588,63 @@ namespace Blocky.Game
             var current = BlockyLanguages.Current?.Code;
             foreach (var (code, button) in _languageButtons)
                 button.EnableInClassList(ActiveModeClass, string.Equals(code, current, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private const string ThemePrefKey = "Blocky.Theme";
+        private static readonly CustomStyleProperty<Color> GridDotProperty = new("--bk-grid-dot");
+        private static readonly string[] ThemeClasses = { "blocky-theme--light", "blocky-theme--dark", "blocky-theme--contrast" };
+        private static readonly string[] ThemeNameKeys = { "theme.light", "theme.dark", "theme.contrast" };
+
+        /// <summary>One button that names the theme on show and moves to the next — three would crowd the title bar.</summary>
+        private VisualElement BuildThemeButton()
+        {
+            var group = new VisualElement();
+            group.AddToClassList("blocky-ingame-mode"); // the same pill as Free / Simple and the languages
+            group.AddToClassList("blocky-ingame-theme");
+
+            _themeButton = new Button(NextTheme);
+            _themeButton.AddToClassList("blocky-ingame-mode__button");
+            group.Add(_themeButton);
+            Localize(ShowTheme);
+            return group;
+        }
+
+        /// <summary>Light → Dark → High contrast → Light, remembered on this computer like the language.</summary>
+        private void NextTheme()
+        {
+            Theme = (BlockyTheme)(((int)theme + 1) % ThemeClasses.Length);
+            PlayerPrefs.SetString(ThemePrefKey, theme.ToString());
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>The learner's last pick on this computer, or <paramref name="fallback"/> (the Inspector's) when there is none.</summary>
+        private static BlockyTheme SavedTheme(BlockyTheme fallback) =>
+            PlayerPrefs.HasKey(ThemePrefKey) && Enum.TryParse<BlockyTheme>(PlayerPrefs.GetString(ThemePrefKey), out var saved) &&
+            Enum.IsDefined(typeof(BlockyTheme), saved)
+                ? saved
+                : fallback;
+
+        /// <summary>Puts the theme's class on the root — the stylesheets do the rest — and names it on its button.</summary>
+        private void ApplyTheme()
+        {
+            if (_root == null) return; // before Awake: read when the workspace is built
+            for (var i = 0; i < ThemeClasses.Length; i++) _root.EnableInClassList(ThemeClasses[i], i == (int)theme);
+            ShowTheme();
+        }
+
+        private void ShowTheme()
+        {
+            if (_themeButton == null) return;
+            _themeButton.text = BlockyText.Get(ThemeNameKeys[(int)theme]);
+            _themeButton.tooltip = BlockyText.Get("theme.tooltip");
+        }
+
+        /// <summary>The grid is painted from code, so its dot color is read off the viewport, where each theme sets <c>--bk-grid-dot</c>.</summary>
+        private void OnViewportStyleResolved(CustomStyleResolvedEvent evt)
+        {
+            if (!evt.customStyle.TryGetValue(GridDotProperty, out var dot) || dot == _gridDot) return;
+            _gridDot = dot;
+            _canvasViewport.MarkDirtyRepaint();
         }
 
         /// <summary>Puts words on an element now, and again whenever the language changes.</summary>
@@ -641,7 +734,7 @@ namespace Blocky.Game
             while (size.x / spacing * (size.y / spacing) > MaxGridDots) spacing *= 2f;
 
             var painter = ctx.painter2D;
-            painter.fillColor = new Color(0.08f, 0.12f, 0.20f, 0.14f);
+            painter.fillColor = _gridDot;
             painter.BeginPath();
 
             const float half = GridDotSize / 2f;

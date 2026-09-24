@@ -27,6 +27,18 @@
     --bk-warn: rgb(196, 132, 18);
     --bk-warn-soft: rgb(255, 246, 228);
     --bk-warn-line: rgb(243, 206, 134);
+    --bk-hint-bg: rgb(255, 250, 233);
+    --bk-hint-bg-hover: rgb(255, 245, 214);
+    --bk-hint-ink: rgb(124, 92, 18);
+    --bk-problem-bg: rgb(255, 238, 236);
+    --bk-problem-bg-hover: rgb(255, 228, 225);
+    --bk-problem-line: rgb(244, 168, 160);
+    --bk-problem-ink: rgb(150, 44, 36);
+    --bk-tip-bg: rgba(255, 255, 255, 0.72);
+    --bk-paused-tray: rgba(255, 255, 255, 0.7);
+    --bk-scroll-track: rgba(0, 0, 0, 0.03);
+    --bk-scroll-thumb: rgba(26, 31, 44, 0.20);
+    --bk-scroll-thumb-hover: rgba(26, 31, 44, 0.36);
 }
 
 .blocky-ingame-root {
@@ -147,8 +159,9 @@
     color: rgb(255, 255, 255);
 }
 
-/* The language buttons: the same segmented pill as Free / Simple (.blocky-ingame-mode), set a little closer. */
-.blocky-ingame-language {
+/* The language buttons and the theme button: the same segmented pill as Free / Simple (.blocky-ingame-mode), set a little closer. */
+.blocky-ingame-language,
+.blocky-ingame-theme {
     margin-left: 8px;
 }
 
@@ -214,7 +227,7 @@
 }
 
 .blocky-runbar--paused .blocky-runbar__group {
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: var(--bk-paused-tray);
 }
 
 .blocky-runbar__button {
@@ -271,7 +284,7 @@
     border-radius: 9px;
     border-width: 1px;
     border-color: var(--bk-warn-line);
-    background-color: rgb(255, 255, 255);
+    background-color: var(--bk-surface);
     font-size: 11px;
     color: var(--bk-warn);
     -unity-font-style: bold;
@@ -462,6 +475,7 @@
     min-width: 120px;
     overflow: hidden;
     background-color: var(--bk-canvas);
+    --bk-grid-dot: rgba(20, 31, 51, 0.14); /* read from code by the grid painter, so it is set on the viewport itself */
 }
 
 /* ─── Simple mode: one numbered column ───────────────────────────────────────────────────────────────── */
@@ -686,23 +700,23 @@
 }
 
 .blocky-advice--hint {
-    background-color: rgb(255, 250, 233);
+    background-color: var(--bk-hint-bg);
     border-color: var(--bk-warn-line);
-    color: rgb(124, 92, 18);
+    color: var(--bk-hint-ink);
 }
 
 .blocky-advice--hint:hover {
-    background-color: rgb(255, 245, 214);
+    background-color: var(--bk-hint-bg-hover);
 }
 
 .blocky-advice--problem {
-    background-color: rgb(255, 238, 236);
-    border-color: rgb(244, 168, 160);
-    color: rgb(150, 44, 36);
+    background-color: var(--bk-problem-bg);
+    border-color: var(--bk-problem-line);
+    color: var(--bk-problem-ink);
 }
 
 .blocky-advice--problem:hover {
-    background-color: rgb(255, 228, 225);
+    background-color: var(--bk-problem-bg-hover);
 }
 
 .blocky-advice-more {
@@ -748,7 +762,7 @@
     border-radius: 9px;
     border-width: 1px;
     border-color: var(--bk-line-soft);
-    background-color: rgba(255, 255, 255, 0.72);
+    background-color: var(--bk-tip-bg);
     font-size: 10px;
     color: var(--bk-ink-2);
 }
@@ -896,17 +910,17 @@
 .blocky-ingame-root .unity-scroller .unity-base-slider__tracker {
     border-width: 0;
     border-radius: 4px;
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: var(--bk-scroll-track);
 }
 
 .blocky-ingame-root .unity-scroller .unity-base-slider__dragger {
     border-width: 0;
     border-radius: 3px;
-    background-color: rgba(26, 31, 44, 0.20);
+    background-color: var(--bk-scroll-thumb);
 }
 
 .blocky-ingame-root .unity-scroller .unity-base-slider__dragger:hover {
-    background-color: rgba(26, 31, 44, 0.36);
+    background-color: var(--bk-scroll-thumb-hover);
 }
 
 .blocky-ingame-root .unity-scroller--vertical .unity-base-slider__dragger {
@@ -929,3 +943,121 @@
     top: 0;
     height: 8px;
 }
+
+/* ─── Themes ─────────────────────────────────────────────────────────────────────────────────────────── */
+
+/* The workspace root carries one of blocky-theme--light / --dark / --contrast (BlockyInGamePanel.Theme). Light is
+   the tokens at the top of this sheet. The others redefine the tokens on the root, which every element below
+   inherits — plus the few values code reads off an element itself (the grid's dots, a block's fill and
+   outline), which have to be set on that element. */
+
+.blocky-theme--dark {
+    --bk-header: rgb(14, 16, 22);
+    --bk-header-soft: rgba(255, 255, 255, 0.08);
+    --bk-surface: rgb(33, 37, 48);
+    --bk-surface-2: rgb(27, 30, 40);
+    --bk-surface-3: rgb(41, 46, 59);
+    --bk-canvas: rgb(22, 25, 33);
+    --bk-line: rgb(56, 62, 79);
+    --bk-line-soft: rgb(45, 50, 64);
+    --bk-ink: rgb(232, 235, 243);
+    --bk-ink-2: rgb(168, 176, 196);
+    --bk-ink-3: rgb(121, 130, 151);
+    --bk-accent: rgb(96, 165, 255);
+    --bk-accent-soft: rgb(36, 52, 82);
+    --bk-warn: rgb(240, 186, 80);
+    --bk-warn-soft: rgb(58, 48, 26);
+    --bk-warn-line: rgb(120, 96, 44);
+    --bk-hint-bg: rgb(52, 45, 26);
+    --bk-hint-bg-hover: rgb(64, 55, 30);
+    --bk-hint-ink: rgb(245, 214, 140);
+    --bk-problem-bg: rgb(64, 32, 32);
+    --bk-problem-bg-hover: rgb(78, 38, 38);
+    --bk-problem-line: rgb(140, 70, 64);
+    --bk-problem-ink: rgb(255, 184, 174);
+    --bk-tip-bg: rgba(255, 255, 255, 0.05);
+    --bk-paused-tray: rgba(255, 255, 255, 0.06);
+    --bk-scroll-track: rgba(255, 255, 255, 0.03);
+    --bk-scroll-thumb: rgba(255, 255, 255, 0.18);
+    --bk-scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+}
+
+.blocky-theme--dark .blocky-ingame-canvas-viewport {
+    --bk-grid-dot: rgba(255, 255, 255, 0.10);
+}
+
+/* High contrast: black on white, strong lines, and Scratch's high-contrast block colors — lighter fills with black
+   text and a black outline — so every block reads without relying on color. */
+.blocky-theme--contrast {
+    --bk-header: rgb(0, 0, 0);
+    --bk-header-soft: rgba(255, 255, 255, 0.18);
+    --bk-surface: rgb(255, 255, 255);
+    --bk-surface-2: rgb(255, 255, 255);
+    --bk-surface-3: rgb(232, 232, 232);
+    --bk-canvas: rgb(255, 255, 255);
+    --bk-line: rgb(0, 0, 0);
+    --bk-line-soft: rgb(96, 96, 96);
+    --bk-ink: rgb(0, 0, 0);
+    --bk-ink-2: rgb(0, 0, 0);
+    --bk-ink-3: rgb(56, 56, 56);
+    --bk-on-dark: rgb(255, 255, 255);
+    --bk-on-dark-2: rgb(235, 235, 235);
+    --bk-accent: rgb(0, 76, 204);
+    --bk-accent-soft: rgb(214, 228, 255);
+    --bk-go: rgb(0, 122, 54);
+    --bk-go-hover: rgb(0, 142, 64);
+    --bk-stop: rgb(190, 0, 0);
+    --bk-stop-hover: rgb(214, 18, 18);
+    --bk-warn: rgb(112, 70, 0);
+    --bk-warn-soft: rgb(255, 238, 190);
+    --bk-warn-line: rgb(0, 0, 0);
+    --bk-hint-bg: rgb(255, 238, 190);
+    --bk-hint-bg-hover: rgb(255, 226, 156);
+    --bk-hint-ink: rgb(0, 0, 0);
+    --bk-problem-bg: rgb(255, 214, 214);
+    --bk-problem-bg-hover: rgb(255, 194, 194);
+    --bk-problem-line: rgb(0, 0, 0);
+    --bk-problem-ink: rgb(0, 0, 0);
+    --bk-tip-bg: rgb(255, 255, 255);
+    --bk-paused-tray: rgb(255, 255, 255);
+    --bk-scroll-track: rgba(0, 0, 0, 0.06);
+    --bk-scroll-thumb: rgba(0, 0, 0, 0.55);
+    --bk-scroll-thumb-hover: rgba(0, 0, 0, 0.8);
+    --blocky-color-motion: rgb(128, 181, 255);
+    --blocky-color-looks: rgb(204, 179, 255);
+    --blocky-color-control: rgb(255, 190, 76);
+    --blocky-color-event: rgb(255, 217, 102);
+    --blocky-color-conditions: rgb(133, 196, 224);
+    --blocky-color-sensing: rgb(133, 196, 224);
+    --blocky-color-operators: rgb(126, 206, 126);
+    --blocky-color-sound: rgb(225, 157, 225);
+    --blocky-color-variables: rgb(255, 165, 76);
+    --blocky-color-lists: rgb(255, 153, 102);
+    --blocky-color-myblocks: rgb(255, 153, 170);
+}
+
+.blocky-theme--contrast .blocky-ingame-canvas-viewport {
+    --bk-grid-dot: rgba(0, 0, 0, 0.28);
+}
+
+.blocky-theme--contrast .blocky-shaped {
+    --blocky-stroke: rgb(0, 0, 0);
+    --blocky-selected-stroke: rgb(0, 76, 204);
+}
+
+.blocky-theme--contrast .blocky-shaped Label,
+.blocky-theme--contrast .blocky-param-field > .unity-base-field__label {
+    color: rgb(0, 0, 0);
+}
+
+.blocky-theme--contrast .blocky-block--category-motion { --blocky-fill: rgb(128, 181, 255); }
+.blocky-theme--contrast .blocky-block--category-looks { --blocky-fill: rgb(204, 179, 255); }
+.blocky-theme--contrast .blocky-block--category-control { --blocky-fill: rgb(255, 190, 76); }
+.blocky-theme--contrast .blocky-block--category-event { --blocky-fill: rgb(255, 217, 102); }
+.blocky-theme--contrast .blocky-block--category-conditions { --blocky-fill: rgb(133, 196, 224); }
+.blocky-theme--contrast .blocky-block--category-sensing { --blocky-fill: rgb(133, 196, 224); }
+.blocky-theme--contrast .blocky-block--category-operators { --blocky-fill: rgb(126, 206, 126); }
+.blocky-theme--contrast .blocky-block--category-sound { --blocky-fill: rgb(225, 157, 225); }
+.blocky-theme--contrast .blocky-block--category-variables { --blocky-fill: rgb(255, 165, 76); }
+.blocky-theme--contrast .blocky-block--category-lists { --blocky-fill: rgb(255, 153, 102); }
+.blocky-theme--contrast .blocky-block--category-myblocks { --blocky-fill: rgb(255, 153, 170); }

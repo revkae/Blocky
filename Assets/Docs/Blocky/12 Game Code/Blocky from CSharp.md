@@ -48,6 +48,10 @@ How game code talks to Blocky: hearing what the learner's scripts do, sending th
 
 **Remember the hats:** with *only these*, a learner who can't take a `when Go clicked` out of the palette can't start a script. List one, or give the object a starting script that has it.
 
+## Themes
+
+`panel.Theme = BlockyTheme.Dark;` — `Light`, `Dark` or `HighContrast`, for this session. The learner can switch in the title bar; their pick is remembered on the computer and wins the next time. The Inspector's *Theme* field is the look before anyone has picked. See [[09 Decisions/Decisions#ADR-035 — Three themes as classes on the workspace root; High contrast recolors the blocks too|ADR-035]].
+
 ## Making a puzzle level
 
 1. Give the robot a starting program in the scene (`when Go clicked` with nothing under it), or allow the hat in the toolbox.

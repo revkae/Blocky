@@ -45,7 +45,9 @@ namespace Blocky.Editor
 
         private static readonly Color RunningStroke = new(1f, 0.86f, 0.1f);
 
-        public void Draw(Painter2D p, Color fill, bool selected = false, bool running = false)
+        /// <param name="stroke">The outline, when the theme sets one (<c>--blocky-stroke</c>); else a darker shade of the fill.</param>
+        /// <param name="selectedStroke">The outline of a selected block, when the theme sets one (<c>--blocky-selected-stroke</c>); else white.</param>
+        public void Draw(Painter2D p, Color fill, bool selected = false, bool running = false, Color? stroke = null, Color? selectedStroke = null)
         {
             if (float.IsNaN(Width) || float.IsNaN(Height) || Width <= 0f || Height <= 0f) return;
 
@@ -53,7 +55,9 @@ namespace Blocky.Editor
             // extra strokes produced no visible geometry, so "selected" and "running" change colors, not the number
             // of passes. Running wins the outline (it's the live signal); selected still lightens the fill.
             p.fillColor = selected ? Color.Lerp(fill, Color.white, 0.18f) : fill;
-            p.strokeColor = running ? RunningStroke : selected ? Color.white : new Color(fill.r * 0.78f, fill.g * 0.78f, fill.b * 0.78f, 1f);
+            p.strokeColor = running ? RunningStroke
+                : selected ? selectedStroke ?? Color.white
+                : stroke ?? new Color(fill.r * 0.78f, fill.g * 0.78f, fill.b * 0.78f, 1f);
             p.lineWidth = running ? 4f : selected ? 3f : 1f;
             Trace(p);
             p.Fill();
@@ -161,17 +165,22 @@ namespace Blocky.Editor
 
     /// <summary>
     /// Draws a <see cref="BlockOutline"/> as an element's background. The fill comes from the USS custom property
-    /// <c>--blocky-fill</c> (set per category in blocky-*.uss), so colors stay in stylesheets, not code.
+    /// <c>--blocky-fill</c> (set per category in blocky-*.uss), so colors stay in stylesheets, not code — and so do
+    /// the outline colors a theme may set, <c>--blocky-stroke</c> and <c>--blocky-selected-stroke</c>.
     /// </summary>
     internal sealed class BlockShapePainter
     {
         private static readonly CustomStyleProperty<Color> FillProperty = new("--blocky-fill");
+        private static readonly CustomStyleProperty<Color> StrokeProperty = new("--blocky-stroke");
+        private static readonly CustomStyleProperty<Color> SelectedStrokeProperty = new("--blocky-selected-stroke");
         private static readonly Color FallbackFill = new(0.55f, 0.55f, 0.58f);
 
         private readonly VisualElement _element;
         private readonly Func<BlockOutline> _outline;
         private readonly float _shade;
         private Color _fill = FallbackFill;
+        private Color? _stroke;
+        private Color? _selectedStroke;
 
         /// <param name="shade">Multiplies the fill — below 1 draws a darker hole in the block's color (an empty condition slot).</param>
         public BlockShapePainter(VisualElement element, Func<BlockOutline> outline, float shade = 1f)
@@ -190,8 +199,11 @@ namespace Blocky.Editor
 
         private void OnCustomStyleResolved(CustomStyleResolvedEvent evt)
         {
-            if (!evt.customStyle.TryGetValue(FillProperty, out var fill)) return;
-            _fill = fill;
+            var style = evt.customStyle;
+            if (style.TryGetValue(FillProperty, out var fill)) _fill = fill;
+            // A theme change can take an outline color away again, so absent means "none", not "keep the last one".
+            _stroke = style.TryGetValue(StrokeProperty, out var stroke) ? stroke : null;
+            _selectedStroke = style.TryGetValue(SelectedStrokeProperty, out var selected) ? selected : null;
             _element.MarkDirtyRepaint();
         }
 
@@ -199,7 +211,7 @@ namespace Blocky.Editor
         {
             var fill = new Color(_fill.r * _shade, _fill.g * _shade, _fill.b * _shade, 1f);
             _outline().Draw(mgc.painter2D, fill, _element.ClassListContains(BlockOutline.SelectedClass),
-                _element.ClassListContains(BlockOutline.RunningClass));
+                _element.ClassListContains(BlockOutline.RunningClass), _stroke, _selectedStroke);
         }
     }
 }
