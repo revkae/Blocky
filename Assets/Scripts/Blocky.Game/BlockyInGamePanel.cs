@@ -168,6 +168,15 @@ namespace Blocky.Game
         private string _storageKey;
         private string _storageNoticeKey; // "storage.unreadable" / "storage.save_failed" while the edited object's save has a problem, else null
         private Button _themeButton;
+        private Button _opener; // "Blocks", in the corner while the workspace is closed: the way in without a keyboard
+
+        // Fingers on empty table (Free mode): one pans, two pinch to zoom. Mouse gestures keep their own state.
+        private readonly Dictionary<int, Vector2> _touches = new();
+        private float _pinchStartDistance;
+        private float _pinchStartZoom;
+        private Vector2 _pinchLastMidpoint;
+        private Vector2 _touchStart;
+        private bool _touchMoved;
         private Color _gridDot = new(0.08f, 0.12f, 0.20f, 0.14f); // the theme's --bk-grid-dot, read off the viewport
         private Label _limitChip;          // "Blocks 3 / 5", when the toolbox sets a limit
         private bool _limitRefused;        // a block was just refused at the limit: say why until the next edit
@@ -262,20 +271,20 @@ namespace Blocky.Game
             if (_pointerOverEditorFrame == Time.frameCount) return _pointerOverEditor;
 
             _pointerOverEditorFrame = Time.frameCount;
-            var mouse = Mouse.current;
-            _pointerOverEditor = _visible && mouse != null && IsOverWorkspace(mouse.position.ReadValue());
+            // Closed, the workspace is only its "Blocks" button, and a press on that isn't a press in the game either.
+            _pointerOverEditor = BlockyInput.TryGetPointerPosition(out var position) && IsOverWorkspace(position);
             return _pointerOverEditor;
         }
 
         private void Update()
         {
             var keyboard = Keyboard.current;
-            var mouse = Mouse.current;
+            var pointer = Pointer.current; // the mouse, a pen or a finger — whichever was used last
             if (keyboard != null && keyboard[toggleKey].wasPressedThisFrame)
                 SetVisible(!_visible);
 
-            DriveActiveDrag(mouse);
-            EndStaleTableGestures(mouse);
+            DriveActiveDrag(pointer);
+            EndStaleTableGestures(pointer);
 
             if (!_visible) return;
 
@@ -295,15 +304,15 @@ namespace Blocky.Game
                 else if (IsUndoShortcut(keyboard)) UndoLastEdit();
             }
 
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+            if (pointer == null || !pointer.press.wasPressedThisFrame) return;
 
-            var pointer = mouse.position.ReadValue();
-            if (IsOverWorkspace(pointer)) return; // click landed somewhere in the workspace, not the game
+            var position = pointer.position.ReadValue();
+            if (IsOverWorkspace(position)) return; // the press landed somewhere in the workspace, not the game
 
             var cam = Camera.main;
             if (cam == null) return;
 
-            var ray = cam.ScreenPointToRay(pointer);
+            var ray = cam.ScreenPointToRay(position);
             if (Physics.Raycast(ray, out var hit))
                 SetTarget(hit.collider.gameObject);
         }
@@ -346,19 +355,21 @@ namespace Blocky.Game
             RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(screenPointer.x, Screen.height - screenPointer.y));
 
         /// <summary>
-        /// Drives any open press/drag from the real mouse, every frame. UI events alone aren't reliable enough:
-        /// a pointer-up is lost when the button is released where the UI doesn't receive input (over the game
-        /// view, outside the window), and a control inside a block (checkbox, text box) captures the pointer on
-        /// press and keeps the move events to itself. The physical button and position are the ground truth.
+        /// Drives any open press/drag from the real pointer — mouse, pen or finger — every frame. UI events alone
+        /// aren't reliable enough: a pointer-up is lost when the button is released where the UI doesn't receive
+        /// input (over the game view, outside the window), and a control inside a block (checkbox, text box)
+        /// captures the pointer on press and keeps the move events to itself. The physical press and position are
+        /// the ground truth. (A <see cref="Mouse"/>'s press is its left button, a touchscreen's its first finger —
+        /// so on a touchscreen laptop a finger's drag is no longer ended by the mouse button reading up.)
         /// </summary>
-        private void DriveActiveDrag(Mouse mouse)
+        private void DriveActiveDrag(Pointer pointer)
         {
             var drag = _dragContext?.ActiveDrag;
-            if (drag == null || mouse == null || _root.panel == null) return;
+            if (drag == null || pointer == null || _root.panel == null) return;
 
-            var pointer = ScreenToPanel(mouse.position.ReadValue());
-            if (mouse.leftButton.isPressed) drag.Poll(pointer);
-            else drag.ForceEnd(pointer);
+            var position = ScreenToPanel(pointer.position.ReadValue());
+            if (pointer.press.isPressed) drag.Poll(position);
+            else drag.ForceEnd(position);
         }
 
         /// <summary>Delete/Backspace inside a number or text box edits the text — it must not delete the block.</summary>
@@ -415,6 +426,7 @@ namespace Blocky.Game
             _root.style.paddingRight = ResizeHandleWidth; // reserves the strip the absolutely-positioned handle sits in
             _root.style.flexDirection = FlexDirection.Column;
 
+            _root.Add(BuildOpener());
             _root.Add(BuildHeader());
 
             _runBar = BuildRunBar();
@@ -536,8 +548,10 @@ namespace Blocky.Game
             bar.Add(BuildLanguageButtons());
             bar.Add(BuildThemeButton());
 
-            var keyHint = new VisualElement();
+            // Also the close button — a tablet has no Tab key.
+            var keyHint = new Button(() => SetVisible(false));
             keyHint.AddToClassList("blocky-ingame-keyhint");
+            Localize(() => keyHint.tooltip = BlockyText.Format("workspace.close.tooltip", toggleKey.ToString()));
             var key = new Label(toggleKey.ToString());
             key.AddToClassList("blocky-ingame-key");
             keyHint.Add(key);
@@ -1227,7 +1241,17 @@ namespace Blocky.Game
         /// </summary>
         private void OnViewportPointerDown(PointerDownEvent evt)
         {
-            if (_canvasView == null || _panning || _selectingBox || !IsTableBackground(evt.target as VisualElement)) return;
+            if (_canvasView == null || !IsTableBackground(evt.target as VisualElement)) return;
+
+            // Fingers on the free table: one pans, two pinch — a finger has no right button, and a selection box
+            // is a mouse's gesture. (Simple mode below already pans with anything.)
+            if (evt.pointerType == PointerType.touch && workspaceMode == WorkspaceMode.Free)
+            {
+                TouchDown(evt);
+                return;
+            }
+
+            if (_panning || _selectingBox) return;
 
             // Simple mode has no selection box, so empty table is there to scroll the column, with any button.
             if (workspaceMode == WorkspaceMode.Simple)
@@ -1252,6 +1276,12 @@ namespace Blocky.Game
 
         private void OnViewportPointerMove(PointerMoveEvent evt)
         {
+            if (_touches.ContainsKey(evt.pointerId))
+            {
+                TouchMove(evt.pointerId, evt.position);
+                return;
+            }
+
             if (_selectingBox && evt.pointerId == _boxPointerId)
             {
                 UpdateBoxSelect(evt.position);
@@ -1267,6 +1297,12 @@ namespace Blocky.Game
 
         private void OnViewportPointerUp(PointerUpEvent evt)
         {
+            if (_touches.ContainsKey(evt.pointerId))
+            {
+                TouchUp(evt.pointerId);
+                return;
+            }
+
             if (_selectingBox && evt.pointerId == _boxPointerId)
             {
                 UpdateBoxSelect(evt.position);
@@ -1328,18 +1364,118 @@ namespace Blocky.Game
             if (_canvasViewport.HasPointerCapture(_boxPointerId)) _canvasViewport.ReleasePointer(_boxPointerId);
         }
 
-        /// <summary>A release the UI never saw (over the game view, outside the window) must still end a selection box or a pan.</summary>
-        private void EndStaleTableGestures(Mouse mouse)
+        /// <summary>A release the UI never saw (over the game view, outside the window) must still end a selection box, a pan or a pinch.</summary>
+        private void EndStaleTableGestures(Pointer pointer)
         {
-            if (mouse == null) return;
-            if (_selectingBox && !mouse.leftButton.isPressed) EndBoxSelect();
-            if (_panning && !IsPanButtonHeld(mouse)) EndPan();
+            if (_touches.Count > 0 && !AnyFingerDown()) EndTouches();
+            if (pointer == null) return;
+            if (_selectingBox && !pointer.press.isPressed) EndBoxSelect();
+            if (_panning && !IsPanButtonHeld(pointer)) EndPan();
         }
 
-        /// <summary>Simple mode pans with the left button too — there's no selection box there to use it for.</summary>
-        private bool IsPanButtonHeld(Mouse mouse) =>
-            mouse.rightButton.isPressed || mouse.middleButton.isPressed ||
-            (workspaceMode == WorkspaceMode.Simple && mouse.leftButton.isPressed);
+        /// <summary>
+        /// A mouse pans with the right or middle button — and in Simple mode the left one too, as there's no selection
+        /// box there to use it for. A pen or a finger pans with its press.
+        /// </summary>
+        private bool IsPanButtonHeld(Pointer pointer) => pointer is Mouse mouse
+            ? mouse.rightButton.isPressed || mouse.middleButton.isPressed || (workspaceMode == WorkspaceMode.Simple && mouse.leftButton.isPressed)
+            : pointer.press.isPressed;
+
+        // ---- fingers on the free table ---------------------------------------------------------------------
+
+        private void TouchDown(PointerDownEvent evt)
+        {
+            _touches[evt.pointerId] = evt.position;
+            _canvasViewport.CapturePointer(evt.pointerId);
+
+            if (_touches.Count == 1)
+            {
+                _touchStart = evt.position;
+                _touchMoved = false;
+            }
+            else if (_touches.Count == 2)
+            {
+                BeginPinch();
+            }
+            evt.StopPropagation();
+        }
+
+        private void BeginPinch()
+        {
+            var (a, b) = FirstTwoTouches();
+            _pinchStartDistance = Mathf.Max(1f, Vector2.Distance(a, b));
+            _pinchStartZoom = _zoom;
+            _pinchLastMidpoint = (a + b) / 2f;
+            _touchMoved = true; // two fingers are never a tap
+        }
+
+        /// <summary>One finger drags the table; two keep the point between them still and zoom by how far apart they've moved.</summary>
+        private void TouchMove(int pointerId, Vector2 position)
+        {
+            var last = _touches[pointerId];
+            _touches[pointerId] = position;
+
+            if (_touches.Count == 1)
+            {
+                if (!_touchMoved && Vector2.Distance(position, _touchStart) < BoxSelectThreshold) return; // still a tap
+                _touchMoved = true;
+                _pan += position - last;
+                ApplyCanvasTransform();
+                return;
+            }
+
+            var (a, b) = FirstTwoTouches();
+            var midpoint = (a + b) / 2f;
+            ZoomAround(_canvasViewport.WorldToLocal(midpoint), _pinchStartZoom * Vector2.Distance(a, b) / _pinchStartDistance);
+            _pan += midpoint - _pinchLastMidpoint; // and the pair moving together drags the table
+            _pinchLastMidpoint = midpoint;
+            ApplyCanvasTransform();
+        }
+
+        private void TouchUp(int pointerId)
+        {
+            _touches.Remove(pointerId);
+            if (_canvasViewport.HasPointerCapture(pointerId)) _canvasViewport.ReleasePointer(pointerId);
+
+            if (_touches.Count == 0)
+            {
+                if (!_touchMoved) _canvasView?.ClearSelection(); // a tap on empty table, like a click
+                return;
+            }
+
+            if (_touches.Count >= 2) BeginPinch(); // a third finger lifted: go on with the two left
+            // One finger left after a pinch: it carries on panning from where it is, with no jump.
+        }
+
+        private void EndTouches()
+        {
+            foreach (var pointerId in _touches.Keys)
+                if (_canvasViewport.HasPointerCapture(pointerId)) _canvasViewport.ReleasePointer(pointerId);
+            _touches.Clear();
+        }
+
+        private (Vector2 a, Vector2 b) FirstTwoTouches()
+        {
+            Vector2 a = default, b = default;
+            var n = 0;
+            foreach (var position in _touches.Values)
+            {
+                if (n == 0) a = position;
+                else if (n == 1) b = position;
+                else break;
+                n++;
+            }
+            return (a, b);
+        }
+
+        private static bool AnyFingerDown()
+        {
+            var touchscreen = Touchscreen.current;
+            if (touchscreen == null) return false;
+            foreach (var touch in touchscreen.touches)
+                if (touch.press.isPressed) return true;
+            return false;
+        }
 
         private void OnViewportWheel(WheelEvent evt)
         {
@@ -1668,10 +1804,47 @@ namespace Blocky.Game
             RefreshBlockLimit();
         }
 
+        /// <summary>
+        /// Opens or closes the workspace. Closed, the root shrinks to its "Blocks" button in the corner
+        /// (<c>blocky-ingame-root--closed</c> hides everything else), so the rest of the screen is the game's
+        /// again — presses there pick objects and reach the scripts.
+        /// </summary>
         private void SetVisible(bool value)
         {
             _visible = value;
-            _root.style.display = value ? DisplayStyle.Flex : DisplayStyle.None;
+            _root.EnableInClassList("blocky-ingame-root--closed", !value);
+            _root.style.width = value ? new StyleLength(panelWidth) : new StyleLength(StyleKeyword.Auto);
+            _root.style.bottom = value ? new StyleLength(0f) : new StyleLength(StyleKeyword.Auto);
+            _root.style.paddingRight = value ? new StyleLength(ResizeHandleWidth) : new StyleLength(0f);
+        }
+
+        /// <summary>
+        /// "Blocks", in the top-left corner while the workspace is closed: the way in on a tablet, which has no Tab
+        /// key, and a reminder on a laptop that there is one.
+        /// </summary>
+        private Button BuildOpener()
+        {
+            _opener = new Button(() => SetVisible(true));
+            _opener.AddToClassList("blocky-opener");
+
+            var mark = new Label("B");
+            mark.AddToClassList("blocky-ingame-mark");
+            _opener.Add(mark);
+
+            var label = new Label();
+            label.AddToClassList("blocky-opener__label");
+            _opener.Add(label);
+
+            var key = new Label(toggleKey.ToString());
+            key.AddToClassList("blocky-ingame-key");
+            _opener.Add(key);
+
+            Localize(() =>
+            {
+                label.text = BlockyText.Get("workspace.open");
+                _opener.tooltip = BlockyText.Format("workspace.open.tooltip", toggleKey.ToString());
+            });
+            return _opener;
         }
 
         private void SetTarget(GameObject go)

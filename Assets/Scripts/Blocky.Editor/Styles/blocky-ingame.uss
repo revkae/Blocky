@@ -165,11 +165,61 @@
     margin-left: 8px;
 }
 
+/* "Tab hides this" — a button too, so a tablet can close the workspace. */
 .blocky-ingame-keyhint {
     flex-direction: row;
     align-items: center;
     flex-shrink: 0;
-    margin-left: 12px;
+    margin: 0 0 0 8px;
+    padding: 3px 6px;
+    border-width: 0;
+    border-radius: 7px;
+    background-color: rgba(0, 0, 0, 0);
+    transition-property: background-color;
+    transition-duration: 90ms;
+}
+
+.blocky-ingame-keyhint:hover {
+    background-color: var(--bk-header-soft);
+}
+
+/* ─── Closed: only the "Blocks" button, in the corner ─────────────────────────────────────────────────── */
+
+/* The root shrinks to the button (BlockyInGamePanel.SetVisible) and lets the game have the rest of the screen. */
+.blocky-ingame-root.blocky-ingame-root--closed {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.blocky-ingame-root--closed > * {
+    display: none;
+}
+
+.blocky-opener {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    margin: 12px;
+    padding: 6px 10px 6px 6px;
+    border-width: 0;
+    border-radius: 12px;
+    background-color: var(--bk-header);
+    transition-property: background-color;
+    transition-duration: 90ms;
+}
+
+.blocky-ingame-root--closed > .blocky-opener {
+    display: flex;
+}
+
+.blocky-opener:hover {
+    background-color: var(--bk-accent);
+}
+
+.blocky-opener__label {
+    margin: 0 10px 0 8px;
+    font-size: 13px;
+    color: var(--bk-on-dark);
+    -unity-font-style: bold;
 }
 
 /* A key cap, so "Tab" reads as a key and not as a word. */

@@ -6,6 +6,15 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (touch) — Tablets and touchscreens
+User request: "Touch and tablet support". Design in [[09 Decisions/Decisions#ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch|ADR-037]].
+
+- **The last-used pointer everywhere:** `Pointer.current` (mouse, pen or finger) replaces `Mouse.current` in picking objects, the drag safety net (`DriveActiveDrag`), stale-gesture cleanup, `BlockyInput` (`mouse down?`) and `TriggerBroker.PollClicked` (`when clicked`). A touchscreen laptop no longer ends a finger's drag because the mouse button reads up.
+- **Free table:** one finger on empty table pans, a tap clears the selection, two fingers pinch-zoom around the point between them and pan together.
+- **A "Blocks [Tab]" button** opens the closed workspace from the corner; "Tab hides this" closes it. Closed, the root shrinks to that button so the game has the rest of the screen.
+- **Words:** the button and both tooltips in English and Türkçe (261 strings each).
+- **Verified:** compiles, and nothing else changed in the suite. **Not verified:** none of it has touched a touchscreen — see the device checklist in [[11 Release/Release Readiness|Release Readiness]] §4.
+
 ## 2026-09-24 (wizard) — Blocky › New Block…
 User request: "A 'New Block' wizard in the Unity menu". Design in [[09 Decisions/Decisions#ADR-036 — New blocks live in the project's own folder, and a missing op stops one script, not the game|ADR-036]].
 

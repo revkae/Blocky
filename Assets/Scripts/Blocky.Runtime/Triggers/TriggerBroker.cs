@@ -80,11 +80,9 @@ namespace Blocky.Runtime.Triggers
             _pointerDownLastPoll = isDown;
 
             if (!isDown || wasDown || camera == null) return;
+            if (!BlockyInput.TryGetPointerPosition(out var position)) return; // mouse, pen or finger — the one just pressed
 
-            var mouse = Mouse.current;
-            if (mouse == null) return;
-
-            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
+            var ray = camera.ScreenPointToRay(position);
             if (Physics.Raycast(ray, out var hit)) OnClicked?.Invoke(hit.collider.gameObject);
         }
 

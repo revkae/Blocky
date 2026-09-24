@@ -361,6 +361,15 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - **Generated classes carry `[Preserve]`** on the class and its constructor: Blocky makes them by reflection, so nothing else names them, and the `link.xml` only keeps Blocky's own assemblies.
 **Not done:** the wizard makes no hats and no C-blocks; it doesn't translate (other languages get the English words to translate); and renaming or deleting a made block is by hand.
 
+## ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch
+**Status:** Accepted (user request, 2026-09-24: "Touch and tablet support"). Built and compiled outside Unity only — **not tried on any touchscreen**.
+**Context:** UI Toolkit already turns a finger into pointer events with button 0, so dragging blocks was never the problem. What broke touch was every place the code read `Mouse.current` itself: picking an object in the game, the per-frame "is the button still down?" check that ends a drag the UI missed (on a touchscreen laptop it ended a finger's drag at once, because the *mouse* button read up), `mouse down?`, `when clicked`, and panning, which wanted a right or middle button no finger has.
+**Decision:**
+- **One pointer, whichever was used last:** the Input System's `Pointer.current` — a `Mouse`, a pen or a `Touchscreen`, whose `press` is the left button, the tip or the first finger. `BlockyInput.TryGetPointerPosition` and its press serve the runtime (`mouse down?`, `when clicked`); the panel picks objects, drives drags and ends stale gestures from the same pointer. Panning with a mouse still wants the right or middle button (or the left in Simple mode); with a pen or a finger it is the press.
+- **Fingers on the free table:** one finger on empty table pans (a tap clears the selection, like a click), a second makes it a pinch — the point between the fingers stays put while the zoom follows their distance, and moving both drags the table. A selection box stays a mouse gesture. Simple mode already panned with any press.
+- **A way in and out without a keyboard.** Closed, the workspace is a "Blocks [Tab]" button in the top-left corner: the root shrinks to it (`blocky-ingame-root--closed` hides every other child) and the rest of the screen is the game's. The title bar's "Tab hides this" is now a button that closes it.
+**Known limits:** a finger on a palette block always drags it out, so the palette scrolls by its tabs or beside the blocks — deciding by direction, as Blockly does, would mean taking the pointer back from the palette's ScrollView, which can't be tried without a device. `when key pressed` and `key pressed?` still need a keyboard; on-screen keys would be a block-level feature of their own.
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above
