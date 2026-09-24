@@ -15,6 +15,42 @@ namespace Blocky.Data
         /// <summary>A stack with no hat block — blocks left lying on the table. Saved like any other stack, but never compiled or run (Scratch's loose blocks).</summary>
         public static bool IsLoose(BlockStack stack) => string.IsNullOrEmpty(stack.triggerBlockType);
 
+        /// <summary>
+        /// How many blocks are on the table, the way a block limit counts them ("solve it in 5 blocks"): every block
+        /// in every script and every loose one, inside C-blocks and inside inputs too — but not the hats, which
+        /// aren't blocks of the solution, only where it starts.
+        /// </summary>
+        public static int CountBlocks(ObjectProgram program)
+        {
+            var count = 0;
+            if (program?.stacks == null) return 0;
+            foreach (var stack in program.stacks) count += CountBlocks(stack.sequence);
+            return count;
+        }
+
+        private static int CountBlocks(BlockNode[] sequence)
+        {
+            var count = 0;
+            if (sequence == null) return 0;
+            foreach (var node in sequence)
+            {
+                count += CountBlock(node);
+                if (node.branches == null) continue;
+                foreach (var branch in node.branches) count += CountBlocks(branch);
+            }
+            return count;
+        }
+
+        /// <summary>The block itself and every block sitting in its inputs, to any depth.</summary>
+        private static int CountBlock(BlockNode node)
+        {
+            var count = 1;
+            if (node.parameters == null) return count;
+            foreach (var param in node.parameters)
+                if (param?.reporter != null) count += CountBlock(param.reporter);
+            return count;
+        }
+
         public static BlockNode FindNode(ObjectProgram program, string stackId, string nodeId)
         {
             var stack = FindStack(program, stackId);

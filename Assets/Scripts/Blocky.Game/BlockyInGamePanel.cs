@@ -79,6 +79,9 @@ namespace Blocky.Game
         [SerializeField] private float paletteWidth = 280f; // enough for the widest prototype's last parameter
         [SerializeField] private WorkspaceMode workspaceMode = WorkspaceMode.Free;
 
+        [Tooltip("What this level lets the learner use: which blocks the palette offers, and a block limit. Empty: every block, no limit.")]
+        [SerializeField] private BlockyToolbox toolbox;
+
         private UIDocument _uiDocument;
         private BlockRegistry _registry;
 
@@ -148,6 +151,10 @@ namespace Blocky.Game
         private DragContext _dragContext;
         private string _storageKey;
         private string _storageNoticeKey; // "storage.unreadable" / "storage.save_failed" while the edited object's save has a problem, else null
+        private Label _limitChip;          // "Blocks 3 / 5", when the toolbox sets a limit
+        private bool _limitRefused;        // a block was just refused at the limit: say why until the next edit
+        private List<Advice> _advice = new(); // the advice on show, so a notice can be added without working it out again
+        private readonly List<(BlockDefinition definition, VisualElement item)> _paletteItems = new(); // dimmed at the limit
         private bool _visible;
 
         private int _pointerOverEditorFrame = -1;
@@ -166,6 +173,28 @@ namespace Blocky.Game
         private readonly List<string> _runningNow = new();      // filled every frame, never reallocated
         private readonly HashSet<string> _runningShown = new(); // what the table currently lights up
 
+        /// <summary>
+        /// What this level lets the learner use (<see cref="BlockyToolbox"/>): the palette shows only its blocks and
+        /// the table counts against its limit. Null: every block, no limit. Setting it redraws the palette at once —
+        /// a game can hand each level its own.
+        /// </summary>
+        public BlockyToolbox Toolbox
+        {
+            get => toolbox;
+            set
+            {
+                toolbox = value;
+                if (_root == null) return; // before Awake: it is read when the workspace is built
+                ApplyToolboxTo(_store);
+                GroupBlocksByCategory();
+                RebuildPalette();
+                RefreshBlockLimit();
+            }
+        }
+
+        /// <summary>How many blocks the edited object's program uses, the way the limit counts them (hats don't count); 0 with no object.</summary>
+        public int BlocksUsed => _store != null ? ProgramQuery.CountBlocks(_store.Program) : 0;
+
         private void Awake()
         {
             _uiDocument = GetComponent<UIDocument>();
@@ -179,6 +208,12 @@ namespace Blocky.Game
         }
 
         private void OnEnable() => LocalizationSettings.SelectedLocaleChanged += OnLanguageChanged;
+
+        // Tuning a level's toolbox in the Inspector during Play mode redraws the palette straight away.
+        private void OnValidate()
+        {
+            if (Application.isPlaying && _root != null) Toolbox = toolbox;
+        }
 
         private void OnDisable() => LocalizationSettings.SelectedLocaleChanged -= OnLanguageChanged;
 
@@ -413,7 +448,11 @@ namespace Blocky.Game
             _dragContext = new DragContext(_registry, _dragLayer,
                 p => _canvasViewport.worldBound.Contains(p),
                 p => _paletteScroll.worldBound.Contains(p) || _tabRail.worldBound.Contains(p),
-                () => _zoom);
+                () => _zoom)
+            {
+                CanTakeFromPalette = definition => toolbox == null || _store == null || toolbox.CanAdd(_store.Program, definition),
+                PaletteRefused = _ => OnLimitRefused()
+            };
             BuildPalette();
             SetWorkspaceMode(workspaceMode); // lights the chosen mode, fills its tips and sets the view up for it
         }
@@ -914,6 +953,16 @@ namespace Blocky.Game
             var tools = new VisualElement { pickingMode = PickingMode.Ignore };
             tools.AddToClassList("blocky-table-tools");
 
+            _limitChip = new Label { pickingMode = PickingMode.Ignore };
+            _limitChip.AddToClassList("blocky-limit");
+            _limitChip.style.display = DisplayStyle.None; // until an object is picked in a level with a limit
+            Localize(() =>
+            {
+                _limitChip.tooltip = BlockyText.Get("limit.tooltip");
+                RefreshBlockLimit();
+            });
+            tools.Add(_limitChip);
+
             _undoButton = new Button(UndoLastEdit);
             _undoButton.AddToClassList("blocky-table-tools__button");
             Localize(() =>
@@ -944,11 +993,21 @@ namespace Blocky.Game
         {
             _adviceList.Clear();
 
+            _advice = advice;
             if (_storageNoticeKey != null)
             {
                 var notice = new Label(BlockyText.Format(_storageNoticeKey, _target != null ? _target.name : string.Empty)) { pickingMode = PickingMode.Ignore };
                 notice.AddToClassList("blocky-advice");
                 notice.AddToClassList("blocky-advice--problem");
+                _adviceList.Add(notice);
+            }
+
+            var limitNotice = LimitNotice();
+            if (limitNotice != null)
+            {
+                var notice = new Label(limitNotice) { pickingMode = PickingMode.Ignore };
+                notice.AddToClassList("blocky-advice");
+                notice.AddToClassList("blocky-advice--hint");
                 _adviceList.Add(notice);
             }
 
@@ -968,7 +1027,56 @@ namespace Blocky.Game
                 _adviceList.Add(more);
             }
 
-            _adviceList.style.display = advice.Count > 0 || _storageNoticeKey != null ? DisplayStyle.Flex : DisplayStyle.None;
+            _adviceList.style.display = advice.Count > 0 || _storageNoticeKey != null || limitNotice != null ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        /// <summary>
+        /// The store enforces the toolbox for every way a block gets onto the table — the palette asks first, but the
+        /// ⬡ hole's menu and anything added later go through the store, which refuses an edit past the limit.
+        /// </summary>
+        private void ApplyToolboxTo(ProgramStore store)
+        {
+            if (store == null) return;
+            store.BlockLimit = toolbox != null ? toolbox.blockLimit : 0;
+            store.Offers = toolbox == null ? null : blockType => toolbox.Allows(_registry.Find(blockType));
+        }
+
+        private void OnLimitRefused()
+        {
+            _limitRefused = true;
+            ShowAdvice(_advice);
+        }
+
+        /// <summary>What to say about the block limit, if anything: over it (a save or a scene program from before the limit), or a block just refused.</summary>
+        private string LimitNotice()
+        {
+            if (toolbox == null || !toolbox.HasLimit || _store == null) return null;
+            var used = ProgramQuery.CountBlocks(_store.Program);
+            if (used > toolbox.blockLimit) return BlockyText.Format("limit.over", used, toolbox.blockLimit);
+            return _limitRefused ? BlockyText.Format("limit.reached", toolbox.blockLimit) : null;
+        }
+
+        /// <summary>
+        /// The block limit on show: the "Blocks 3 / 5" chip (amber when full, red when over), and the palette's blocks
+        /// dimmed while no more fit — hats stay lit, since they don't count.
+        /// </summary>
+        private void RefreshBlockLimit()
+        {
+            if (_limitChip == null) return;
+            var limited = toolbox != null && toolbox.HasLimit && _store != null;
+            _limitChip.style.display = limited ? DisplayStyle.Flex : DisplayStyle.None;
+
+            var used = limited ? ProgramQuery.CountBlocks(_store.Program) : 0;
+            var full = limited && used >= toolbox.blockLimit;
+            if (limited)
+            {
+                _limitChip.text = BlockyText.Format("limit.count", used, toolbox.blockLimit);
+                _limitChip.EnableInClassList("blocky-limit--full", used == toolbox.blockLimit);
+                _limitChip.EnableInClassList("blocky-limit--over", used > toolbox.blockLimit);
+            }
+
+            foreach (var (definition, item) in _paletteItems)
+                item.EnableInClassList("blocky-palette__prototype--unavailable", full && definition.shape != BlockShape.Trigger);
         }
 
         private Button AdviceRow(Advice item)
@@ -1296,10 +1404,12 @@ namespace Blocky.Game
         /// <summary>The registry's blocks by category, in enum order, empty categories left out — shared by the tab rail and the palette so they always agree.</summary>
         private void GroupBlocksByCategory()
         {
+            _blocksByCategory.Clear();
             var byCategory = new Dictionary<BlockCategory, List<BlockDefinition>>();
             for (var opcode = 0; opcode < _registry.Count; opcode++)
             {
                 var def = _registry.GetByOpcode(opcode);
+                if (toolbox != null && !toolbox.Allows(def)) continue; // this level doesn't offer it
                 if (!byCategory.TryGetValue(def.category, out var list))
                     byCategory[def.category] = list = new List<BlockDefinition>();
                 list.Add(def);
@@ -1361,8 +1471,10 @@ namespace Blocky.Game
 
             _paletteScroll.Clear();
             _paletteSections.Clear();
+            _paletteItems.Clear();
             BuildPalette();
             _paletteScroll.scrollOffset = scroll;
+            RefreshBlockLimit(); // the new entries start undimmed
         }
 
         private void BuildPalette()
@@ -1390,6 +1502,7 @@ namespace Blocky.Game
                     var item = BlockPrototype.Create(def, _registry);
                     item.AddManipulator(new PaletteDragManipulator(item, def, _dragContext));
                     section.Add(item);
+                    _paletteItems.Add((def, item));
                 }
 
                 if (category == BlockCategory.MyBlocks) AddCustomBlockRuns(section);
@@ -1406,7 +1519,7 @@ namespace Blocky.Game
         private void AddCustomBlockRuns(VisualElement section)
         {
             var run = _registry.Find(CustomBlocks.RunType);
-            if (run == null) return;
+            if (run == null || (toolbox != null && !toolbox.Allows(run))) return;
 
             foreach (var name in _customBlocksShown)
             {
@@ -1421,6 +1534,7 @@ namespace Blocky.Game
                 var item = BlockPrototype.Create(run, _registry, MakeRun());
                 item.AddManipulator(new PaletteDragManipulator(item, run, _dragContext, MakeRun));
                 section.Add(item);
+                _paletteItems.Add((run, item));
             }
         }
 
@@ -1453,10 +1567,12 @@ namespace Blocky.Game
                 foreach (var element in stackView.Query<VisualElement>().Where(e => e is IBlockElement).ToList())
                     element.AddManipulator(new CanvasDragManipulator(element, _dragContext));
 
+            _limitRefused = false; // the table changed: a refusal from before is old news
             var advice = ProgramAdvice.Collect(_store.Program, _registry);
             _canvasView.SetAdvice(advice);
             ShowAdvice(advice);
             RefreshCustomBlocks();
+            RefreshBlockLimit();
         }
 
         private void SetVisible(bool value)
@@ -1481,6 +1597,8 @@ namespace Blocky.Game
 
             _store = new ProgramStore(program) { UndoCapacity = UndoSteps };
             _store.OnChanged += _ => OnProgramChanged();
+            _store.LimitRefused += OnLimitRefused;
+            ApplyToolboxTo(_store);
             _liveAsset = null; // the previous object's runner keeps its own live asset; this object gets a fresh one on its first edit
 
             _statusLabel.text = go.name; // the lit dot in front of it already says "this is what you're editing"

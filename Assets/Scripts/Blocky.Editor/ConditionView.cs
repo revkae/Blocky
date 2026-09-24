@@ -148,7 +148,7 @@ namespace Blocky.Editor
             for (var opcode = 0; opcode < _registry.Count; opcode++)
             {
                 var definition = _registry.GetByOpcode(opcode);
-                if (definition.shape == BlockShape.Boolean)
+                if (definition.shape == BlockShape.Boolean && (_store.Offers == null || _store.Offers(definition.blockType)))
                     menu.AddItem(BlockView.DisplayName(definition), false, () => Fill(definition));
             }
 

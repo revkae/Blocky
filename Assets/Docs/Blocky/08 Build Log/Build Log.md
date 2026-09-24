@@ -6,6 +6,15 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (toolbox) — Per-level toolboxes and block limits
+User request: "Choose which blocks appear in each level. Limit the number of blocks ('solve it in 5 blocks')". Design in [[09 Decisions/Decisions#ADR-034|ADR-034]]; how to use it in [[12 Game Code/Blocky from CSharp#A level's toolbox and block limit|Blocky from C#]].
+
+- **`BlockyToolbox`** asset (Blocky.Compiler): *only these* / *all except these*, categories and blocks, `blockLimit`. On `BlockyInGamePanel` as the *Toolbox* field and the `Toolbox` property (redraws the palette; also when edited in the Inspector during Play mode). The palette, its tabs and the ready-made `run [name]` entries follow it.
+- **The limit:** `ProgramQuery.CountBlocks` (hats don't count; blocks in C-blocks, in inputs and loose ones do). A "Blocks 3 / 5" chip above Undo — amber when full, red when over — and the palette's blocks dimmed at the limit (hats stay lit). A refused block, or a program over the limit, gets a line above the advice.
+- **Enforced in `ProgramStore`:** `BlockLimit` — an edit that adds blocks past it is run with its change notices held back and undone unseen (`LimitRefused`; `Apply` returns false). `Offers` filters the ⬡ hole's click menu, the one place a block is made without the palette. The palette also refuses the drag up front (`DragContext.CanTakeFromPalette` / `PaletteRefused`).
+- **Words:** the chip, its tooltip and two notices in English and Türkçe (254 strings each).
+- **Verified outside Unity only:** 6 `BlockyToolboxTests` and 5 `ProgramStoreLimitTests` pass (filters, the count, hats, refusals leaving no trace, trimming a program that is already over); everything else unchanged. Not seen yet: the chip, the dimming and the refusal line in Play mode.
+
 ## 2026-09-24 (events) — C# events for game code, and a `level complete` block
 User request: "C# events such as 'script finished' and 'level complete'". Design in [[09 Decisions/Decisions#ADR-033|ADR-033]]; how to use it in the new note [[12 Game Code/Blocky from CSharp|Blocky from C#]]. Catalog now at **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 triggers).
 

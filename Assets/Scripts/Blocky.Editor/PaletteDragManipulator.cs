@@ -38,6 +38,13 @@ namespace Blocky.Editor
             // Before any object is picked there's no table to drop on — the palette can be browsed, not dragged from.
             if (evt.button != 0 || IsTracking || Context.ActiveDrag != null || !Context.HasTarget) return;
 
+            if (Context.CanTakeFromPalette != null && !Context.CanTakeFromPalette(_definition))
+            {
+                Context.PaletteRefused?.Invoke(_definition);
+                evt.StopPropagation();
+                return;
+            }
+
             var ghost = BlockPrototype.Create(_definition, Context.Registry, _makeNode?.Invoke());
             _session = new ChainDragSession(Context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
                 ChainShape.Of(_definition), fromCanvas: false, MakeCommand);

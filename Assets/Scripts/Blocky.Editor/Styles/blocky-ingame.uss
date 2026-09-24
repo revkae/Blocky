@@ -585,6 +585,37 @@
     opacity: 0.4;
 }
 
+/* The level's block limit, "Blocks 3 / 5": a chip above Undo, amber when full, red when over. */
+.blocky-limit {
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 13px;
+    border-width: 1px;
+    border-color: var(--bk-line);
+    background-color: var(--bk-surface);
+    font-size: 12px;
+    color: var(--bk-ink-2);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.blocky-limit--full {
+    border-color: var(--bk-warn-line);
+    background-color: var(--bk-warn-soft);
+    color: var(--bk-warn);
+}
+
+.blocky-limit--over {
+    border-color: var(--bk-stop);
+    background-color: var(--bk-stop);
+    color: rgb(255, 255, 255);
+}
+
+/* A palette block that can't be added now — the block limit is reached. Still visible, so the learner sees what they'd get. */
+.blocky-palette__prototype--unavailable {
+    opacity: 0.35;
+}
+
 /* One card, bottom-right: zoom in, zoom out, fit, and what the zoom currently is. */
 .blocky-zoom-controls {
     position: absolute;

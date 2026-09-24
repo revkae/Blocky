@@ -329,6 +329,16 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - **`level complete` is a block, and `when level complete` a hat,** in Events — so a teacher can make a level with no C# (the goal's "when collided → level complete"). Completing fires every time; game code ignores repeats if it cares, rather than Blocky guessing when a level "starts".
 **Also:** `BlockyEvents.Broadcast` sends messages into the scripts, `MessageSent` carries every broadcast out, and `ProgramEdited` is reported by the in-game editor after each change.
 
+## ADR-034 — A level's toolbox is an asset on the editor; its block limit is enforced by the program store
+**Status:** Accepted (user request, 2026-09-24: "Choose which blocks appear in each level. Limit the number of blocks — 'solve it in 5 blocks'"). Built and tested outside Unity only.
+**Decision:**
+- **`BlockyToolbox`** (Blocky.Compiler, `Create › Blocky › Toolbox`): *only these* or *all except these*, listed as whole categories and single block assets (dragged in, so no typed ids to get wrong; matched by block type), and a `blockLimit` (0 = none). It is set on `BlockyInGamePanel` per scene — one level, one toolbox — or from code (`panel.Toolbox`), which redraws the palette at once; changing it in the Inspector during Play mode does too.
+- **The toolbox limits what can be added, never what runs.** A scene program or a save may hold blocks the toolbox leaves out, or more blocks than the limit; they stay and run. Over the limit, the counter turns red and says so, and only edits that don't add blocks go through.
+- **Hats don't count.** They say where a solution starts, not what it does; counting them would make "5 blocks" mean 4. Blocks inside C-blocks and inside inputs do count, and so do loose ones — they are on the table.
+- **Enforced in `ProgramStore`, not only in the palette.** The palette refuses a drag up front (dimmed entries, a counter going amber), which is the friendly path, but a block also arrives through the ⬡ hole's click menu, and through whatever gets added later (paste, a smarter picker). So the store applies an edit with its change notices held back, and if the edit added blocks past `BlockLimit`, undoes it — still held back — and raises `LimitRefused`: listeners (the table, the save, the running program) never see it happen. `Apply` now returns false for a refused edit. Undo and Redo aren't checked: they only return to states the learner already had.
+- **`ProgramStore.Offers`** carries the toolbox's filter to views that make blocks themselves (the ⬡ menu). It's UI policy on a data class, accepted because the store is already the editing session (it owns undo) and every view has it.
+**Cost:** a limit makes every edit count the program's blocks (a walk of the tree, trivial next to the rebuild each edit causes).
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above

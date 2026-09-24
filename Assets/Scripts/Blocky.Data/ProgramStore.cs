@@ -13,10 +13,30 @@ namespace Blocky.Data
     {
         private readonly List<IProgramCommand> _undoStack = new();
         private readonly List<IProgramCommand> _redoStack = new();
+        private readonly List<StructureChange> _heldChanges = new();
+        private bool _holdingChanges;
 
         public ObjectProgram Program { get; }
         public event Action<StructureChange> OnChanged;
         public int UndoCapacity { get; set; } = 0;
+
+        /// <summary>
+        /// The most blocks the program may have, counted as <see cref="ProgramQuery.CountBlocks"/> does (hats don't
+        /// count) — a level's "solve it in 5 blocks". 0: no limit. An edit that would take the program over it, or
+        /// further over, is refused: <see cref="Apply"/> returns false, the program is left exactly as it was and
+        /// <see cref="OnChanged"/> never hears of it. Edits that don't add blocks are always allowed, so a program
+        /// already over the limit can still be tidied and trimmed.
+        /// </summary>
+        public int BlockLimit { get; set; }
+
+        /// <summary>An edit was refused because of <see cref="BlockLimit"/> — so the editor can say why nothing happened.</summary>
+        public event Action LimitRefused;
+
+        /// <summary>
+        /// Which blocks may be added, by block type — a level's toolbox. Null: any. Views that make a block on their
+        /// own (the ⬡ hole's menu) offer only these; the palette is filtered by its host.
+        /// </summary>
+        public Func<string, bool> Offers { get; set; }
 
         public ProgramStore(ObjectProgram program)
         {
@@ -27,16 +47,48 @@ namespace Blocky.Data
 
         public bool CanRedo => _redoStack.Count > 0;
 
-        public void Apply(IProgramCommand cmd)
+        /// <summary>Runs <paramref name="cmd"/> and records it for Undo. False when <see cref="BlockLimit"/> refused it.</summary>
+        public bool Apply(IProgramCommand cmd)
         {
             if (cmd == null) throw new ArgumentNullException(nameof(cmd));
-            cmd.Do(this);
+
+            if (BlockLimit <= 0) cmd.Do(this);
+            else if (!DoWithinLimit(cmd)) return false;
 
             _redoStack.Clear(); // a new edit branches the history: what was undone can't be reached from here any more
-            if (UndoCapacity <= 0) return;
+            if (UndoCapacity <= 0) return true;
             _undoStack.Add(cmd);
             if (_undoStack.Count > UndoCapacity)
                 _undoStack.RemoveAt(0);
+            return true;
+        }
+
+        /// <summary>
+        /// Runs the command with its change notices held back, and keeps it only if it doesn't add blocks past the
+        /// limit; otherwise undoes it — still held back — so listeners never see the program change at all.
+        /// </summary>
+        private bool DoWithinLimit(IProgramCommand cmd)
+        {
+            var before = ProgramQuery.CountBlocks(Program);
+            _holdingChanges = true;
+            try { cmd.Do(this); }
+            finally { _holdingChanges = false; }
+
+            var after = ProgramQuery.CountBlocks(Program);
+            if (after > BlockLimit && after > before)
+            {
+                _holdingChanges = true;
+                try { cmd.Undo(this); }
+                finally { _holdingChanges = false; }
+                _heldChanges.Clear();
+                LimitRefused?.Invoke();
+                return false;
+            }
+
+            var changes = _heldChanges.ToArray(); // a listener may edit again, which would add to the list mid-loop
+            _heldChanges.Clear();
+            foreach (var change in changes) OnChanged?.Invoke(change);
+            return true;
         }
 
         public void Undo()
@@ -66,6 +118,10 @@ namespace Blocky.Data
                 _undoStack.RemoveAt(0);
         }
 
-        internal void RaiseChanged(StructureChange change) => OnChanged?.Invoke(change);
+        internal void RaiseChanged(StructureChange change)
+        {
+            if (_holdingChanges) _heldChanges.Add(change);
+            else OnChanged?.Invoke(change);
+        }
     }
 }

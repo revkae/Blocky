@@ -74,6 +74,15 @@ namespace Blocky.Editor
         /// <summary>An object is being edited — there's somewhere for a drag to land.</summary>
         public bool HasTarget => Store != null && Canvas != null;
 
+        /// <summary>
+        /// Asked before a block is taken out of the palette: false refuses the drag (a level's block limit is
+        /// reached). Null lets every block out.
+        /// </summary>
+        public Func<BlockDefinition, bool> CanTakeFromPalette { get; set; }
+
+        /// <summary>Told when <see cref="CanTakeFromPalette"/> refused a block, so the host can say why.</summary>
+        public Action<BlockDefinition> PaletteRefused { get; set; }
+
         public DragContext(BlockRegistry registry, DragLayer dragLayer,
             Func<Vector2, bool> isOverCanvas, Func<Vector2, bool> isOverDiscard, Func<float> canvasZoom)
         {

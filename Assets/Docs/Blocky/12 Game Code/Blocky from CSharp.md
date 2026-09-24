@@ -34,6 +34,28 @@ How game code talks to Blocky: hearing what the learner's scripts do, sending th
 | `BlockyRuntime.Variables.Get("score")` / `Set(...)` / `Item("items", 1)` / `Length("items")` | Read or change what the scripts see; `owner` picks an object's own copy |
 | `runner.SetProgramAsset(asset)` then `Shutdown()` + `Initialize()` | Give an object a program from code (it wins over a save — [[09 Decisions/Decisions#ADR-031|ADR-031]]) |
 
+## A level's toolbox and block limit
+
+`Assets › Create › Blocky › Toolbox` makes a `BlockyToolbox`: **only these** or **all except these** — whole categories and single blocks (drag them in from `Assets/Resources/Blocks`) — and a **block limit** (0 = none). Set it on the scene's `BlockyInGamePanel` (the *Toolbox* field), or from code:
+
+| Call | Does |
+|---|---|
+| `panel.Toolbox = levelToolbox` | Palette shows only what it allows; the table counts against its limit. Redraws at once. `null`: every block, no limit |
+| `panel.BlocksUsed` | How many blocks the edited object's program uses, the way the limit counts them |
+| `ProgramQuery.CountBlocks(program)` | The same count for any program (in `Blocky.Data`) |
+
+**How the limit counts:** every block in every script and every loose one, inside C-blocks and inputs too — but not hats. At the limit the palette's blocks dim, the "Blocks 5 / 5" chip above Undo turns amber, and a block that won't fit is refused with a line saying why. A program that is already over (from a save or the scene) shows red and can only lose blocks. The limit is checked in `ProgramStore` itself, so every way of adding a block obeys it — see [[09 Decisions/Decisions#ADR-034|ADR-034]].
+
+**Remember the hats:** with *only these*, a learner who can't take a `when Go clicked` out of the palette can't start a script. List one, or give the object a starting script that has it.
+
+## Making a puzzle level
+
+1. Give the robot a starting program in the scene (`when Go clicked` with nothing under it), or allow the hat in the toolbox.
+2. Make a toolbox: *only these* — Motion and `repeat` — with a limit of 5.
+3. Put it on the level's `BlockyInGamePanel`.
+4. On the goal: `when collided → level complete`. Or check in C# when `AllScriptsFinished` fires (the example below).
+5. React to `BlockyEvents.LevelCompleted`: next level, stars — and to `WorldReset` to put the level back.
+
 ## Rules for handlers
 
 - Everything is raised on the **main thread**, while Blocky runs its scripts or from the call that caused it.
