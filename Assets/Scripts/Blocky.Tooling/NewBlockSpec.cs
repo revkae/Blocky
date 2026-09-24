@@ -10,6 +10,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Tooling
 {
     /// <summary>What kind of block the wizard makes — the three a game adds most. Hats and C-blocks need the runner or the VM's frames, and are made by hand.</summary>
