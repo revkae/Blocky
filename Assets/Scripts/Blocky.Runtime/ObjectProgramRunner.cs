@@ -6,6 +6,7 @@ using Blocky.Runtime.Persistence;
 using Blocky.Runtime.Triggers;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace Blocky.Runtime
 {
@@ -14,6 +15,8 @@ namespace Blocky.Runtime
     /// §6.7 — Milestone 6's "first end-to-end authored-and-run behaviour"). Compiles on enable, subscribes to
     /// the shared <see cref="TriggerBroker"/> per stack, and applies each trigger's <see cref="RetriggerPolicy"/>.
     /// Disabling halts every thread it started; re-enabling does not resume them (TDD §6.4) — triggers must fire again.
+    /// The program it runs is the one the in-game editor saved for this object, when there is one (ADR-031), else
+    /// the one it was given in the scene.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ObjectProgramRunner : MonoBehaviour
@@ -22,14 +25,106 @@ namespace Blocky.Runtime
 
         private CompiledProgram _compiled;
         private bool _initialized;
+        private bool _programChosen; // the save has been looked for, or code handed a program over — either way, don't look again
+        private SavedProgramStatus _savedProgram;
         private readonly List<(BlockStack stack, BlockDefinition trigger, int entryPc)> _stacks = new();
         private readonly List<Action> _unsubscribe = new();
 
-        /// <summary>Assign before enabling — Unity runs <c>OnEnable</c> the instant an inactive object with this component becomes active.</summary>
-        public void SetProgramAsset(BlockProgramAsset asset) => programAsset = asset;
+        /// <summary>
+        /// Assign before enabling — Unity runs <c>OnEnable</c> the instant an inactive object with this component
+        /// becomes active. A program handed over this way wins over one saved by the in-game editor.
+        /// </summary>
+        public void SetProgramAsset(BlockProgramAsset asset)
+        {
+            programAsset = asset;
+            _programChosen = true;
+            _savedProgram = SavedProgramStatus.None; // whatever the save held, this is what runs now
+        }
 
         /// <summary>The asset this runner currently loads from, or null. Runtime-safe read (no <c>SerializedObject</c> needed).</summary>
         public BlockProgramAsset ProgramAsset => programAsset;
+
+        /// <summary>
+        /// What the in-game editor had saved for this object when the runner looked — <see cref="SavedProgramStatus.None"/>
+        /// before it looks, and again once code hands it a program (<see cref="SetProgramAsset"/>), which then runs instead.
+        /// </summary>
+        public SavedProgramStatus SavedProgram => _savedProgram;
+
+        /// <summary>
+        /// The program this object runs — the same one it compiles on <see cref="Initialize"/>, so an editor opening it
+        /// shows exactly what runs: the program the in-game editor saved for it in an earlier session when there is one,
+        /// else the one it was given in the scene. Empty when it has neither.
+        /// </summary>
+        public ObjectProgram LoadProgram()
+        {
+            UseSavedProgram();
+            return programAsset != null ? programAsset.Load() : new ObjectProgram();
+        }
+
+        /// <summary>
+        /// The first time the program is needed, looks for one saved by the in-game editor and, when there is one,
+        /// runs it instead of the scene's. It becomes this runner's asset, so a clone made later copies it and runs
+        /// the same program. A clone looks too, under its own key, and finds nothing: saves belong to scene objects.
+        /// </summary>
+        private void UseSavedProgram()
+        {
+            if (_programChosen) return;
+            _programChosen = true;
+            if (!RuntimeProgramStorage.HasSavesFor(gameObject.scene)) return;
+
+            var key = RuntimeProgramStorage.KeyFor(gameObject);
+            _savedProgram = RuntimeProgramStorage.TryLoad(key, out var saved);
+            if (_savedProgram != SavedProgramStatus.Loaded) return;
+
+            var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+            asset.name = key;
+            asset.Save(saved);
+            programAsset = asset;
+        }
+
+        /// <summary>
+        /// Gives a runner back to every object in <paramref name="scene"/> that the in-game editor saved a program
+        /// for but that has none of its own — an object first programmed in the game, where the editor added the runner
+        /// while it ran. Objects that already have a runner find their save themselves. Returns how many were added.
+        /// </summary>
+        public static int AttachToSavedObjects(Scene scene)
+        {
+            if (!scene.IsValid() || !scene.isLoaded || !RuntimeProgramStorage.HasSavesFor(scene)) return 0;
+
+            var roots = scene.GetRootGameObjects();
+            var transforms = new Transform[roots.Length];
+            for (var i = 0; i < roots.Length; i++) transforms[i] = roots[i].transform;
+            Array.Sort(transforms, (a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
+            return AttachUnder(transforms, RuntimeProgramStorage.SceneKey(scene));
+        }
+
+        /// <summary>
+        /// Walks one level of siblings, in hierarchy order, building each key the way
+        /// <see cref="RuntimeProgramStorage.KeyFor"/> does — but once for the whole scene rather than per object.
+        /// </summary>
+        private static int AttachUnder(Transform[] siblings, string parentKey)
+        {
+            var added = 0;
+            var seen = new Dictionary<string, int>(RuntimeProgramStorage.NameComparer);
+            foreach (var t in siblings)
+            {
+                seen.TryGetValue(t.name, out var sameNameIndex);
+                seen[t.name] = sameNameIndex + 1;
+                var key = RuntimeProgramStorage.ChildKey(parentKey, t.name, sameNameIndex);
+
+                if (t.GetComponent<ObjectProgramRunner>() == null && RuntimeProgramStorage.Exists(key))
+                {
+                    t.gameObject.AddComponent<ObjectProgramRunner>();
+                    added++;
+                }
+
+                if (t.childCount == 0) continue;
+                var children = new Transform[t.childCount];
+                for (var i = 0; i < children.Length; i++) children[i] = t.GetChild(i);
+                added += AttachUnder(children, key);
+            }
+            return added;
+        }
 
         private void OnEnable() => Initialize();
 
@@ -53,7 +148,7 @@ namespace Blocky.Runtime
             BlockyRuntime.Objects.Register(gameObject);  // so another object's "distance to [me]" never has to search the scene
 
             var registry = BlockyRuntime.Registry;
-            var program = programAsset != null ? programAsset.Load() : new ObjectProgram();
+            var program = LoadProgram(); // the in-game editor's save, if it left one, else the scene's program
             ProgramUpgrades.UpgradeCheckboxConditions(program, registry); // assets saved before condition blocks existed
             var result = ProgramCompiler.Link(program, registry);
             _compiled = result.Program;
@@ -73,6 +168,9 @@ namespace Blocky.Runtime
                 gameObject.AddComponent<BlockCollisionRelay>();
 
             SubscribeTriggers();
+
+            // Last, once this runner is complete: a new ticker gives runners back to other saved objects as it wakes.
+            if (Application.isPlaying) BlockyRuntimeTicker.EnsureExists();
         }
 
         /// <summary>Halts every thread this runner started and unsubscribes from triggers. See <see cref="Initialize"/> for why this is public.</summary>

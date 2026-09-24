@@ -6,11 +6,15 @@ tags: [home, dashboard]
 
 This vault is the single source of truth for design, decisions, and progress. The full technical design lives in [[Welcome|Technical Design Document]] — everything below is a navigable breakdown of it, kept in sync as we build.
 
-## Status: v1 complete (Milestones 1–7)
+## Status: past v1 — a Scratch-style editor inside the game, not yet released
 
-Every goal in the TDD's own §1.2 Goals section is met: data-driven extensibility, deterministic execution, zero-allocation-*capable* steady state (measured via §11.3's `ProfilerMarker`s, not yet optimized against), structural isolation, headless testability. All 18 v1 catalog blocks exist as real assets and run end-to-end from a real scene through `ObjectProgramRunner` and `TriggerBroker`. 85/85 tests passing throughout.
+Milestones 1–7, the TDD's own v1, are done, and every goal in its §1.2 is met: data-driven extensibility, deterministic execution, zero-allocation-*capable* steady state (measurable through §11.3's `ProfilerMarker`s, not yet optimized against), structural isolation, headless testability. Work then went past v1 on purpose — the scoping conversation [[09 Decisions/Decisions#ADR-009|ADR-009]] asked for happened when the user asked for "most stuff that exists in scratch and delightex".
 
-**Milestone 8 (undo UI, variables, expression blocks, custom procedures) is intentionally not started.** The TDD's own §1.2 lists all four as explicit v1 non-goals — "deferred, but the data model is shaped so none of these require a rewrite" — while §13's build order separately lists them as a future dependency chain. Read together: Milestones 1–7 *are* v1 by the document's own definition, and Milestone 8 is genuinely post-v1 scope. Decided 2026-09-13 to stop here rather than silently start building outside the document's stated v1 boundary — see [[09 Decisions/Decisions#ADR-009|ADR-009]].
+What exists today: **71 blocks** (31 steps, 15 conditions, 17 reporters, 8 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables and a watcher, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
+
+**Tests:** 286/286 EditMode tests at the last full run inside Unity (2026-09-18). The language pass and the 2026-09-24 fixes added tests that have so far run only outside Unity — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
+
+**Before release:** [[11 Release/Release Readiness|Release Readiness]] lists what's left for the Asset Store and for classrooms.
 
 ## Map
 
@@ -38,14 +42,17 @@ Every goal in the TDD's own §1.2 Goals section is met: data-driven extensibilit
 - [x] 5. Interaction (drag & drop) — done, see [[08 Build Log/Build Log|Build Log]]
 - [x] 6. Integration (palette, canvas persistence, triggers, runner) — done, see [[08 Build Log/Build Log|Build Log]]. **A program can now run end-to-end from a real scene.**
 - [x] 7. Expansion (full catalog, editor polish, virtualization, profiling) — done, see [[08 Build Log/Build Log|Build Log]]
-- [ ] 8. Deferred (undo UI → variables → expression blocks → custom procedures) — **not started, by decision.** Post-v1 per TDD §1.2; pick up only when there's a real product reason to go past v1.
+- [ ] 8. Deferred (undo UI → variables → expression blocks → custom procedures) — **mostly done**: undo/redo in the in-game editor ([[09 Decisions/Decisions#ADR-012|ADR-012]], [[09 Decisions/Decisions#ADR-018|ADR-018]]), expression blocks ([[09 Decisions/Decisions#ADR-021|ADR-021]]), variables ([[09 Decisions/Decisions#ADR-023|ADR-023]]). Custom procedures ([[09 Decisions/Decisions#ADR-029|ADR-029]]) and lists ([[09 Decisions/Decisions#ADR-028|ADR-028]]) are designed, not built.
 
 ## Known gaps carried forward (not silently dropped)
-- Live-editable param fields (`ParamFieldFactory` is still read-only by design — see [[05 Editor UI/Editor UI|Editor UI]])
-- Interactive pan/zoom on `ProgramCanvasView` (rebuild-on-change and viewport-based virtualization both work; dragging/zooming the canvas itself does not exist yet — nothing drives `SetViewport` in real use)
-- `BlockDragManipulator`/`DragLayer` — real pointer wiring implemented, not unit tested (needs a live panel)
-- Thread pooling / zero-allocation (TDD §11.2 explicitly a "Milestone 7 profiling pass" item — the `ProfilerMarker`s exist now to *measure* this, but no pooling work has happened yet)
-- `BlockViewPool` (view recycling by block type) and the collapsed-stack toggle — the two other Milestone 7 "huge programs" mitigations beyond viewport virtualization, TDD §8.4
+- Custom blocks and lists — designed ([[09 Decisions/Decisions#ADR-029|ADR-029]], [[09 Decisions/Decisions#ADR-028|ADR-028]]), not built
+- The language pass has never been compiled or run inside Unity ([[09 Decisions/Decisions#ADR-030|ADR-030]])
+- No player build yet: IL2CPP/WebGL behaviour is untested. A `link.xml` now keeps the reflection-bound ops (TDD §14), but only a real build proves it
+- The in-game editor is mouse-and-keyboard only, and 3D only (picking objects, `when clicked` and collisions use 3D physics)
+- The Editor window (`Blocky/Program Editor`) has no undo
+- A real mouse dragging blocks in the running game can't be driven by automation (Play-mode automation stalls the player loop), so many Build Log entries end with it unverified — it needs checking by hand
+- Thread pooling / zero-allocation: the `ProfilerMarker`s can measure it (TDD §11.3), but the §11.1 budgets have never been measured
+- `BlockViewPool` and the collapsed-stack toggle (TDD §8.4) are not built, and viewport virtualization (`ProgramCanvasView.SetViewport`) exists but nothing calls it yet
 
 ## Working rule
 

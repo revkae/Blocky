@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Blocky.Runtime.Triggers;
 using UnityEngine.InputSystem;
 
+// The statics here are caches that hold the same answers in every Play session, so there is nothing to reset.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Runtime.Ops
 {
     /// <summary>

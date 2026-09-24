@@ -23,7 +23,7 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 (These two assets predate condition blocks and still store their condition as a checkbox value; it runs as before, and opening the object in the in-game editor shows it as a `true` condition block.)
 | **WaiterCube** | when_play_clicked | `control.wait(2s)` → `motion.set_position` teleport |
 
-`BlockyManager` holds the single `BlockyRuntimeTicker` that drives everything (TDD §6.5 — one scheduler tick, one keyboard poll, one look-at check per frame, shared scene-wide).
+`BlockyManager` holds the single `BlockyRuntimeTicker` that drives everything (TDD §6.5 — one scheduler tick, one keyboard poll, one look-at check per frame, shared scene-wide). A scene without one gets one added in Play mode, with a note in the console.
 
 ## In-game program editor
 `BlockyInGamePanel` (GameObject in this scene) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it.
@@ -53,7 +53,7 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 - **Undo** (table's top-right, or Ctrl/Cmd+Z) takes back the last edit to the selected object.
 - **Advice** under the table explains in plain words why a script won't do anything (no event on top, empty ⬡ hole, a number out of range…). The block gets a "?" (hint) or "!" (won't run) badge; click a message to select its block.
 
-Every edit — drop, delete, value change — autosaves to `Application.persistentDataPath/BlockyPrograms/<name>.json` and hot-reloads the object's `ObjectProgramRunner`. There is no save step. Number and text boxes commit when you press Enter or click away.
+Every edit — drop, delete, value change — autosaves to `Application.persistentDataPath/BlockyPrograms/<scene>/<object>.json` and hot-reloads the object's `ObjectProgramRunner`. There is no save step. Number and text boxes commit when you press Enter or click away. The next time the game starts, every object runs what was saved for it — objects first programmed in the game included — instead of its scene program ([[09 Decisions/Decisions#ADR-031|ADR-031]]). In the Unity Editor, **Blocky › In-Game Saves** shows the folder or deletes it, to go back to the scene's programs.
 
 This is a different tool from `Blocky/Program Editor` (the Editor-only window, which edits project assets and keeps its button-based editing). See [[05 Editor UI/Editor UI|Editor UI]] for how both share the same `BlockView`/`HatView`/`ProgramCanvasView` components.
 

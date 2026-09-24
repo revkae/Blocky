@@ -1,0 +1,10 @@
+<!--
+  Keeps Blocky's reflection-only code in IL2CPP builds (WebGL, iOS, Android) at any Managed Stripping Level.
+  - Blocky.Runtime: every block op is found by its [BlockExecutor] attribute and made with Activator.CreateInstance
+    (OpTableBuilder), so no code names the op classes and the linker would otherwise remove them above Minimal.
+  - Blocky.Data: programs are read and written by Newtonsoft.Json, which reaches their fields by reflection.
+-->
+<linker>
+  <assembly fullname="Blocky.Runtime" preserve="all"/>
+  <assembly fullname="Blocky.Data" preserve="all"/>
+</linker>

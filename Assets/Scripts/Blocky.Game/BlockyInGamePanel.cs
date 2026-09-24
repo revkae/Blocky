@@ -11,6 +11,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Game
 {
     /// <summary>
@@ -141,6 +144,7 @@ namespace Blocky.Game
         private ProgramCanvasView _canvasView;
         private DragContext _dragContext;
         private string _storageKey;
+        private string _storageNoticeKey; // "storage.unreadable" / "storage.save_failed" while the edited object's save has a problem, else null
         private bool _visible;
 
         private int _pointerOverEditorFrame = -1;
@@ -162,6 +166,7 @@ namespace Blocky.Game
         private void Awake()
         {
             _uiDocument = GetComponent<UIDocument>();
+            BlockyRuntimeTicker.EnsureExists(); // nothing runs without one, and it gives runners back to objects programmed in an earlier session
             _registry = BlockyRuntime.Registry;
             panelWidth = Mathf.Clamp(Mathf.Max(panelWidth, ComfortableWidth), MinPanelWidth, Mathf.Max(MinPanelWidth, Screen.width - MinGameStrip));
             GroupBlocksByCategory();
@@ -905,10 +910,21 @@ namespace Blocky.Game
             return tools;
         }
 
-        /// <summary>Problems (a script won't run) first, then hints; each row selects its block when clicked. The rest stay as badges on the blocks.</summary>
+        /// <summary>
+        /// Problems (a script won't run) first, then hints; each row selects its block when clicked. The rest stay as
+        /// badges on the blocks. Above them all, a line when this object's save couldn't be read or written.
+        /// </summary>
         private void ShowAdvice(List<Advice> advice)
         {
             _adviceList.Clear();
+
+            if (_storageNoticeKey != null)
+            {
+                var notice = new Label(BlockyText.Format(_storageNoticeKey, _target != null ? _target.name : string.Empty)) { pickingMode = PickingMode.Ignore };
+                notice.AddToClassList("blocky-advice");
+                notice.AddToClassList("blocky-advice--problem");
+                _adviceList.Add(notice);
+            }
 
             var shown = 0;
             foreach (var kind in new[] { AdviceKind.Problem, AdviceKind.Hint })
@@ -926,7 +942,7 @@ namespace Blocky.Game
                 _adviceList.Add(more);
             }
 
-            _adviceList.style.display = advice.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            _adviceList.style.display = advice.Count > 0 || _storageNoticeKey != null ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private Button AdviceRow(Advice item)
@@ -1379,15 +1395,16 @@ namespace Blocky.Game
         private void SetTarget(GameObject go)
         {
             _target = go;
-            _storageKey = go.name;
+            _storageKey = RuntimeProgramStorage.KeyFor(go);
 
             _runner = go.GetComponent<ObjectProgramRunner>();
             if (_runner == null) _runner = go.AddComponent<ObjectProgramRunner>();
 
-            var program = RuntimeProgramStorage.Exists(_storageKey)
-                ? RuntimeProgramStorage.Load(_storageKey)
-                : _runner.ProgramAsset != null ? _runner.ProgramAsset.Load() : new ObjectProgram { targetObjectUid = go.name };
+            // Exactly what the object runs: its save from an earlier session when it has one, else its scene program.
+            var program = _runner.LoadProgram();
+            if (string.IsNullOrEmpty(program.targetObjectUid)) program.targetObjectUid = go.name;
             ProgramUpgrades.UpgradeCheckboxConditions(program, _registry); // old checkbox conditions become condition blocks (saved with the next edit)
+            _storageNoticeKey = _runner.SavedProgram == SavedProgramStatus.Unreadable ? "storage.unreadable" : null;
 
             _store = new ProgramStore(program) { UndoCapacity = UndoSteps };
             _store.OnChanged += _ => OnProgramChanged();
@@ -1425,7 +1442,8 @@ namespace Blocky.Game
         /// </summary>
         private void OnProgramChanged()
         {
-            RuntimeProgramStorage.Save(_storageKey, _store.Program);
+            // A failed save keeps the edit (it still runs) and says so under the table; the next good save clears it.
+            _storageNoticeKey = RuntimeProgramStorage.TrySave(_storageKey, _store.Program, out _) ? null : "storage.save_failed";
 
             if (_liveAsset == null) _liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
             _liveAsset.Save(_store.Program);

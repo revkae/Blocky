@@ -1,6 +1,9 @@
 using System;
 using UnityEngine.InputSystem;
 
+// Blocky resets these statics itself at the start of every Play session (ADR-014), so the statics-cleanup analyzer has nothing to add.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Runtime
 {
     /// <summary>
@@ -27,5 +30,13 @@ namespace Blocky.Runtime
 
         /// <summary>Test-only hook: replaces the real mouse button. Pass null to go back to the real mouse.</summary>
         public static void SetForTests(Func<bool> buttonHeld) => _buttonHeldOverride = buttonHeld;
+
+        /// <summary>Domain reload is off (ADR-014): neither a test's mouse nor a closed session's editor may carry into the next Play session.</summary>
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewPlaySession()
+        {
+            _buttonHeldOverride = null;
+            IsPointerOverUi = null;
+        }
     }
 }

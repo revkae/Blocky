@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// Blocky resets these statics itself at the start of every Play session (ADR-014), so the statics-cleanup analyzer has nothing to add.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Runtime
 {
     /// <summary>

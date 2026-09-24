@@ -4,6 +4,8 @@
   "about": "Blocky'nin Türkçe metinleri. Buradaki bir anahtar eksik ya da boşsa İngilizcesi gösterilir. {0}, {1} gibi yer tutucuları koru; cümlede yerleri değişebilir.",
   "strings": {
     "status.pick_object": "Kodlamak için oyundaki bir nesneye tıkla",
+    "storage.unreadable": "“{0}” için kaydedilen program açılamadı, bu yüzden sahnedeki programını çalıştırıyor. Eski dosya saklandı.",
+    "storage.save_failed": "“{0}” için program kaydedilemedi. Değişikliğin şimdi çalışıyor ama bir dahaki sefere burada olmayacak.",
     "mode.free": "Serbest",
     "mode.free.tooltip": "Scratch masası: bloklar her yere konabilir; yayılabilir, kaydırabilir ve yakınlaştırabilirsin",
     "mode.simple": "Basit",

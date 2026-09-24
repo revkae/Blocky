@@ -21,7 +21,9 @@ Runtime (VM)                    VmScheduler (+ pause/step/speed) · Thread pool 
 
 `ProgramAdvice` (Compiler layer) reads the data model and the registry to produce plain-language hints and problems; the in-game editor shows them. It never feeds the VM. The editor reads the VM only through `RunningBlocks` (which block is running) and the run bar's `BlockyRuntime` commands. See [[09 Decisions/Decisions#ADR-012|ADR-012]].
 
-**Shared runtime state is per Play session.** The project enters Play mode with domain reload *off* (Enter Play Mode Options: `DisableDomainReload, DisableSceneReload`), so statics survive from one Play session to the next. `BlockyRuntime` therefore resets itself (scheduler, triggers, world snapshot, playback) through `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`. Any new static state needs the same treatment. See [[09 Decisions/Decisions#ADR-014|ADR-014]].
+**Shared runtime state is per Play session.** The project enters Play mode with domain reload *off* (Enter Play Mode Options: `DisableDomainReload, DisableSceneReload`), so statics survive from one Play session to the next. `BlockyRuntime` therefore resets itself (scheduler, triggers, world snapshot, playback) through `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`. Any new static state needs the same treatment. See [[09 Decisions/Decisions#ADR-014|ADR-014]]. Every file with static state also opens with a `#pragma` for Unity's statics-cleanup analyzer and a line saying why — [[09 Decisions/Decisions#ADR-032|ADR-032]].
+
+**Saved programs.** The in-game editor saves one file per object (`BlockyPrograms/<scene>/<path>.json`, `RuntimeProgramStorage`), and a runner runs its object's save instead of its scene program; `BlockyRuntimeTicker` gives a runner back to a saved object that has none. See [[09 Decisions/Decisions#ADR-031|ADR-031]].
 
 Editor multi-select adds `BlockRef` and the group commands `MoveBlocks` / `DeleteBlocks` to the data layer, and `GroupDragSession` (an `IDragSession`, like `ChainDragSession`) to the editor layer.
 

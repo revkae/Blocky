@@ -4,6 +4,8 @@
   "about": "Blocky's English text, the source every other language falls back to. To add a language, copy this file into this folder as <code>.json, set locale and name, and translate the strings. Keep placeholders like {0} and {1}; they may move within a sentence.",
   "strings": {
     "status.pick_object": "Click an object in the game to code it",
+    "storage.unreadable": "The saved program for “{0}” couldn't be opened, so it runs its scene program. The old file was kept.",
+    "storage.save_failed": "Couldn't save the program for “{0}”. Your change runs now, but won't be here next time.",
     "mode.free": "Free",
     "mode.free.tooltip": "The Scratch table: blocks go anywhere, and you can spread out, pan and zoom",
     "mode.simple": "Simple",

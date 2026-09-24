@@ -2,6 +2,9 @@ using System.Collections.Generic;
 using Blocky.Data;
 using UnityEngine;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Editor
 {
     /// <summary>How strict the table is about where blocks are allowed to go.</summary>

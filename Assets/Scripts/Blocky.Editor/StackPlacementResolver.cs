@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Editor
 {
     /// <summary>Nudges a desired canvas position by (16, 16) repeatedly until it clears every existing stack's nominal rect (TDD §8.4).</summary>

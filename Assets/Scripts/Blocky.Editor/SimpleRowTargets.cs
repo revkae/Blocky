@@ -3,6 +3,9 @@ using Blocky.Data;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Editor
 {
     /// <summary>What a drop on a block's row does to the script (<see cref="WorkspaceMode.Simple"/>).</summary>

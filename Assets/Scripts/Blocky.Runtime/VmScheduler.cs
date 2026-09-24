@@ -4,6 +4,9 @@ using Blocky.Compiler;
 using Unity.Profiling;
 using UnityEngine;
 
+// The statics here are fixed values that never change, so there is nothing to reset between Play sessions.
+#pragma warning disable UAL0010, UAL0013
+
 namespace Blocky.Runtime
 {
     /// <summary>
