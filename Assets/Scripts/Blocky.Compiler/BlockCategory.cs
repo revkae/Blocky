@@ -21,7 +21,10 @@ namespace Blocky.Compiler
         Sound,
 
         /// <summary>Named values the program can set and read back.</summary>
-        Variables
+        Variables,
+
+        /// <summary>Numbered collections of values — a queue of waypoints, a high-score table (Scratch's lists).</summary>
+        Lists
     }
 
     public static class BlockCategoryNames

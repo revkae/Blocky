@@ -256,7 +256,7 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - `Stop` clears every bubble, like it deletes every clone: a stopped run leaves nothing on screen.
 
 ## ADR-028 — Lists: a second store beside variables, same names, same scopes
-**Status:** Proposed — **not built**. Written while the Unity editor was unreachable, so nothing here has been compiled or tried.
+**Status:** Accepted — built 2026-09-24 (user request: "Custom blocks … and lists"). Compiled and tested outside Unity only (18 `ListTests`); not yet opened in the editor. What changed from the proposal is under **As built** below.
 **Why:** Scratch's other data type. In a 3D game it is what a learner reaches for to keep a queue of waypoints, a high-score table, or the colours a light cycles through.
 **Shape of it:**
 - `BlockyVariables` gains a second dictionary, name → `List<BlockValue>`, with exactly the variable rules: named in the block, trimmed and case-insensitive, shared or per-object by the same `everyone` / `this object` dropdown, and a list that was never touched reads as empty rather than failing.
@@ -264,6 +264,12 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - Blocks: `add (thing) to [list]`, `delete (n) of [list]`, `delete all of [list]`, `insert (thing) at (n) of [list]`, `replace item (n) of [list] with (thing)` (statements); `item (n) of [list]`, `item # of (thing) in [list]`, `length of [list]` (round); `[list] contains (thing)?` (hexagon, using `ValueComparison` so "10" matches 10).
 - The watcher card lists a shared list as `name  [a, b, c]`, truncated past a few items.
 **Cost:** one dictionary, nine ops, nine assets. No VM or editor change — every input is an ordinary value input.
+**As built:**
+- **Their own category.** In the Variables tab the nine list blocks sorted *before* the three variable blocks (the palette orders a category by `blockType`), which read as a jumble. `BlockCategory.Lists` (appended, value 9) gives them a tab of their own, in Scratch's deeper list orange.
+- **Every change makes the list; reading never does.** So `delete all of [items]` — the usual first block of a program that fills one — puts `items  []` on the watcher, while asking the length of a list nobody has used doesn't.
+- **A cap of 10,000 items**, for the same reason as the clone cap: `repeat forever { add … }` should stop growing, not use up the machine.
+- **Position inputs are 1–10,000**, so a typed 0 is flagged by the advice ("positions count from 1") instead of silently doing nothing; a *computed* position outside the list still does nothing.
+- The store keeps one `Store` (values + lists) per scope, so pruning a destroyed object drops both at once.
 
 ## ADR-029 — Custom blocks reuse the loop-frame machinery the VM already has
 **Status:** Proposed — **not built**, same caveat as ADR-028. This is the design, worked out on paper against the code as it stands.

@@ -6,6 +6,17 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (lists) — Lists, in a tab of their own
+User request: "Beat Blocks Engine 2 … custom blocks … and lists (ADR-028)". Design in [[09 Decisions/Decisions#ADR-028|ADR-028]], now accepted; catalog in [[06 Block Catalog/Block Catalog#Lists|Block Catalog]]. Catalog now at **80 blocks** (36 steps, 16 conditions, 20 reporters, 8 triggers).
+
+- **`BlockyVariables` holds lists** beside the variables, under the same rules: named in the block, trimmed and case-insensitive, shared or per object. One `Store` per scope now holds both, so pruning a destroyed object drops its lists too.
+- **Nine blocks** (`ListOps.cs`, nine assets): add, delete, delete all, insert, replace; item, item #, length; contains?. Positions count from 1 and round down; one the list doesn't have does nothing or reads empty. Items match the way `=` does. A list stops at 10,000 items.
+- **`BlockCategory.Lists`** — a new tab, Scratch's deeper orange (`--blocky-color-lists`), because inside Variables the palette's `blockType` order put the list blocks first.
+- **The watcher card** shows shared lists as `name  [a, b, c]`, the first five items and the length for a longer one.
+- **Words:** block names, "item" / "list" and the tab in English and Türkçe (236 strings each).
+- **A test on the shipped catalog:** `EveryBlockInTheCatalog_IsBoundToAnOp` loads `Resources/Blocks` and builds the op tables, so an asset with a missing or wrong-kind op fails a test. Checked by breaking one on purpose.
+- **Verified outside Unity only**, with the offline compiler and Unity stand-ins described in the entry below: every assembly (Editor and Game included) compiles; 18 new `ListTests` and the catalog test pass, the rest of the suite is unchanged (4 known stand-in gaps, the same as before). Still to see in Unity: the Lists tab and its color, the watcher row, and a list program in Play mode.
+
 ## 2026-09-24 (later) — Release fixes: saved programs run at startup, safe save files, link.xml, the demo in the build, an automatic ticker, a quiet analyzer
 User request: "Fix what is known to be wrong. Do these all" — section 2 of [[11 Release/Release Readiness|Release Readiness]], written the same day from a code review. Design in [[09 Decisions/Decisions#ADR-031|ADR-031]] (saves) and [[09 Decisions/Decisions#ADR-032|ADR-032]] (the analyzer).
 

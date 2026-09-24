@@ -6,7 +6,7 @@ tags: [block-catalog]
 
 Source: [[Welcome|TDD §9]] for the v1 MVP set. Semantics there are normative for those blocks — they define yield behaviour. Everything after the MVP section is the Scratch/Delightex parity work, designed in [[09 Decisions/Decisions#ADR-020|ADR-020]].
 
-**71 blocks live** as `BlockDefinition` `.asset` files under `Assets/Resources/Blocks/`, verified through `BlockRegistry.LoadFromResources()`: 31 steps, 15 conditions and 17 reporters bound by `OpTableBuilder`, 8 triggers correctly unbound (`TriggerBroker` dispatches those).
+**80 blocks live** as `BlockDefinition` `.asset` files under `Assets/Resources/Blocks/`, verified through `BlockRegistry.LoadFromResources()`: 36 steps, 16 conditions and 20 reporters bound by `OpTableBuilder`, 8 triggers correctly unbound (`TriggerBroker` dispatches those). `OpTableBuilderTests.EveryBlockInTheCatalog_IsBoundToAnOp` checks the shipped assets themselves, so an asset whose op is missing or of the wrong kind fails a test instead of the first Play.
 
 **Every white input takes an expression.** Since [[09 Decisions/Decisions#ADR-021|ADR-021]] a reporter can be dropped on any `Number`, `Text` or `Bool` input of any block in this catalog — `move forward (pick random 1 to 10)`, `wait ((timer) / (2))`, `repeat ((length of (join …)))` — with no per-block work, because every op reads its inputs through `OpContext.GetNumber` / `GetText` / `GetBool`. A `Choice` dropdown is the one input that does not: it is a fixed list, not a value.
 
@@ -51,6 +51,17 @@ The variable is **named in the block** — no "create a variable" dialog, no per
 
 Shared variables show up live in a **watcher card** in the table's top-left corner while the workspace is open ([[09 Decisions/Decisions#ADR-024|ADR-024]]).
 
+## Lists
+**Changing a list** (statements): `lists.add` (`item`, `list`, `scope`) — "add (thing) to [list]" · `lists.delete` (`index`, `list`, `scope`) · `lists.delete_all` (`list`, `scope`) · `lists.insert` (`item`, `index`, `list`, `scope`) · `lists.replace` (`index`, `list`, `item`, `scope`) — "replace item (1) of [list] with (thing)"
+
+**Reading one:** `lists.item` (`index`, `list`, `scope`, round) · `lists.index_of` (`item`, `list`, `scope`, round) — where the item first appears, 0 when it isn't there · `lists.length` (`list`, `scope`, round) · `lists.contains` (`list`, `item`, `scope`, hexagon)
+
+Lists follow the variable rules ([[09 Decisions/Decisions#ADR-028|ADR-028]]): **named in the block**, trimmed and case-insensitive, and the same `everyone` / `this object` dropdown. A list and a variable may share a name — they are different things. They have their own **Lists** tab, a deeper orange than Variables, as Scratch colors them.
+
+**Positions count from 1** and are rounded down (`item 2.7` is item 2). A position the list doesn't have does nothing when changing the list and reads as empty — never an error. `insert` also accepts one past the end, which adds to the end, so inserting at 1 into an empty list works. The inputs reject 0 or less when typed, with advice. Every block that changes a list makes it if it doesn't exist yet, so `delete all of [items]` is the usual first block of a program that fills one; reading never makes a list. Items are matched the way `=` matches (`ValueComparison`), so `10` finds `"10.0"` and `apple` finds `Apple`. Items keep their kind: a number added to a list is still a number when it comes back out.
+
+**Capped at 10,000 items** a list (`BlockyVariables.MaxListLength`); past that `add` and `insert` quietly do nothing, like the clone cap. Shared lists show on the watcher card as `name  [a, b, c]`; a longer one shows its first five items and its length, `[a, b, c, d, e, …]  (12)`.
+
 ## Talking about another object
 `sensing.distance_to` (`object`, round) · `sensing.position_of` (`object`, `axis`, round) · `sensing.touching_object` (`object`, hexagon) · `motion.point_towards` (`object`) · `motion.go_to` (`object`, `duration`)
 
@@ -74,7 +85,7 @@ A clone is a plain `Instantiate`, so it brings its colliders, renderer and runne
 The project has no audio files, so notes are **generated**: a sine wave at the right pitch and length, faded 10 ms at each end so it does not click, cached per note. MIDI numbering as in Scratch (60 = middle C, 69 = A 440). `play note` holds the script while it sounds, so a column of them is a tune; `play sound` loads from `Resources/Sounds/` and carries straight on so sounds overlap, and is silence rather than an error when nothing matches. Each object gets one `AudioSource` on first use, 2D on purpose so a beep is never inaudible for being behind the camera. `Stop` silences everything.
 
 ## Not built yet
-Lists, and custom blocks ("My Blocks"). Lists are a second data type beside variables; custom blocks need a call stack in the VM.
+Custom blocks ("My Blocks") — they need a call stack in the VM ([[09 Decisions/Decisions#ADR-029|ADR-029]]).
 
 ## How a block gets added
 The asset plus one `[BlockExecutor]` class, and nothing else (TDD §7). The palette, the tab rail, the compiler, serialization and the op tables all discover it: the palette groups by `BlockCategory` in enum order and skips empty categories, and `OpTableBuilder` binds by `executorKey` through one reflection scan. New assets are generated as YAML rather than hand-placed one by one — Unity imports them and writes the `.meta` files itself.

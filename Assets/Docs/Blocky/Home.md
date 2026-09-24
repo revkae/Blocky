@@ -10,7 +10,7 @@ This vault is the single source of truth for design, decisions, and progress. Th
 
 Milestones 1–7, the TDD's own v1, are done, and every goal in its §1.2 is met: data-driven extensibility, deterministic execution, zero-allocation-*capable* steady state (measurable through §11.3's `ProfilerMarker`s, not yet optimized against), structural isolation, headless testability. Work then went past v1 on purpose — the scoping conversation [[09 Decisions/Decisions#ADR-009|ADR-009]] asked for happened when the user asked for "most stuff that exists in scratch and delightex".
 
-What exists today: **71 blocks** (31 steps, 15 conditions, 17 reporters, 8 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables and a watcher, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
+What exists today: **80 blocks** (36 steps, 16 conditions, 20 reporters, 8 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables, lists and a watcher, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
 
 **Tests:** 286/286 EditMode tests at the last full run inside Unity (2026-09-18). The language pass and the 2026-09-24 fixes added tests that have so far run only outside Unity — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
 
@@ -42,10 +42,10 @@ What exists today: **71 blocks** (31 steps, 15 conditions, 17 reporters, 8 trigg
 - [x] 5. Interaction (drag & drop) — done, see [[08 Build Log/Build Log|Build Log]]
 - [x] 6. Integration (palette, canvas persistence, triggers, runner) — done, see [[08 Build Log/Build Log|Build Log]]. **A program can now run end-to-end from a real scene.**
 - [x] 7. Expansion (full catalog, editor polish, virtualization, profiling) — done, see [[08 Build Log/Build Log|Build Log]]
-- [ ] 8. Deferred (undo UI → variables → expression blocks → custom procedures) — **mostly done**: undo/redo in the in-game editor ([[09 Decisions/Decisions#ADR-012|ADR-012]], [[09 Decisions/Decisions#ADR-018|ADR-018]]), expression blocks ([[09 Decisions/Decisions#ADR-021|ADR-021]]), variables ([[09 Decisions/Decisions#ADR-023|ADR-023]]). Custom procedures ([[09 Decisions/Decisions#ADR-029|ADR-029]]) and lists ([[09 Decisions/Decisions#ADR-028|ADR-028]]) are designed, not built.
+- [ ] 8. Deferred (undo UI → variables → expression blocks → custom procedures) — **mostly done**: undo/redo in the in-game editor ([[09 Decisions/Decisions#ADR-012|ADR-012]], [[09 Decisions/Decisions#ADR-018|ADR-018]]), expression blocks ([[09 Decisions/Decisions#ADR-021|ADR-021]]), variables ([[09 Decisions/Decisions#ADR-023|ADR-023]]), lists ([[09 Decisions/Decisions#ADR-028|ADR-028]]). Custom procedures ([[09 Decisions/Decisions#ADR-029|ADR-029]]) are designed, not built.
 
 ## Known gaps carried forward (not silently dropped)
-- Custom blocks and lists — designed ([[09 Decisions/Decisions#ADR-029|ADR-029]], [[09 Decisions/Decisions#ADR-028|ADR-028]]), not built
+- Custom blocks — designed ([[09 Decisions/Decisions#ADR-029|ADR-029]]), not built
 - The language pass has never been compiled or run inside Unity ([[09 Decisions/Decisions#ADR-030|ADR-030]])
 - No player build yet: IL2CPP/WebGL behaviour is untested. A `link.xml` now keeps the reflection-bound ops (TDD §14), but only a real build proves it
 - The in-game editor is mouse-and-keyboard only, and 3D only (picking objects, `when clicked` and collisions use 3D physics)

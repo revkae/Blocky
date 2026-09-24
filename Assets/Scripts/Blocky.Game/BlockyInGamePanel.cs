@@ -103,6 +103,8 @@ namespace Blocky.Game
         private bool _tipsOpen;
         private VisualElement _watchers;
         private readonly Dictionary<string, Label> _watcherRows = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Label> _listWatcherRows = new(StringComparer.OrdinalIgnoreCase);
+        private readonly System.Text.StringBuilder _watcherText = new();
         private Label _zoomLabel;
         private VisualElement _tabRail;
         private readonly List<(BlockCategory category, Button tab)> _tabs = new();
@@ -712,9 +714,9 @@ namespace Blocky.Game
         /// Step forward waits for a timed block to finish, and the bar turns amber while paused.
         /// </summary>
         /// <summary>
-        /// Scratch's stage monitors: every shared variable, with its value, while a program is running. It shows
-        /// itself only once something has set one, so a table with no variables on it has no card in the corner.
-        /// Per-object variables are not listed — there is one row per name, and ten objects each with their own
+        /// Scratch's stage monitors: every shared variable and list, with its value, while a program is running. It
+        /// shows itself only once something has set one, so a table with no variables on it has no card in the
+        /// corner. Per-object ones are not listed — there is one row per name, and ten objects each with their own
         /// "hits" would be ten rows saying different things.
         /// </summary>
         private VisualElement BuildWatchers()
@@ -729,36 +731,59 @@ namespace Blocky.Game
         private void RefreshWatchers()
         {
             var shared = BlockyRuntime.Variables.Shared;
-            _watchers.style.display = shared.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            if (shared.Count == 0)
+            var lists = BlockyRuntime.Variables.SharedLists;
+            var any = shared.Count + lists.Count > 0;
+            _watchers.style.display = any ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!any)
             {
-                if (_watcherRows.Count > 0)
-                {
-                    _watchers.Clear();
-                    _watcherRows.Clear();
-                }
+                if (_watcherRows.Count + _listWatcherRows.Count > 0) ClearWatchers();
                 return;
             }
 
             foreach (var pair in shared)
-            {
-                if (!_watcherRows.TryGetValue(pair.Key, out var row))
-                {
-                    row = new Label();
-                    row.AddToClassList("blocky-watchers__row");
-                    _watchers.Add(row);
-                    _watcherRows[pair.Key] = row;
-                }
+                ShowWatcher(_watcherRows, pair.Key, $"{pair.Key}  {pair.Value.AsText()}");
+            foreach (var pair in lists)
+                ShowWatcher(_listWatcherRows, pair.Key, ListWatcherText(pair.Key, pair.Value));
 
-                var text = $"{pair.Key}  {pair.Value.AsText()}";
-                if (row.text != text) row.text = text; // a Label rebuilds its mesh on every assignment, equal or not
+            if (_watcherRows.Count == shared.Count && _listWatcherRows.Count == lists.Count) return;
+
+            // A variable or a list can only disappear when the play session is reset, which drops the whole store at once.
+            ClearWatchers();
+        }
+
+        private void ShowWatcher(Dictionary<string, Label> rows, string name, string text)
+        {
+            if (!rows.TryGetValue(name, out var row))
+            {
+                row = new Label();
+                row.AddToClassList("blocky-watchers__row");
+                _watchers.Add(row);
+                rows[name] = row;
             }
 
-            if (_watcherRows.Count == shared.Count) return;
+            if (row.text != text) row.text = text; // a Label rebuilds its mesh on every assignment, equal or not
+        }
 
-            // A variable can only disappear when the play session is reset, which drops the whole store at once.
+        private void ClearWatchers()
+        {
             _watchers.Clear();
             _watcherRows.Clear();
+            _listWatcherRows.Clear();
+        }
+
+        /// <summary>"name  [a, b, c]"; a longer list shows its first few items and its length — "[a, b, c, d, e, …]  (12)". A watcher is a glance, not a table.</summary>
+        private string ListWatcherText(string name, List<BlockValue> items)
+        {
+            const int shown = 5;
+            _watcherText.Clear().Append(name).Append("  [");
+            for (var i = 0; i < items.Count && i < shown; i++)
+            {
+                if (i > 0) _watcherText.Append(", ");
+                _watcherText.Append(items[i].AsText());
+            }
+
+            if (items.Count <= shown) return _watcherText.Append(']').ToString();
+            return _watcherText.Append(", …]  (").Append(items.Count).Append(')').ToString();
         }
 
         private void RefreshRunState()

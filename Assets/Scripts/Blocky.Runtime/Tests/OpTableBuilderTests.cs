@@ -45,5 +45,18 @@ namespace Blocky.Runtime.Tests
             var registry = BlockRegistry.Build(new[] { Def("event.when_play_clicked", "unbound.executor", BlockShape.Trigger) });
             Assert.DoesNotThrow(() => OpTableBuilder.Build(registry, typeof(OpTableBuilder).Assembly));
         }
+
+        /// <summary>
+        /// The shipped catalog, not a fixture: every block asset in Resources/Blocks has an op of the right kind.
+        /// A new asset whose op is missing, misspelled or the wrong kind fails here instead of at the first Play.
+        /// </summary>
+        [Test]
+        public void EveryBlockInTheCatalog_IsBoundToAnOp()
+        {
+            var registry = BlockRegistry.LoadFromResources();
+            Assert.Greater(registry.Count, 0, "no block assets found");
+
+            Assert.DoesNotThrow(() => OpTableBuilder.BuildAll(registry));
+        }
     }
 }
