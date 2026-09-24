@@ -29,6 +29,8 @@ namespace Blocky.Runtime
         private readonly SlotEvaluator _slots;
         private readonly List<VmThread> _threads = new();
         private readonly List<VmThread> _pending = new();
+        private readonly List<VmThread> _started = new();  // reused each tick: the threads to report as started
+        private readonly List<VmThread> _finished = new(); // reused each tick: the threads to report as finished
         private readonly HashSet<(CompiledProgram, int)> _loggedFailures = new();
         private float _now;
         private float _timerOrigin;
@@ -48,6 +50,21 @@ namespace Blocky.Runtime
 
         /// <summary>Fired when a thread exhausts its per-tick instruction budget (an infinite-loop guard, TDD §6.4).</summary>
         public event Action<VmThread> OnRunawayThread;
+
+        /// <summary>A thread began running — at the top of the tick after it was started (TDD §6.4).</summary>
+        public event Action<VmThread> ThreadStarted;
+
+        /// <summary>
+        /// A thread that had started ended by itself during a tick — see <see cref="VmThread.EndReason"/>. Not raised
+        /// for threads ended from outside: <see cref="StopAll"/>, <see cref="StopWhere"/>, a restart by the thread's own event.
+        /// </summary>
+        public event Action<VmThread> ThreadFinished;
+
+        /// <summary>
+        /// A thread finished by itself (<see cref="ThreadFinished"/>) and left nothing running or waiting to start.
+        /// Never raised when everything was ended from outside — <see cref="StopAll"/>, an edit, disabled objects.
+        /// </summary>
+        public event Action AllThreadsFinished;
 
         /// <param name="conditionTable">Condition ops by opcode (<see cref="OpTableBuilder.BuildConditions"/>); without it every condition slot reads as false.</param>
         /// <param name="valueTable">Reporter ops by opcode (<see cref="OpTableBuilder.BuildValues"/>); without it every value slot reads as empty.</param>
@@ -133,17 +150,24 @@ namespace Blocky.Runtime
         /// </summary>
         public void StopAllThreads()
         {
-            foreach (var t in _threads) t.State = ThreadState.Done;
-            foreach (var t in _pending) t.State = ThreadState.Done;
+            foreach (var t in _threads) StopByBlock(t);
+            foreach (var t in _pending) StopByBlock(t);
         }
 
         /// <summary>Ends every script running on <paramref name="target"/> except <paramref name="except"/> — <c>stop [other scripts in this object]</c>.</summary>
         public void StopOtherThreadsOn(GameObject target, VmThread except)
         {
             foreach (var t in _threads)
-                if (t != except && t.Target == target) t.State = ThreadState.Done;
+                if (t != except && t.Target == target) StopByBlock(t);
             foreach (var t in _pending)
-                if (t != except && t.Target == target) t.State = ThreadState.Done;
+                if (t != except && t.Target == target) StopByBlock(t);
+        }
+
+        private static void StopByBlock(VmThread t)
+        {
+            if (t.State == ThreadState.Done) return;
+            t.EndReason ??= ScriptEndReason.StoppedByBlock;
+            t.State = ThreadState.Done;
         }
 
         /// <summary>Freezes every script where it is. Script time stops too, so a half-finished wait or move resumes exactly where it left off.</summary>
@@ -231,8 +255,15 @@ namespace Blocky.Runtime
             {
                 if (_stepping)
                     foreach (var t in _pending) GrantStep(t);
+                foreach (var t in _pending)
+                {
+                    if (t.State == ThreadState.Done) continue; // stopped before it ever ran
+                    t.Announced = true;
+                    _started.Add(t);
+                }
                 _threads.AddRange(_pending);
                 _pending.Clear();
+                Report(_started, ThreadStarted);
             }
 
             for (var i = 0; i < _threads.Count; i++)
@@ -253,7 +284,32 @@ namespace Blocky.Runtime
             }
 
             if (_stepping && EveryThreadParked()) _stepping = false; // paused again, each script one block further on
+
+            foreach (var t in _threads)
+                if (t.State == ThreadState.Done && t.EndReason.HasValue && t.Announced) _finished.Add(t);
             _threads.RemoveAll(_isDone);
+            var anyFinished = _finished.Count > 0;
+            Report(_finished, ThreadFinished);
+
+            // Asked after the reports: a listener may have started something new.
+            if (anyFinished && !HasWork)
+            {
+                try { AllThreadsFinished?.Invoke(); }
+                catch (Exception ex) { Debug.LogException(ex); }
+            }
+        }
+
+        /// <summary>Tells listeners about <paramref name="threads"/> once the lists are settled, then empties it. A listener's exception never stops the VM.</summary>
+        private static void Report(List<VmThread> threads, Action<VmThread> listeners)
+        {
+            if (threads.Count == 0) return;
+            if (listeners != null)
+                foreach (var t in threads)
+                {
+                    try { listeners(t); }
+                    catch (Exception ex) { Debug.LogException(ex); }
+                }
+            threads.Clear();
         }
 
         private bool EveryThreadParked()
@@ -290,6 +346,7 @@ namespace Blocky.Runtime
 
             if (t.Pc < 0 || t.Pc >= t.EndPc)
             {
+                t.EndReason = ScriptEndReason.Completed;
                 t.State = ThreadState.Done; // ran off the end of its own script, not just the end of the program
                 return;
             }
@@ -318,6 +375,7 @@ namespace Blocky.Runtime
             catch (Exception ex)
             {
                 LogFailure(t, instr, ex.Message);
+                t.EndReason = ScriptEndReason.Failed;
                 t.State = ThreadState.Done;
                 return;
             }
@@ -343,6 +401,7 @@ namespace Blocky.Runtime
                     break;
                 case OpResult.Fail:
                     LogFailure(t, instr, "op returned Fail");
+                    t.EndReason = ScriptEndReason.Failed;
                     t.State = ThreadState.Done;
                     break;
             }

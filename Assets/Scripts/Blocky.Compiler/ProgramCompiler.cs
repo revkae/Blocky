@@ -171,8 +171,12 @@ namespace Blocky.Compiler
                 stackExitPoints[i] = code.Count; // where this script ends, so its thread stops here instead of running on into the next one
             }
 
+            var triggerTypes = new string[program.stacks.Length];
+            for (var i = 0; i < triggerTypes.Length; i++)
+                triggerTypes[i] = ProgramQuery.IsLoose(program.stacks[i]) ? null : program.stacks[i].triggerBlockType;
+
             var compiled = new CompiledProgram(code.ToArray(), paramTable.ToArray(), stackEntryPoints, debugIds.ToArray(), stackExitPoints,
-                ProcedureNames(program, stackEntryPoints));
+                ProcedureNames(program, stackEntryPoints), triggerTypes);
             return new CompileResult(compiled, diagnostics);
         }
 

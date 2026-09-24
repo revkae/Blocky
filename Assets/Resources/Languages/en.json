@@ -113,6 +113,8 @@
     "block.event.when_key_pressed": "When Key Pressed",
     "block.event.when_looked_at": "When Looked At",
     "block.event.when_play_clicked": "When Play Clicked",
+    "block.event.level_complete": "level complete",
+    "block.event.when_level_complete": "when level complete",
     "block.looks.change_color": "Change Color",
     "block.looks.say": "Say",
     "block.looks.set_scale": "Set Scale",

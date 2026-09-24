@@ -98,6 +98,7 @@ namespace Blocky.Runtime
             _clones?.DeleteAll(); // a run never leaves its copies behind, exactly as Scratch clears clones on stop
             BlockySpeechBubble.HideAll(); // nor a bubble mid-sentence
             _audio?.StopAll();            // nor a note still sounding
+            BlockyEvents.RaiseStopped();  // and game code resets whatever it keeps itself
         }
 
         /// <summary>Stops every script and puts every programmed object back how it started, ready for <see cref="Go"/>.</summary>
@@ -105,6 +106,7 @@ namespace Blocky.Runtime
         {
             Stop();
             _world.RestoreAll();
+            BlockyEvents.RaiseWorldReset();
         }
 
         /// <summary>Freezes every script where it is.</summary>

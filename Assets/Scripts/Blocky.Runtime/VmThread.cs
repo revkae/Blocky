@@ -69,6 +69,16 @@ namespace Blocky.Runtime
         /// <summary>Step mode: reached the start of a block with no budget left, and waits there for the next step.</summary>
         public bool StepParked;
 
+        /// <summary>
+        /// How this thread ended by itself — it ran out of blocks, a stop block ended it, or a block failed — for
+        /// <see cref="BlockyEvents.ScriptFinished"/>. Null while it runs, and when something outside ended it (the
+        /// Stop button, an edit, its object going away, a restart by its own event).
+        /// </summary>
+        public ScriptEndReason? EndReason;
+
+        /// <summary>Reported as started (<see cref="VmScheduler.ThreadStarted"/>), so that only such threads are reported finished.</summary>
+        internal bool Announced;
+
         public VmThread(CompiledProgram program, GameObject target, int entryPc)
         {
             Program = program;
@@ -221,6 +231,7 @@ namespace Blocky.Runtime
             thread.ResumePc = _resumePc;
             thread.StepBudget = 0;
             thread.StepParked = false;
+            thread.EndReason = null; // back where it was, it hasn't ended; if it ends again, that is news again
         }
     }
 }

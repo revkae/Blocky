@@ -1524,6 +1524,7 @@ namespace Blocky.Game
             _runner.Shutdown();
             _runner.SetProgramAsset(_liveAsset);
             _runner.Initialize();
+            BlockyEvents.ReportProgramEdited(_target);
         }
     }
 }

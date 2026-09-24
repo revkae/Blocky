@@ -73,7 +73,7 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
 
 ### Later
 - [ ] Students add their own objects — today they can only program what was placed in the scene in Unity.
-- [ ] Challenges the app can check ("reach the flag").
+- [ ] Challenges the app can check ("reach the flag"). The pieces exist since 2026-09-24 — a `level complete` block and `BlockyEvents` ([[12 Game Code/Blocky from CSharp|Blocky from C#]]); what's missing is a challenge list in the app itself.
 - [ ] More languages — one file each ([[10 Localization/Localization|Localization]]); pick by where you sell.
 
 ## 5. Ready for the Asset Store
@@ -105,7 +105,7 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
   - Block reference — from [[06 Block Catalog/Block Catalog|Block Catalog]].
   - Adding a block: one `BlockDefinition` asset + one `[BlockExecutor]` class — what developers are buying.
   - Adding a language — from [[10 Localization/Localization|Localization]].
-  - Saving and loading programs, and the scripting entry points (`ObjectProgramRunner`, `BlockyRuntime.Playback`, `RuntimeProgramStorage`).
+  - Saving and loading programs, and the scripting entry points (`ObjectProgramRunner`, `BlockyRuntime.Playback`, `RuntimeProgramStorage`, `BlockyEvents` — from [[12 Game Code/Blocky from CSharp|Blocky from C#]]).
   - Known limits: Unity version, mouse and keyboard, 3D.
 - [ ] **Version and changelog.** `bundleVersion` is `0.1.0`; ship `1.0.0` with a changelog.
 - [ ] **A support address** (email, Discord, or a public issues-only repo) and a reply time you can keep — reviews follow support.

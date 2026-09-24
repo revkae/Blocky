@@ -20,6 +20,7 @@ namespace Blocky.Runtime.Ops
                     ctx.Scheduler?.StopOtherThreadsOn(ctx.Target, ctx.Thread);
                     return OpResult.Continue;
                 default: // this script
+                    ctx.Thread.EndReason = ScriptEndReason.StoppedByBlock;
                     ctx.Thread.State = ThreadState.Done;
                     break;
             }

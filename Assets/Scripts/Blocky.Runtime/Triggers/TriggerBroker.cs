@@ -54,6 +54,15 @@ namespace Blocky.Runtime.Triggers
 
         public void Broadcast(string message) => OnBroadcast?.Invoke(message ?? string.Empty);
 
+        /// <summary>
+        /// The level is complete — a <c>level complete</c> block ran (the object is its), or game code called
+        /// <see cref="BlockyEvents.CompleteLevel"/>. Every <c>when level complete</c> script starts, and
+        /// <see cref="BlockyEvents.LevelCompleted"/> tells game code.
+        /// </summary>
+        public event Action<GameObject> OnLevelCompleted;
+
+        public void RaiseLevelCompleted(GameObject by) => OnLevelCompleted?.Invoke(by);
+
         private bool _pointerDownLastPoll;
 
         /// <summary>Rising edge of a click on an object in the scene — the object the ray hit, never a UI press.</summary>

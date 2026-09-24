@@ -255,6 +255,13 @@ namespace Blocky.Runtime
                         _unsubscribe.Add(() => broker.OnCloneStarted -= Handler);
                         break;
                     }
+                    case "event.when_level_complete":
+                    {
+                        void Handler(GameObject by) => Fire(triggerDef, entryPc);
+                        broker.OnLevelCompleted += Handler;
+                        _unsubscribe.Add(() => broker.OnLevelCompleted -= Handler);
+                        break;
+                    }
                     case "event.when_broadcast_received":
                     {
                         void Handler(string message)

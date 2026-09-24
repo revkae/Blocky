@@ -25,7 +25,7 @@ namespace Blocky.Runtime
 
         public static BlockRegistry Registry => _registry ??= BlockRegistry.LoadFromResources();
         public static VmScheduler Scheduler => _scheduler ??= CreateScheduler();
-        public static TriggerBroker Triggers => _triggers ??= new TriggerBroker();
+        public static TriggerBroker Triggers => _triggers ??= BlockyEvents.Watch(new TriggerBroker());
 
         /// <summary>Every programmed object's start (for Reset) — runners record their object when they first start.</summary>
         public static WorldSnapshot World => _world ??= new WorldSnapshot();
@@ -48,15 +48,15 @@ namespace Blocky.Runtime
         private static VmScheduler CreateScheduler()
         {
             var (steps, conditions, values) = OpTableBuilder.BuildAll(Registry);
-            return new VmScheduler(steps, conditions, values);
+            return BlockyEvents.Watch(new VmScheduler(steps, conditions, values));
         }
 
         /// <summary>Test-only hook: injects fixtures instead of the Resources-scanned registry/reflection-bound op table.</summary>
         public static void SetForTests(BlockRegistry registry, VmScheduler scheduler, TriggerBroker triggers)
         {
             _registry = registry;
-            _scheduler = scheduler;
-            _triggers = triggers;
+            _scheduler = BlockyEvents.Watch(scheduler); // so BlockyEvents reports what the injected ones do
+            _triggers = BlockyEvents.Watch(triggers);
             _playback = null; // rebuilt around the injected scheduler and broker
         }
 

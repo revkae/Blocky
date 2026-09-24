@@ -27,8 +27,11 @@ namespace Blocky.Compiler
         /// </summary>
         public readonly string[] ProcedureNames;
 
+        /// <summary>Per stack: its hat's block type (<c>event.when_go_clicked</c>…), or null for a loose stack — what <c>BlockyEvents</c> reports a script by.</summary>
+        public readonly string[] StackTriggerTypes;
+
         public CompiledProgram(Instruction[] code, ParamValue[] paramTable, int[] stackEntryPoints, string[] debugNodeIds,
-            int[] stackExitPoints = null, string[] procedureNames = null)
+            int[] stackExitPoints = null, string[] procedureNames = null, string[] stackTriggerTypes = null)
         {
             Code = code;
             ParamTable = paramTable;
@@ -36,7 +39,11 @@ namespace Blocky.Compiler
             DebugNodeIds = debugNodeIds;
             StackExitPoints = stackExitPoints;
             ProcedureNames = procedureNames;
+            StackTriggerTypes = stackTriggerTypes;
         }
+
+        /// <summary>Which stack starts at <paramref name="entryPc"/>, or -1. Every stack with code has its own entry pc.</summary>
+        public int StackIndexFor(int entryPc) => entryPc < 0 ? -1 : System.Array.IndexOf(StackEntryPoints, entryPc);
 
         /// <summary>
         /// Where the custom block <paramref name="name"/> is: its first pc and the pc just past its last block. False

@@ -6,6 +6,16 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (events) — C# events for game code, and a `level complete` block
+User request: "C# events such as 'script finished' and 'level complete'". Design in [[09 Decisions/Decisions#ADR-033|ADR-033]]; how to use it in the new note [[12 Game Code/Blocky from CSharp|Blocky from C#]]. Catalog now at **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 triggers).
+
+- **`BlockyEvents`**: `ScriptStarted`, `ScriptFinished` (with `Completed` / `StoppedByBlock` / `Failed`), `AllScriptsFinished`, `LevelCompleted`, `MessageSent`, `Stopped`, `WorldReset`, `ProgramEdited`; commands `Broadcast`, `CompleteLevel`. Handlers are dropped every Play session and a throwing handler is only logged.
+- **Scheduler:** `ThreadStarted` / `ThreadFinished` / `AllThreadsFinished`, and `VmThread.EndReason`, set only where a script ends itself — so the Stop button, an edit or a destroyed object never read as "finished".
+- **Blocks:** `level complete` (statement) and `when level complete` (hat) in Events; a new broker channel, `OnLevelCompleted`. `Playback.Stop` / `ResetWorld` raise `Stopped` / `WorldReset`; the in-game editor reports each edit.
+- **`CompiledProgram.StackTriggerTypes` / `StackIndexFor`**, so a report can say which script it was and which event started it.
+- **Words:** 250 strings per language.
+- **Verified outside Unity only:** 10 new `BlockyEventsTests` pass (reasons, the order of reports, Stop and an edit not counting as finished, a throwing handler, the level-complete blocks, messages both ways); the rest unchanged. The tests caught one real gap on the way: "all finished" compared work between ticks and missed a script that started and ended in one tick.
+
 ## 2026-09-24 (custom blocks) — My Blocks: define, run, inputs, recursion
 User request: "Custom blocks, which are already designed in ADR-029". Design in [[09 Decisions/Decisions#ADR-029|ADR-029]], now accepted with an **As built** list; catalog in [[06 Block Catalog/Block Catalog#My Blocks|Block Catalog]]; the VM side in [[04 Runtime/Runtime VM|Runtime VM]]. Catalog now at **85 blocks** (37 steps, 16 conditions, 23 reporters, 9 triggers).
 
