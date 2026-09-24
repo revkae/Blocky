@@ -48,6 +48,10 @@ How game code talks to Blocky: hearing what the learner's scripts do, sending th
 
 **Remember the hats:** with *only these*, a learner who can't take a `when Go clicked` out of the palette can't start a script. List one, or give the object a starting script that has it.
 
+## Your own blocks
+
+`Blocky › New Block…` makes a block: the asset, a class with its inputs already read, and its words in every language, in `Assets/BlockyBlocks` (or a folder you pick). Write what the block does in the class; it is in the palette from the next Play. By hand it is the same two things — a `BlockDefinition` asset in any `Resources/Blocks` folder and a class with `[BlockExecutor("its.type")]` implementing `IBlockOp` (a command), `IValueOp` (a round value) or `IConditionOp` (a ⬡ question) — in any assembly that references Blocky.Runtime. Words for your blocks go in `Resources/Languages/<code>.blocks.json`; they are added to Blocky's file for that language. A class with the key of a built-in block replaces Blocky's. See [[09 Decisions/Decisions#ADR-036 — New blocks live in the project's own folder, and a missing op stops one script, not the game|ADR-036]].
+
 ## Themes
 
 `panel.Theme = BlockyTheme.Dark;` — `Light`, `Dark` or `HighContrast`, for this session. The learner can switch in the title bar; their pick is remembered on the computer and wins the next time. The Inspector's *Theme* field is the look before anyone has picked. See [[09 Decisions/Decisions#ADR-035 — Three themes as classes on the workspace root; High contrast recolors the blocks too|ADR-035]].

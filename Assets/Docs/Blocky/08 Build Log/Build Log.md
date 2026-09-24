@@ -6,6 +6,15 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (wizard) — Blocky › New Block…
+User request: "A 'New Block' wizard in the Unity menu". Design in [[09 Decisions/Decisions#ADR-036 — New blocks live in the project's own folder, and a missing op stops one script, not the game|ADR-036]].
+
+- **`NewBlockWizard`** (a UI Toolkit editor window) over **`NewBlockSpec`**: name, kind (command / value / question), tab, block type (default `game.<name>`), folder, and inputs (number, text, dropdown, object, condition). It makes the asset, a `[BlockExecutor]` class with each input read the right way, and `<code>.blocks.json` for every language, under `Assets/BlockyBlocks`; then opens the class.
+- **Three changes it needed:** `OpTableBuilder` now finds ops in every assembly that references Blocky.Runtime (a game's op for a built-in key replaces Blocky's); `BlockyRuntime` builds its tables with `BuildAllForPlay`, so a block without a working op stops only the scripts that reach it instead of every block; `LanguageFiles` merges more files for one language (`en` + `en.blocks`) instead of skipping the second.
+- **New test assembly `Blocky.Tooling.Tests`** — 18 tests: names, the checks, the asset, the class, the words, the language file. Plus 3 `OpTableBuilderTests` (an op in another assembly found with no registration; a missing op left empty for Play; a script reaching it failing while others run) and one for the language merge.
+- **The classes it writes compile:** one of each kind, with every input kind and inputs named `self` and `object`, was generated and compiled against Blocky.Runtime with warnings as errors.
+- **Not verified:** the window has not been opened in Unity. Try it: make a command with a number input, write `self.transform.position += Vector3.up * height;`, press Play, find it in its tab.
+
 ## 2026-09-24 (themes) — Light, Dark and High contrast
 User request: "2–3 color themes". Design in [[09 Decisions/Decisions#ADR-035 — Three themes as classes on the workspace root; High contrast recolors the blocks too|ADR-035]].
 

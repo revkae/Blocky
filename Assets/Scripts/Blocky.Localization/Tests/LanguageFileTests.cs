@@ -27,6 +27,29 @@ namespace Blocky.Localization.Tests
         }
 
         [Test]
+        public void MoreFilesForALanguage_AddToIt_OverTheFileNamedByItsCode()
+        {
+            LanguageFile File(string code, string name, params (string key, string text)[] strings) =>
+                new(code, name, strings.ToDictionary(s => s.key, s => s.text));
+
+            // Loaded in any order; "tr" is the base whatever comes first, and the project's own files lie over it by name.
+            var files = LanguageFiles.Combine(new[]
+            {
+                ("tr.blocks", File("tr", "ignored", ("block.game.jump", "zıpla"), ("run.go", "Başla!"))),
+                ("en", File("en", "English", ("run.go", "▶ Go"))),
+                ("tr", File("tr", "Türkçe", ("run.go", "▶ Başlat"), ("run.stop", "Durdur")))
+            });
+
+            Assert.AreEqual(2, files.Count);
+            Assert.AreEqual("en", files[0].Code, "the source language first");
+            var turkish = files[1];
+            Assert.AreEqual("Türkçe", turkish.Name, "the name comes from the base file");
+            Assert.AreEqual("zıpla", turkish.Strings["block.game.jump"]);
+            Assert.AreEqual("Durdur", turkish.Strings["run.stop"]);
+            Assert.AreEqual("Başla!", turkish.Strings["run.go"], "a project's own file wins where it repeats a string");
+        }
+
+        [Test]
         public void Parse_WithoutALocale_UsesTheFileName_AndSkipsValuesThatArentText()
         {
             var file = LanguageFile.Parse("{ \"strings\": { \"a\": \"text\", \"b\": 3, \"c\": \"2024-01-01\" } }", "de");

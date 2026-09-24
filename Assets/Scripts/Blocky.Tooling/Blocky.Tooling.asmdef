@@ -5,7 +5,9 @@
         "Blocky.Data",
         "Blocky.Compiler",
         "Blocky.Editor",
-        "Blocky.Runtime"
+        "Blocky.Runtime",
+        "Blocky.Localization",
+        "Newtonsoft.Json"
     ],
     "includePlatforms": [
         "Editor"

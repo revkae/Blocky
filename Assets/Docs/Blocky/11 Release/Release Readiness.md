@@ -103,7 +103,7 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
   - Quick start in five minutes: import → drop in the prefab → give an object a program → Play → Tab.
   - Using the workspace — most of it is already in [[08 Build Log/Demo Scene#In-game program editor|Demo Scene]].
   - Block reference — from [[06 Block Catalog/Block Catalog|Block Catalog]].
-  - Adding a block: one `BlockDefinition` asset + one `[BlockExecutor]` class — what developers are buying.
+  - Adding a block: one `BlockDefinition` asset + one `[BlockExecutor]` class — what developers are buying. `Blocky › New Block…` makes both, and the words ([[09 Decisions/Decisions#ADR-036 — New blocks live in the project's own folder, and a missing op stops one script, not the game|ADR-036]]).
   - Adding a language — from [[10 Localization/Localization|Localization]].
   - Saving and loading programs, and the scripting entry points (`ObjectProgramRunner`, `BlockyRuntime.Playback`, `RuntimeProgramStorage`, `BlockyEvents` — from [[12 Game Code/Blocky from CSharp|Blocky from C#]]).
   - Known limits: Unity version, mouse and keyboard, 3D.

@@ -47,7 +47,9 @@ namespace Blocky.Runtime
 
         private static VmScheduler CreateScheduler()
         {
-            var (steps, conditions, values) = OpTableBuilder.BuildAll(Registry);
+            // A block without a working op stops only the scripts that use it, never every block in the game.
+            var (steps, conditions, values) = OpTableBuilder.BuildAllForPlay(Registry, message =>
+                UnityEngine.Debug.LogError($"Blocky: {message} Scripts that use that block will stop at it. Write its [BlockExecutor] class, or fix the one that doesn't compile."));
             return BlockyEvents.Watch(new VmScheduler(steps, conditions, values));
         }
 

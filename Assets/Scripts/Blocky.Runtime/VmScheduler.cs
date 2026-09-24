@@ -363,6 +363,15 @@ namespace Blocky.Runtime
             }
 
             var instr = t.Program.Code[t.Pc];
+            var op = _opTable[instr.Opcode];
+            if (op == null)
+            {
+                LogFailure(t, instr, "no op is bound to this block (the console said which when the game started)");
+                t.EndReason = ScriptEndReason.Failed;
+                t.State = ThreadState.Done;
+                return;
+            }
+
             var span = new ReadOnlySpan<ParamValue>(t.Program.ParamTable, instr.ParamOffset, instr.ParamCount);
             var ctx = new OpContext(t, t.Pc, instr, span, dt, _now, _slots, this);
             t.ActivePc = t.Pc;
@@ -370,7 +379,7 @@ namespace Blocky.Runtime
             OpResult result;
             try
             {
-                result = _opTable[instr.Opcode].Execute(ref ctx);
+                result = op.Execute(ref ctx);
             }
             catch (Exception ex)
             {

@@ -51,7 +51,10 @@ namespace Blocky.Localization
 
     /// <summary>
     /// Every language file in <c>Resources/Languages</c>. A language is one file there, so adding one means
-    /// adding a file: nothing else in the project lists them.
+    /// adding a file: nothing else in the project lists them. More files for the same language add to it:
+    /// a project keeps the words for its own blocks in, say, <c>en.blocks.json</c> in its own <c>Resources/Languages</c>
+    /// folder, so updating Blocky never touches them. The file named just by its code (<c>en</c>) is the base; the
+    /// others are laid over it in name order, and a string they repeat replaces the base's.
     /// </summary>
     public static class LanguageFiles
     {
@@ -71,20 +74,59 @@ namespace Blocky.Localization
 
         private static List<LanguageFile> Load()
         {
-            var files = new List<LanguageFile>();
+            var parsed = new List<(string assetName, LanguageFile file)>();
             foreach (var asset in Resources.LoadAll<TextAsset>(BlockyLanguages.ResourcesFolder))
             {
                 try
                 {
                     var file = LanguageFile.Parse(asset.text, asset.name);
                     if (file == null) Debug.LogWarning($"Blocky: language file '{asset.name}' has no \"locale\" and was skipped.");
-                    else if (Find(files, file.Code) != null) Debug.LogWarning($"Blocky: two language files are for '{file.Code}'; '{asset.name}' was skipped.");
-                    else files.Add(file);
+                    else parsed.Add((asset.name, file));
                 }
                 catch (JsonException e)
                 {
                     Debug.LogWarning($"Blocky: language file '{asset.name}' isn't valid JSON and was skipped: {e.Message}");
                 }
+            }
+
+            return Combine(parsed);
+        }
+
+        /// <summary>
+        /// One <see cref="LanguageFile"/> per language from any number of files: for each language the file named by
+        /// its code is the base (else the first by name), and the rest are laid over it in name order, their strings
+        /// replacing the base's where they repeat one. The source language comes first, then the rest by code.
+        /// </summary>
+        public static List<LanguageFile> Combine(IEnumerable<(string assetName, LanguageFile file)> parsed)
+        {
+            var byCode = new Dictionary<string, List<(string assetName, LanguageFile file)>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in parsed)
+            {
+                if (!byCode.TryGetValue(entry.file.Code, out var group)) byCode[entry.file.Code] = group = new List<(string, LanguageFile)>();
+                group.Add(entry);
+            }
+
+            var files = new List<LanguageFile>();
+            foreach (var group in byCode.Values)
+            {
+                group.Sort((a, b) =>
+                {
+                    var aBase = string.Equals(a.assetName, a.file.Code, StringComparison.OrdinalIgnoreCase);
+                    var bBase = string.Equals(b.assetName, b.file.Code, StringComparison.OrdinalIgnoreCase);
+                    return aBase != bBase ? (aBase ? -1 : 1) : string.CompareOrdinal(a.assetName, b.assetName);
+                });
+
+                if (group.Count == 1)
+                {
+                    files.Add(group[0].file);
+                    continue;
+                }
+
+                var strings = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var (_, file) in group)
+                foreach (var pair in file.Strings)
+                    strings[pair.Key] = pair.Value;
+                files.Add(new LanguageFile(group[0].file.Code, group[0].file.Name, strings));
             }
 
             // The source language first, then the rest in a fixed order, so the language list never shuffles.
@@ -97,7 +139,5 @@ namespace Blocky.Localization
             return files;
         }
 
-        private static LanguageFile Find(List<LanguageFile> files, string code) =>
-            files.Find(f => string.Equals(f.Code, code, StringComparison.OrdinalIgnoreCase));
     }
 }

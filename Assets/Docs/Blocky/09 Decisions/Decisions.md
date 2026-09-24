@@ -349,6 +349,18 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - **A test reads the stylesheets as text** (`StyleSheetTests`): every `var(--x)` has a `:root` definition, a theme redefines only tokens that exist, every category has a color and a fill in the default look and in High contrast, and every look sets the grid's dots. A misspelled token in USS fails silently, so this is the only way such a mistake would be caught before someone saw it.
 **Not done:** the dropdown menus (`GenericDropdownMenu`) and the Editor window use Unity's own theme, not these.
 
+## ADR-036 — New blocks live in the project's own folder, and a missing op stops one script, not the game
+**Status:** Accepted (user request, 2026-09-24: "A 'New Block' wizard in the Unity menu"). Built and tested outside Unity only; the window itself has not been opened.
+**Decision:**
+- **`Blocky › New Block…`** (`NewBlockWizard`, Blocky.Tooling) asks for a name, a kind — *command*, *value* or *question* — a palette tab and the inputs (number, text, dropdown, object, ⬡ condition), and makes three things: the `BlockDefinition` asset, a class with `[BlockExecutor]` and every input already read with the right getter, and the block's words in every language. The logic is `NewBlockSpec`, apart from the window, so it is tested; the classes it writes were compiled against Blocky.Runtime with warnings as errors.
+- **The project's folder, not Blocky's.** Everything goes under `Assets/BlockyBlocks` (asked for): `Resources/Blocks/<type>.asset` — `Resources.LoadAll` merges every `Resources/Blocks` folder — the class beside it, and `Resources/Languages/<code>.blocks.json`. Updating Blocky replaces Blocky's folders; a project's blocks and words survive it.
+- **Language files for one language now merge** (`LanguageFiles.Combine`): the file named by the code (`en.json`) is the base, the others (`en.blocks.json`) are laid over it by name and win where they repeat a key. Before, a second file for a language was skipped with a warning. The wizard never overwrites a key a language already has — an input called "distance" keeps Blocky's label rather than renaming it on every block that has one.
+- **Block types get a prefix of their own**, `game.` by default, and the wizard refuses a type that exists — so a later Blocky that adds `motion.jump` can't collide with a project's.
+- **`OpTableBuilder` scans every loaded assembly that references Blocky.Runtime** when no assembly is named, Blocky.Runtime first and the rest by name. A game's own blocks — in `Assembly-CSharp` or an asmdef of its own — need no registration, and **a game's op for a built-in key replaces Blocky's** (a different `move forward`, say). Two non-Blocky ops for one key are still an error.
+- **In Play, a missing op stops one script, not every block.** `BlockyRuntime` builds its tables with `BuildAllForPlay`: a block whose op is missing or of the wrong kind is logged as an error and left empty, and the VM ends a script that reaches it (`Failed`, one warning). Before, one such block made `OpTableBuilder` throw and nothing ran — with a wizard making assets and scripts, that is one compile error away. The strict `Build*` methods, which tests use, still throw.
+- **Generated classes carry `[Preserve]`** on the class and its constructor: Blocky makes them by reflection, so nothing else names them, and the `link.xml` only keeps Blocky's own assemblies.
+**Not done:** the wizard makes no hats and no C-blocks; it doesn't translate (other languages get the English words to translate); and renaming or deleting a made block is by hand.
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above
