@@ -98,6 +98,28 @@ namespace Blocky.Runtime.Tests
         }
 
         [Test]
+        public void AnEmptyScript_DoesNotStopTheScriptAfterIt()
+        {
+            // A hat left on the table with nothing under it has no code, so its script began where the next one
+            // does — and a thread started for either ended at the empty one's end: the real script never ran.
+            var registry = BuildPlayClickedRegistry();
+            var broker = new TriggerBroker();
+            var scheduler = new VmScheduler(OpTableBuilder.Build(registry, typeof(OpTableBuilder).Assembly));
+            var program = BuildProgram("event.when_play_clicked", 1f, 0f);
+            program.stacks = new[]
+            {
+                new BlockStack { id = "stk_empty", triggerBlockType = "event.when_play_clicked" },
+                program.stacks[0]
+            };
+            AddRunner(registry, program, broker, scheduler);
+
+            broker.FirePlayClicked();
+            scheduler.Tick(1f);
+
+            Assert.AreEqual(1f, _target.transform.position.z, 1e-4f);
+        }
+
+        [Test]
         public void PlayClickedTrigger_StartsThread_AndMovesTarget()
         {
             var registry = BuildPlayClickedRegistry();

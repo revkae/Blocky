@@ -271,6 +271,12 @@ namespace Blocky.Runtime
                 ref var topFrame = ref t.TopFrame();
                 if (t.Pc == topFrame.ExitPc)
                 {
+                    if (topFrame.IsCall)
+                    {
+                        t.ReturnFromCall(); // a custom block finished: carry on after the block that ran it (ADR-029)
+                        return;
+                    }
+
                     // Loop-yield rule (TDD §6.4): force one frame yield per lap that never yielded on its own,
                     // so a zero-yield loop body can't hang the game frame. Only applies to loop frames — a
                     // one-shot if_else skip-frame shouldn't add a hidden yield to every branch taken.
@@ -282,7 +288,7 @@ namespace Blocky.Runtime
                 }
             }
 
-            if (t.Pc < 0 || t.Pc >= t.ExitPc)
+            if (t.Pc < 0 || t.Pc >= t.EndPc)
             {
                 t.State = ThreadState.Done; // ran off the end of its own script, not just the end of the program
                 return;
@@ -326,11 +332,11 @@ namespace Blocky.Runtime
                 case OpResult.YieldFrame:
                     t.Pc++;
                     if (t.State != ThreadState.Sleeping) t.State = ThreadState.YieldedFrame;
-                    MarkAllFramesYielded(t);
+                    t.MarkFramesYielded();
                     break;
                 case OpResult.Retry:
                     if (t.State != ThreadState.Sleeping) t.State = ThreadState.YieldedFrame;
-                    MarkAllFramesYielded(t);
+                    t.MarkFramesYielded();
                     break;
                 case OpResult.Jump:
                     t.Pc = ctx.NextPc;
@@ -340,12 +346,6 @@ namespace Blocky.Runtime
                     t.State = ThreadState.Done;
                     break;
             }
-        }
-
-        private static void MarkAllFramesYielded(VmThread t)
-        {
-            for (var i = 0; i < t.FrameCount; i++)
-                t.Frames[i].YieldedThisLap = true;
         }
 
         private void LogFailure(VmThread t, Instruction instr, string message)

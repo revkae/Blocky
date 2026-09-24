@@ -24,7 +24,10 @@ namespace Blocky.Compiler
         Variables,
 
         /// <summary>Numbered collections of values — a queue of waypoints, a high-score table (Scratch's lists).</summary>
-        Lists
+        Lists,
+
+        /// <summary>Custom blocks: define one, run it from anywhere on the same object (Scratch's My Blocks).</summary>
+        MyBlocks
     }
 
     public static class BlockCategoryNames

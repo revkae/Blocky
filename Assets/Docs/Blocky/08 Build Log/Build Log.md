@@ -6,6 +6,18 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 (custom blocks) — My Blocks: define, run, inputs, recursion
+User request: "Custom blocks, which are already designed in ADR-029". Design in [[09 Decisions/Decisions#ADR-029|ADR-029]], now accepted with an **As built** list; catalog in [[06 Block Catalog/Block Catalog#My Blocks|Block Catalog]]; the VM side in [[04 Runtime/Runtime VM|Runtime VM]]. Catalog now at **85 blocks** (37 steps, 16 conditions, 23 reporters, 9 triggers).
+
+- **Five blocks, a My Blocks tab** (Scratch's pink): `define [name]` (hat), `run [name] a () b () c ()`, `input a` / `b` / `c`. `CustomBlocks` (Blocky.Compiler) holds the type names and the name rules.
+- **VM:** a call is a frame (`Frame.IsCall`) into the definition's script; `Step` returns from it itself (`VmThread.ReturnFromCall`), because with recursion the `run` op can't tell a return from a new call. Threads end at `EndPc` — the definition's exit while inside one. Inputs live on a per-thread array made on the first call. Recursion waits one frame per level, as in Scratch; loops and calls nest up to 256 deep (was 16 for loops), with the frame array growing on demand. Step back saves and restores calls and their inputs.
+- **Compiler:** `CompiledProgram.ProcedureNames` / `TryFindProcedure` — definitions by trimmed, case-insensitive name, the first of a name winning. The runner never starts a `define` script, not even on Step ▶.
+- **Palette:** a ready-made `run [name]` for each `define` on the object, rebuilt when the names change (`PaletteDragManipulator` and `BlockPrototype` take a prepared node).
+- **Advice:** a nameless or duplicate `define`, an unknown or empty `run` name, an `input` block outside a definition — each in English and Türkçe.
+- **Bug fixed on the way:** an empty script (a hat with nothing under it) had the same entry pc as the script after it, and `ExitPcFor` gave that script the empty one's length, so it never ran. Empty scripts now get no entry point. Found by reading, proven by a test that failed before the fix.
+- **Words:** 248 strings per language now.
+- **Verified outside Unity only:** every assembly compiles; 16 new runtime tests (calls, inputs, recursion, the depth limit, Step back, the runner never starting a definition), 12 compile and advice tests and the empty-script test pass, and nothing else changed (the same 4 stand-in gaps). A mutation run — the call return and the moved bound switched off — failed 12 of the 16 runtime tests, so they test what they claim. Still to see in Unity: the tab, the ready-made `run` entries appearing as a `define` is named, and a recursive program in Play mode.
+
 ## 2026-09-24 (lists) — Lists, in a tab of their own
 User request: "Beat Blocks Engine 2 … custom blocks … and lists (ADR-028)". Design in [[09 Decisions/Decisions#ADR-028|ADR-028]], now accepted; catalog in [[06 Block Catalog/Block Catalog#Lists|Block Catalog]]. Catalog now at **80 blocks** (36 steps, 16 conditions, 20 reporters, 8 triggers).
 

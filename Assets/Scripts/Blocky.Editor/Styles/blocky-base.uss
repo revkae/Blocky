@@ -9,6 +9,7 @@
     --blocky-color-sound: rgb(207, 99, 207);
     --blocky-color-variables: rgb(255, 140, 26);
     --blocky-color-lists: rgb(255, 102, 26);
+    --blocky-color-myblocks: rgb(255, 102, 128);
     --blocky-color-error: rgb(190, 60, 60);
     --blocky-color-neutral: rgb(90, 90, 90);
 }
@@ -86,6 +87,12 @@
 .blocky-block--category-lists {
     background-color: var(--blocky-color-lists);
     --blocky-fill: rgb(255, 102, 26);
+}
+
+/* Scratch's My Blocks pink. */
+.blocky-block--category-myblocks {
+    background-color: var(--blocky-color-myblocks);
+    --blocky-fill: rgb(255, 102, 128);
 }
 
 /* Condition block: a hexagon, shorter than a stack block, with room for the pointed ends. */

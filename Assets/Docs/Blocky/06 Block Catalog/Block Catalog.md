@@ -6,7 +6,7 @@ tags: [block-catalog]
 
 Source: [[Welcome|TDD §9]] for the v1 MVP set. Semantics there are normative for those blocks — they define yield behaviour. Everything after the MVP section is the Scratch/Delightex parity work, designed in [[09 Decisions/Decisions#ADR-020|ADR-020]].
 
-**80 blocks live** as `BlockDefinition` `.asset` files under `Assets/Resources/Blocks/`, verified through `BlockRegistry.LoadFromResources()`: 36 steps, 16 conditions and 20 reporters bound by `OpTableBuilder`, 8 triggers correctly unbound (`TriggerBroker` dispatches those). `OpTableBuilderTests.EveryBlockInTheCatalog_IsBoundToAnOp` checks the shipped assets themselves, so an asset whose op is missing or of the wrong kind fails a test instead of the first Play.
+**85 blocks live** as `BlockDefinition` `.asset` files under `Assets/Resources/Blocks/`, verified through `BlockRegistry.LoadFromResources()`: 37 steps, 16 conditions and 23 reporters bound by `OpTableBuilder`, 9 triggers correctly unbound (`TriggerBroker` dispatches those; `define` is started by `run` blocks only). `OpTableBuilderTests.EveryBlockInTheCatalog_IsBoundToAnOp` checks the shipped assets themselves, so an asset whose op is missing or of the wrong kind fails a test instead of the first Play.
 
 **Every white input takes an expression.** Since [[09 Decisions/Decisions#ADR-021|ADR-021]] a reporter can be dropped on any `Number`, `Text` or `Bool` input of any block in this catalog — `move forward (pick random 1 to 10)`, `wait ((timer) / (2))`, `repeat ((length of (join …)))` — with no per-block work, because every op reads its inputs through `OpContext.GetNumber` / `GetText` / `GetBool`. A `Choice` dropdown is the one input that does not: it is a fixed list, not a value.
 
@@ -84,8 +84,21 @@ A clone is a plain `Instantiate`, so it brings its colliders, renderer and runne
 
 The project has no audio files, so notes are **generated**: a sine wave at the right pitch and length, faded 10 ms at each end so it does not click, cached per note. MIDI numbering as in Scratch (60 = middle C, 69 = A 440). `play note` holds the script while it sounds, so a column of them is a tune; `play sound` loads from `Resources/Sounds/` and carries straight on so sounds overlap, and is silence rather than an error when nothing matches. Each object gets one `AudioSource` on first use, 2D on purpose so a beep is never inaudible for being behind the camera. `Stop` silences everything.
 
+## My Blocks
+`custom.define` (`name`, hat) · `custom.run` (`name`, `a`, `b`, `c`) · `custom.input_a`, `custom.input_b`, `custom.input_c` (round)
+
+Scratch's custom blocks ([[09 Decisions/Decisions#ADR-029|ADR-029]]). Put blocks under **define [jump]**, then **run [jump]** from any script on the same object: the definition runs, and the script carries on after the `run`. A `run` hands its definition three values, **a**, **b** and **c**, worked out at the moment of the call; inside the definition **input a** (b, c) reads them — the innermost call's, so recursion works. Outside a definition an input block reads as empty.
+
+Names match the way variable and message names do — trimmed, ignoring case — and belong to the object (a clone has its owner's). A name nothing defines does nothing; of two definitions with one name, the first runs. Once an object has a `define`, the My Blocks tab offers a ready-made **run [jump]** for it under the plain `run`, so running one is a drag, not typing its name again.
+
+A definition never starts on its own — not on Play, Go or Step ▶ — only from a `run`. `stop [this script]` inside one ends the whole script that ran it, as in Scratch. A block that runs itself **waits one frame first** (also Scratch's rule): a recursive drawing unfolds on screen, and a recursion that never stops slows down instead of freezing the game. Loops and custom blocks nest up to **256 deep** together; past that a `run` does nothing, and the stack unwinds.
+
+**The compromise:** in Scratch a custom block grows the inputs its definition declares, with the names it gives them. Here every `run` has the same three inputs, a, b and c, because a block's inputs come from its asset — a call whose shape depended on another script would need the palette, the compiler and the save files to understand shapes that change. It can grow into the real thing later without a data change.
+
+The advice spots the ways this goes wrong silently: a `define` without a name, two with the same name, a `run` whose name nothing defines (or that is empty), and an `input` block outside any definition.
+
 ## Not built yet
-Custom blocks ("My Blocks") — they need a call stack in the VM ([[09 Decisions/Decisions#ADR-029|ADR-029]]).
+Every part of Scratch's language now has a counterpart — events, control, operators, variables, lists and custom blocks. Single blocks that are not: `ask and wait` / `answer` (needs a text box over the game), and the 2D-sprite looks (costumes, layers) and the pen, which have no obvious meaning in a 3D scene. [[11 Release/Release Readiness|Release Readiness]] lists what the product still needs.
 
 ## How a block gets added
 The asset plus one `[BlockExecutor]` class, and nothing else (TDD §7). The palette, the tab rail, the compiler, serialization and the op tables all discover it: the palette groups by `BlockCategory` in enum order and skips empty categories, and `OpTableBuilder` binds by `executorKey` through one reflection scan. New assets are generated as YAML rather than hand-placed one by one — Unity imports them and writes the `.meta` files itself.

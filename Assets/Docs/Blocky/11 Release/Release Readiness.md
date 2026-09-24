@@ -66,7 +66,7 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
 
 ### Should have
 - [ ] **Touch and tablets** (iPad, Android, touchscreen Chromebooks). Choosing an object and ending a drag read `Mouse.current` only (`BlockyInGamePanel.cs:221`, `DriveActiveDrag`); Free mode pans with the right or middle button; there is no pinch zoom. Try a touchscreen laptop too: `DriveActiveDrag` ends a drag whenever the *mouse* button reads up.
-- [ ] **Custom blocks** ("define" / procedures) — the biggest Scratch feature still missing ([[00 Overview/Goals and Non-Goals|Goals & Non-Goals]] deferred it), and the main competitor has functions.
+- [x] **Custom blocks** ("define" / procedures) — built 2026-09-24: `define`, `run` with inputs a/b/c, recursion ([[09 Decisions/Decisions#ADR-029|ADR-029]]). *Confirm in Unity:* the My Blocks tab, a ready-made `run [name]` appearing after you name a `define`, and a recursive program in Play mode.
 - [ ] **2D scenes.** `when clicked` and choosing an object use `Physics.Raycast`, and collisions come from the 3D relay, so a flat 2D stage mostly doesn't work. Add the `Physics2D` paths.
 - [ ] **Speed on school hardware.** Try the WebGL build on a cheap Chromebook with a long program open. The TDD's budgets ([[Welcome|TDD §11.1]]) have markers but were never measured.
 - [ ] **A privacy note for schools**: what the app stores (project files, on the device) and what it sends. Unity Analytics is off in `UnityConnectSettings` today — keep it off, and check what the Unity player collects on its own. Schools ask before children use an app.

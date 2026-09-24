@@ -1,3 +1,4 @@
+using System;
 using Blocky.Compiler;
 using Blocky.Data;
 using UnityEngine;
@@ -14,11 +15,18 @@ namespace Blocky.Editor
     public sealed class PaletteDragManipulator : TableDragManipulator
     {
         private readonly BlockDefinition _definition;
+        private readonly Func<BlockNode> _makeNode;
         private ChainDragSession _session;
 
-        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, DragContext context) : base(paletteItem, context)
+        /// <param name="makeNode">
+        /// Makes the block that gets dropped, for a palette entry that isn't the definition's defaults — a ready-made
+        /// "run [jump]" for a custom block. Null: a fresh block with the definition's default values.
+        /// </param>
+        public PaletteDragManipulator(VisualElement paletteItem, BlockDefinition definition, DragContext context, Func<BlockNode> makeNode = null)
+            : base(paletteItem, context)
         {
             _definition = definition;
+            _makeNode = makeNode;
         }
 
         protected override void RegisterCallbacksOnTarget() => target.RegisterCallback<PointerDownEvent>(OnPointerDown);
@@ -30,7 +38,7 @@ namespace Blocky.Editor
             // Before any object is picked there's no table to drop on — the palette can be browsed, not dragged from.
             if (evt.button != 0 || IsTracking || Context.ActiveDrag != null || !Context.HasTarget) return;
 
-            var ghost = BlockPrototype.Create(_definition, Context.Registry);
+            var ghost = BlockPrototype.Create(_definition, Context.Registry, _makeNode?.Invoke());
             _session = new ChainDragSession(Context, ghost, (Vector2)evt.position - target.worldBound.position, 1f,
                 ChainShape.Of(_definition), fromCanvas: false, MakeCommand);
             _session.Move(evt.position);
@@ -68,7 +76,7 @@ namespace Blocky.Editor
 
         private IProgramCommand MakeCommand(ChainTarget target)
         {
-            var prototype = PaletteView.InstantiatePrototype(_definition);
+            var prototype = _makeNode?.Invoke() ?? PaletteView.InstantiatePrototype(_definition);
             return _definition.shape == BlockShape.Trigger
                 ? DropChain.FromNewTrigger(_definition.blockType, prototype.parameters, target)
                 : DropChain.FromNewNode(prototype, target);
@@ -78,13 +86,15 @@ namespace Blocky.Editor
     /// <summary>Palette rendering of a definition: the real silhouette with default values as static chips. The whole element is one drag handle — nothing inside it takes the pointer.</summary>
     public static class BlockPrototype
     {
-        public static VisualElement Create(BlockDefinition definition, BlockRegistry registry)
+        /// <param name="node">What the entry shows, when it isn't the definition's defaults (a ready-made "run [jump]").</param>
+        public static VisualElement Create(BlockDefinition definition, BlockRegistry registry, BlockNode node = null)
         {
+            node ??= PaletteView.InstantiatePrototype(definition);
             VisualElement view = definition.shape switch
             {
-                BlockShape.Trigger => new HatView(definition, definition.blockType, PaletteView.InstantiatePrototype(definition).parameters, null, null, prototype: true),
-                BlockShape.Boolean or BlockShape.Reporter => ConditionView.CreatePrototype(definition, registry),
-                _ => BlockView.CreatePrototype(definition, registry)
+                BlockShape.Trigger => new HatView(definition, definition.blockType, node.parameters, null, null, prototype: true),
+                BlockShape.Boolean or BlockShape.Reporter => ConditionView.CreatePrototype(definition, registry, node),
+                _ => BlockView.CreatePrototype(definition, registry, node)
             };
 
             view.AddToClassList("blocky-palette__prototype");

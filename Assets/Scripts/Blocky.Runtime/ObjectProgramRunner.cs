@@ -160,7 +160,7 @@ namespace Blocky.Runtime
                 if (ProgramQuery.IsLoose(stack)) continue; // blocks lying loose on the table never run
                 var entryPc = _compiled.StackEntryPoints[i];
                 var triggerDef = registry.Find(stack.triggerBlockType);
-                if (triggerDef == null || entryPc < 0) continue; // unknown trigger type, or this stack failed to compile (TDD §10.2)
+                if (triggerDef == null || entryPc < 0) continue; // unknown trigger type, no blocks, or this stack failed to compile (TDD §10.2)
                 _stacks.Add((stack, triggerDef, entryPc));
             }
 
@@ -190,7 +190,10 @@ namespace Blocky.Runtime
 
             foreach (var (stack, triggerDef, entryPc) in _stacks)
             {
-                // Any stack can also be started by hand from the run bar's Step forward, whatever hat it has.
+                // A custom block's definition runs only when a "run" block calls it — no event starts it, not even Step.
+                if (CustomBlocks.IsDefinition(stack)) continue;
+
+                // Any other stack can also be started by hand from the run bar's Step forward, whatever hat it has.
                 void StepHandler() => FireForStep(entryPc);
                 broker.OnStepAll += StepHandler;
                 _unsubscribe.Add(() => broker.OnStepAll -= StepHandler);

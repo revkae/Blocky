@@ -48,9 +48,9 @@ namespace Blocky.Editor
         internal static bool IsSequenceBlock(BlockDefinition definition) =>
             definition.shape is not (BlockShape.Trigger or BlockShape.Boolean or BlockShape.Reporter);
 
-        /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
-        public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
-            new(PaletteView.InstantiatePrototype(definition), definition, registry, null, null, buttons: false, prototype: true);
+        /// <summary>A palette entry: <paramref name="node"/> (by default, the definition with its default values) as static chips.</summary>
+        public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry, BlockNode node = null) =>
+            new(node ?? PaletteView.InstantiatePrototype(definition), definition, registry, null, null, buttons: false, prototype: true);
 
         internal static string DisplayName(BlockDefinition definition) => definition.DisplayName;
 

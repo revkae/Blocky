@@ -12,7 +12,8 @@ namespace Blocky.Compiler
     /// <summary>
     /// Where every string lookup, validation, and parameter resolution happens — once, at load time
     /// (TDD §3, §6.2). <see cref="Link"/> compiles every stack that has no error diagnostic and skips the
-    /// rest (StackEntryPoints[i] = -1) rather than failing the whole program, per TDD §10.2.
+    /// rest (StackEntryPoints[i] = -1) rather than failing the whole program, per TDD §10.2. Loose stacks and
+    /// scripts with no blocks get -1 too: neither has anything to run.
     /// Condition blocks (<see cref="BlockShape.Boolean"/>) live inside <see cref="ParamKind.Reporter"/> params,
     /// never in a sequence; they compile to a <see cref="ParamValue.Reporter"/> slot the VM evaluates on demand.
     /// </summary>
@@ -156,7 +157,9 @@ namespace Blocky.Compiler
             for (var i = 0; i < program.stacks.Length; i++)
             {
                 var stack = program.stacks[i];
-                if (erroredStackIds.Contains(stack.id) || ProgramQuery.IsLoose(stack))
+                // A script with no blocks has nothing to run, and no code of its own: its entry would be the next
+                // script's entry, and a thread identified by that pc once ran — or ended — the wrong script.
+                if (erroredStackIds.Contains(stack.id) || ProgramQuery.IsLoose(stack) || stack.sequence.Length == 0)
                 {
                     stackEntryPoints[i] = -1;
                     stackExitPoints[i] = -1;
@@ -168,8 +171,34 @@ namespace Blocky.Compiler
                 stackExitPoints[i] = code.Count; // where this script ends, so its thread stops here instead of running on into the next one
             }
 
-            var compiled = new CompiledProgram(code.ToArray(), paramTable.ToArray(), stackEntryPoints, debugIds.ToArray(), stackExitPoints);
+            var compiled = new CompiledProgram(code.ToArray(), paramTable.ToArray(), stackEntryPoints, debugIds.ToArray(), stackExitPoints,
+                ProcedureNames(program, stackEntryPoints));
             return new CompileResult(compiled, diagnostics);
+        }
+
+        /// <summary>
+        /// The custom blocks a <c>run</c> block can reach, under their trimmed names. The first <c>define</c> of a name
+        /// owns it even when it has nothing to run (no blocks, or a problem) — a later one never stands in, which is
+        /// what the advice tells the learner. Null when the program defines nothing runnable.
+        /// </summary>
+        private static string[] ProcedureNames(ObjectProgram program, int[] stackEntryPoints)
+        {
+            string[] names = null;
+            var taken = new List<string>();
+            for (var i = 0; i < program.stacks.Length; i++)
+            {
+                var stack = program.stacks[i];
+                if (!CustomBlocks.IsDefinition(stack)) continue;
+
+                var name = CustomBlocks.DefinedName(stack);
+                if (name.Length == 0 || taken.Exists(n => CustomBlocks.SameName(n, name))) continue;
+                taken.Add(name);
+                if (stackEntryPoints[i] < 0) continue;
+
+                names ??= new string[program.stacks.Length];
+                names[i] = name;
+            }
+            return names;
         }
 
         private static void EmitSequence(BlockNode[] sequence, BlockRegistry registry, List<Instruction> code,

@@ -72,8 +72,87 @@ namespace Blocky.Compiler
                 AdviseSequence(stack.id, stack.sequence, registry, advice);
             }
 
+            AdviseCustomBlocks(program, registry, advice);
             AddUnexplainedErrors(program, registry, advice);
             return advice;
+        }
+
+        /// <summary>
+        /// The mistakes custom blocks invite (ADR-029) — a <c>define</c> with no name, two with the same name, a
+        /// <c>run</c> whose name no <c>define</c> on this object has, an <c>input</c> block outside any definition.
+        /// Each of those runs, but does nothing, which is exactly the kind of bug a learner can't see.
+        /// </summary>
+        private static void AdviseCustomBlocks(ObjectProgram program, BlockRegistry registry, List<Advice> advice)
+        {
+            var define = registry.Find(CustomBlocks.DefineType);
+            if (define == null) return; // a catalog without My Blocks
+            var runName = registry.Find(CustomBlocks.RunType)?.DisplayName ?? CustomBlocks.RunType;
+
+            var defined = new List<string>();
+            foreach (var stack in program.stacks)
+            {
+                if (!CustomBlocks.IsDefinition(stack)) continue;
+
+                var name = CustomBlocks.DefinedName(stack);
+                if (name.Length == 0)
+                    advice.Add(new Advice(AdviceKind.Hint, stack.id, null, BlockyText.Format("advice.define_no_name", define.DisplayName, runName)));
+                else if (defined.Exists(n => CustomBlocks.SameName(n, name)))
+                    advice.Add(new Advice(AdviceKind.Hint, stack.id, null, BlockyText.Format("advice.define_duplicate", define.DisplayName, name)));
+                else
+                    defined.Add(name);
+            }
+
+            foreach (var stack in program.stacks)
+            {
+                if (ProgramQuery.IsLoose(stack)) continue; // loose blocks never run; they have their own hint
+                var insideDefinition = CustomBlocks.IsDefinition(stack);
+
+                ForEachBlock(stack.sequence, (node, shownOn) =>
+                {
+                    string message = null;
+                    if (node.blockType == CustomBlocks.RunType)
+                    {
+                        var name = CustomBlocks.RunName(node); // null: a block in the name input, known only while running
+                        if (name?.Length == 0) message = BlockyText.Format("advice.run_no_name", define.DisplayName);
+                        else if (name != null && !defined.Exists(n => CustomBlocks.SameName(n, name)))
+                            message = BlockyText.Format("advice.run_unknown", define.DisplayName, name);
+                    }
+                    else if (!insideDefinition && IsCustomBlockInput(node.blockType))
+                    {
+                        var input = registry.Find(node.blockType);
+                        if (input != null) message = BlockyText.Format("advice.input_outside", input.DisplayName, define.DisplayName);
+                    }
+
+                    if (message != null && !advice.Exists(a => a.StackId == stack.id && a.NodeId == shownOn.id && a.Message == message))
+                        advice.Add(new Advice(AdviceKind.Hint, stack.id, shownOn.id, message));
+                });
+            }
+        }
+
+        private static bool IsCustomBlockInput(string blockType) => blockType != null && blockType.StartsWith("custom.input_", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Every block of a sequence — nested branches, and blocks sitting in inputs, to any depth — with the block in
+        /// the sequence that holds it (<c>shownOn</c>): the one the table outlines, so the one a message is pinned to.
+        /// </summary>
+        private static void ForEachBlock(BlockNode[] sequence, Action<BlockNode, BlockNode> visit)
+        {
+            foreach (var node in sequence)
+            {
+                visit(node, node);
+                ForEachBlockInInputs(node, node, visit);
+                foreach (var branch in node.branches) ForEachBlock(branch, visit);
+            }
+        }
+
+        private static void ForEachBlockInInputs(BlockNode node, BlockNode shownOn, Action<BlockNode, BlockNode> visit)
+        {
+            foreach (var param in node.parameters)
+            {
+                if (param?.reporter == null) continue;
+                visit(param.reporter, shownOn);
+                ForEachBlockInInputs(param.reporter, shownOn, visit);
+            }
         }
 
         private static void AdviseLoose(BlockStack stack, BlockRegistry registry, List<Advice> advice)

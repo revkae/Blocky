@@ -31,8 +31,9 @@ namespace Blocky.Editor
         public bool IsCondition => Definition.shape == BlockShape.Boolean;
 
         /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
-        public static ConditionView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>
-            new(PaletteView.InstantiatePrototype(definition), definition, registry, null, null, prototype: true);
+        /// <summary>A palette entry: <paramref name="node"/> (by default, the definition with its default values) as static chips.</summary>
+        public static ConditionView CreatePrototype(BlockDefinition definition, BlockRegistry registry, BlockNode node = null) =>
+            new(node ?? PaletteView.InstantiatePrototype(definition), definition, registry, null, null, prototype: true);
 
         public ConditionView(BlockNode node, BlockDefinition definition, BlockRegistry registry, string stackId, ProgramStore store,
             string ownerNodeId = null, string paramKey = null, bool prototype = false)

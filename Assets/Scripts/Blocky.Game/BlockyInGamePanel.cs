@@ -116,6 +116,7 @@ namespace Blocky.Game
         private DragLayer _dragLayer;
         private readonly Dictionary<BlockCategory, VisualElement> _paletteSections = new();
         private readonly List<(BlockCategory category, List<BlockDefinition> blocks)> _blocksByCategory = new();
+        private readonly List<string> _customBlocksShown = new(); // the object's custom blocks, as the palette offers them
 
         private bool _resizing;
         private float _resizeStartPointerX;
@@ -1391,9 +1392,55 @@ namespace Blocky.Game
                     section.Add(item);
                 }
 
+                if (category == BlockCategory.MyBlocks) AddCustomBlockRuns(section);
+
                 _paletteScroll.Add(section);
                 _paletteSections[category] = section;
             }
+        }
+
+        /// <summary>
+        /// A ready-made "run [name]" for each custom block this object defines, under the plain one — the way Scratch
+        /// lists a sprite's own blocks under My Blocks, so running one is a drag rather than typing its name again.
+        /// </summary>
+        private void AddCustomBlockRuns(VisualElement section)
+        {
+            var run = _registry.Find(CustomBlocks.RunType);
+            if (run == null) return;
+
+            foreach (var name in _customBlocksShown)
+            {
+                BlockNode MakeRun()
+                {
+                    var node = BlockNodes.Instantiate(run);
+                    var nameParam = Array.Find(node.parameters, p => p.key == CustomBlocks.NameKey);
+                    if (nameParam != null) nameParam.text = name;
+                    return node;
+                }
+
+                var item = BlockPrototype.Create(run, _registry, MakeRun());
+                item.AddManipulator(new PaletteDragManipulator(item, run, _dragContext, MakeRun));
+                section.Add(item);
+            }
+        }
+
+        /// <summary>Rebuilds the palette when the object's custom blocks change: a define added, renamed or deleted, or another object picked.</summary>
+        private void RefreshCustomBlocks()
+        {
+            var names = _store != null ? CustomBlocks.DefinedNames(_store.Program) : new List<string>();
+            if (SameNames(names, _customBlocksShown)) return;
+
+            _customBlocksShown.Clear();
+            _customBlocksShown.AddRange(names);
+            RebuildPalette();
+        }
+
+        private static bool SameNames(List<string> a, List<string> b)
+        {
+            if (a.Count != b.Count) return false;
+            for (var i = 0; i < a.Count; i++)
+                if (!string.Equals(a[i], b[i], StringComparison.Ordinal)) return false;
+            return true;
         }
 
         /// <summary>
@@ -1409,6 +1456,7 @@ namespace Blocky.Game
             var advice = ProgramAdvice.Collect(_store.Program, _registry);
             _canvasView.SetAdvice(advice);
             ShowAdvice(advice);
+            RefreshCustomBlocks();
         }
 
         private void SetVisible(bool value)
