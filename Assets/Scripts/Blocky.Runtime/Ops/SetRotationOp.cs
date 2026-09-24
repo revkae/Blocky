@@ -8,7 +8,7 @@ namespace Blocky.Runtime.Ops
     {
         public OpResult Execute(ref OpContext ctx)
         {
-            var euler = new Vector3(ctx.Params[0].Number, ctx.Params[1].Number, ctx.Params[2].Number);
+            var euler = new Vector3(ctx.GetNumber(0), ctx.GetNumber(1), ctx.GetNumber(2));
             var isWorldSpace = ctx.Params[3].ChoiceIndex == 0;
 
             if (isWorldSpace) ctx.Target.transform.eulerAngles = euler;

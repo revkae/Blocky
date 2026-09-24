@@ -31,6 +31,7 @@ namespace Blocky.Editor
         public bool Hat;
         public bool BottomTab;
         public bool Hexagon; // a condition (or an empty condition slot): pointed ends, no notch or tab — it never stacks
+        public bool Pill;    // a reporter (or an empty input): fully rounded ends, no notch or tab — it never stacks either
         public List<Vector2> Mouths; // (top, bottom) in local y, one per C-mouth, top to bottom
 
         /// <summary>Class that marks the block the user clicked; drawn as a white outline around the real silhouette.</summary>
@@ -63,6 +64,22 @@ namespace Blocky.Editor
             const float r = CornerRadius;
 
             p.BeginPath();
+
+            if (Pill)
+            {
+                var cap = Mathf.Min(h / 2f, w / 2f); // fully round ends, however short the block is
+                p.MoveTo(new Vector2(cap, 0f));
+                p.LineTo(new Vector2(w - cap, 0f));
+                p.ArcTo(new Vector2(w, 0f), new Vector2(w, cap), cap);
+                p.LineTo(new Vector2(w, h - cap));
+                p.ArcTo(new Vector2(w, h), new Vector2(w - cap, h), cap);
+                p.LineTo(new Vector2(cap, h));
+                p.ArcTo(new Vector2(0f, h), new Vector2(0f, h - cap), cap);
+                p.LineTo(new Vector2(0f, cap));
+                p.ArcTo(new Vector2(0f, 0f), new Vector2(cap, 0f), cap);
+                p.ClosePath();
+                return;
+            }
 
             if (Hexagon)
             {

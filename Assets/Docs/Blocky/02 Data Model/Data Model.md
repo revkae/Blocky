@@ -9,7 +9,7 @@ Source: [[Welcome|TDD §4-5]]. Status: **done** (Milestone 1) — see [[08 Build
 Plain `[Serializable]` C# only. No `MonoBehaviour`, no `ScriptableObject`, no `UnityEngine.Object` fields — object refs are string UIDs resolved at link time. Code lives in `Assets/Scripts/Blocky.Data/`.
 
 ## Shapes
-- `BlockParam` — tagged union (`ParamKind`: Number/Text/Bool/Choice/ObjectRef/Reporter). `Choice` stores a stable id, never a localized display string.
+- `BlockParam` — tagged union (`ParamKind`: Number/Text/Bool/Choice/ObjectRef/Reporter). `Choice` stores a stable id, never a localized display string. **`reporter` is not part of the union**: any param may carry a block in it (a condition in a hexagonal hole, a reporter dropped on a value oval), and the literal stays beside it so pulling the block out restores what was typed — see [[09 Decisions/Decisions#ADR-021|ADR-021]] and [[09 Decisions/Decisions#ADR-022|ADR-022]]. `ParamKind.Reporter` now means only "this input is a hexagonal hole with no literal of its own".
 - `BlockNode` — one instruction: `id`, `blockType`, `parameters[]`, `branches[][]` (jagged, one entry per cavity — covers If/IfElse/future multi-branch without a schema change).
 - `BlockStack` — a trigger + its sequence: `id`, `triggerBlockType`, `triggerParameters[]`, `sequence[]`, `canvasPosition` (authoring-only).
 - `ObjectProgram` — `schemaVersion`, `targetObjectUid`, `stacks[]`.

@@ -27,14 +27,19 @@ namespace Blocky.Runtime
         private readonly VmScheduler _scheduler;
         private readonly TriggerBroker _triggers;
         private readonly WorldSnapshot _world;
+        private readonly BlockyClones _clones;
+        private readonly BlockyAudio _audio;
         private readonly List<Moment> _history = new();
         private bool _goPressed;
 
-        public Playback(VmScheduler scheduler, TriggerBroker triggers, WorldSnapshot world)
+        public Playback(VmScheduler scheduler, TriggerBroker triggers, WorldSnapshot world, BlockyClones clones = null,
+            BlockyAudio audio = null)
         {
             _scheduler = scheduler;
             _triggers = triggers;
             _world = world;
+            _clones = clones;
+            _audio = audio;
         }
 
         /// <summary>1×–<see cref="MaxSpeed"/>×: how fast timed blocks and waits run.</summary>
@@ -90,6 +95,9 @@ namespace Blocky.Runtime
             _scheduler.StopAll();
             _scheduler.Resume();
             _triggers.ResetPlaySession();
+            _clones?.DeleteAll(); // a run never leaves its copies behind, exactly as Scratch clears clones on stop
+            BlockySpeechBubble.HideAll(); // nor a bubble mid-sentence
+            _audio?.StopAll();            // nor a note still sounding
         }
 
         /// <summary>Stops every script and puts every programmed object back how it started, ready for <see cref="Go"/>.</summary>

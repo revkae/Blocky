@@ -8,8 +8,8 @@ namespace Blocky.Runtime.Ops
     {
         public OpResult Execute(ref OpContext ctx)
         {
-            var target = new Vector3(ctx.Params[0].Number, ctx.Params[1].Number, ctx.Params[2].Number);
-            var duration = ctx.Params[3].Number;
+            var target = new Vector3(ctx.GetNumber(0), ctx.GetNumber(1), ctx.GetNumber(2));
+            var duration = ctx.GetNumber(3);
             var transform = ctx.Target.transform;
 
             if (duration <= 0f)

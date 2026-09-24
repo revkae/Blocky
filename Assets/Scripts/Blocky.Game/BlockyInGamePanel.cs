@@ -93,6 +93,8 @@ namespace Blocky.Game
         private VisualElement _tipsCard;
         private Button _tipsToggle;
         private bool _tipsOpen;
+        private VisualElement _watchers;
+        private readonly Dictionary<string, Label> _watcherRows = new(StringComparer.OrdinalIgnoreCase);
         private Label _zoomLabel;
         private VisualElement _tabRail;
         private readonly List<(BlockCategory category, Button tab)> _tabs = new();
@@ -190,6 +192,7 @@ namespace Blocky.Game
 
             KeepContentInView();
             RefreshRunState();
+            RefreshWatchers();
             RefreshHistoryButtons();
             UpdateRunningHighlight();
 
@@ -368,6 +371,7 @@ namespace Blocky.Game
             _canvasViewport.Add(BuildTableFooter());
             _canvasViewport.Add(BuildTableTools());
             _canvasViewport.Add(BuildZoomControls());
+            _canvasViewport.Add(BuildWatchers());
             body.Add(_canvasViewport);
 
             _root.Add(body);
@@ -608,6 +612,56 @@ namespace Blocky.Game
         /// started on their own at scene start — Step back only has something to go back to after a step forward,
         /// Step forward waits for a timed block to finish, and the bar turns amber while paused.
         /// </summary>
+        /// <summary>
+        /// Scratch's stage monitors: every shared variable, with its value, while a program is running. It shows
+        /// itself only once something has set one, so a table with no variables on it has no card in the corner.
+        /// Per-object variables are not listed — there is one row per name, and ten objects each with their own
+        /// "hits" would be ten rows saying different things.
+        /// </summary>
+        private VisualElement BuildWatchers()
+        {
+            _watchers = new VisualElement { pickingMode = PickingMode.Ignore };
+            _watchers.AddToClassList("blocky-watchers");
+            _watchers.style.display = DisplayStyle.None;
+            return _watchers;
+        }
+
+        /// <summary>Called every frame the workspace is open: rows are reused and only their text is rewritten.</summary>
+        private void RefreshWatchers()
+        {
+            var shared = BlockyRuntime.Variables.Shared;
+            _watchers.style.display = shared.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (shared.Count == 0)
+            {
+                if (_watcherRows.Count > 0)
+                {
+                    _watchers.Clear();
+                    _watcherRows.Clear();
+                }
+                return;
+            }
+
+            foreach (var pair in shared)
+            {
+                if (!_watcherRows.TryGetValue(pair.Key, out var row))
+                {
+                    row = new Label();
+                    row.AddToClassList("blocky-watchers__row");
+                    _watchers.Add(row);
+                    _watcherRows[pair.Key] = row;
+                }
+
+                var text = $"{pair.Key}  {pair.Value.AsText()}";
+                if (row.text != text) row.text = text; // a Label rebuilds its mesh on every assignment, equal or not
+            }
+
+            if (_watcherRows.Count == shared.Count) return;
+
+            // A variable can only disappear when the play session is reset, which drops the whole store at once.
+            _watchers.Clear();
+            _watcherRows.Clear();
+        }
+
         private void RefreshRunState()
         {
             var playback = BlockyRuntime.Playback;

@@ -32,12 +32,16 @@ namespace Blocky.Data.Serialization
                     writer.WriteValue(value.boolean);
                     break;
                 case ParamKind.Reporter:
-                    if (value.reporter != null)
-                    {
-                        writer.WritePropertyName("reporter");
-                        serializer.Serialize(writer, value.reporter);
-                    }
-                    break;
+                    break; // a condition slot has no literal of its own; the block in it is written below
+            }
+
+            // Any input can hold a block: a condition in a hexagonal hole, or a reporter dropped on a value oval.
+            // The literal above is kept alongside it, so pulling the block back out restores the number that was
+            // typed before — the same thing Scratch does with a value a reporter is covering.
+            if (value.reporter != null)
+            {
+                writer.WritePropertyName("reporter");
+                serializer.Serialize(writer, value.reporter);
             }
 
             writer.WriteEndObject();
@@ -66,10 +70,11 @@ namespace Blocky.Data.Serialization
                     param.boolean = obj["boolean"]?.Value<bool>() ?? false;
                     break;
                 case ParamKind.Reporter:
-                    if (obj["reporter"] != null)
-                        param.reporter = obj["reporter"].ToObject<BlockNode>(serializer);
-                    break;
+                    break; // nothing but the block, read below
             }
+
+            if (obj["reporter"] != null)
+                param.reporter = obj["reporter"].ToObject<BlockNode>(serializer);
 
             return param;
         }

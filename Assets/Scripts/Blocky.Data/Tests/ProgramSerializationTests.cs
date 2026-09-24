@@ -87,6 +87,57 @@ namespace Blocky.Data.Tests
         }
 
         [Test]
+        public void AReporterOnAValueInput_SurvivesTheRoundTrip_AlongWithTheNumberItCovers()
+        {
+            // The block in the input is what runs; the literal underneath is what comes back when it is pulled out.
+            var program = new ObjectProgram
+            {
+                targetObjectUid = "obj_values",
+                stacks = new[]
+                {
+                    new BlockStack
+                    {
+                        id = "stk_v",
+                        triggerBlockType = "event.when_play_clicked",
+                        sequence = new[]
+                        {
+                            new BlockNode
+                            {
+                                id = "n_move",
+                                blockType = "motion.move_forward",
+                                parameters = new[]
+                                {
+                                    new BlockParam
+                                    {
+                                        key = "distance", kind = ParamKind.Number, number = 5,
+                                        reporter = new BlockNode
+                                        {
+                                            id = "n_add",
+                                            blockType = "operator.add",
+                                            parameters = new[]
+                                            {
+                                                new BlockParam { key = "a", kind = ParamKind.Number, number = 2 },
+                                                new BlockParam { key = "b", kind = ParamKind.Number, number = 3 }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var loaded = ProgramSerializer.Deserialize(ProgramSerializer.Serialize(program));
+            var distance = loaded.stacks[0].sequence[0].parameters[0];
+
+            Assert.IsNotNull(distance.reporter, "the reporter dropped on the input must survive a save");
+            Assert.AreEqual("operator.add", distance.reporter.blockType);
+            Assert.AreEqual(3, distance.reporter.parameters[1].number);
+            Assert.AreEqual(5, distance.number, "and so must the number it is covering");
+        }
+
+        [Test]
         public void Deserialize_MissingSchemaVersion_Throws()
         {
             Assert.Throws<System.IO.InvalidDataException>(() => ProgramSerializer.Deserialize("{ \"stacks\": [] }"));

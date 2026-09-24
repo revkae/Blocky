@@ -83,7 +83,7 @@ namespace Blocky.Editor
             VisualElement view = definition.shape switch
             {
                 BlockShape.Trigger => new HatView(definition, definition.blockType, PaletteView.InstantiatePrototype(definition).parameters, null, null, prototype: true),
-                BlockShape.Boolean => ConditionView.CreatePrototype(definition, registry),
+                BlockShape.Boolean or BlockShape.Reporter => ConditionView.CreatePrototype(definition, registry),
                 _ => BlockView.CreatePrototype(definition, registry)
             };
 

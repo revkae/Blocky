@@ -7,6 +7,18 @@ namespace Blocky.Compiler
         Motion,
         Looks,
         Control,
-        Conditions
+        Conditions,
+
+        /// <summary>What the object can feel: the keyboard, contacts, the timer (Scratch's Sensing).</summary>
+        Sensing,
+
+        /// <summary>Blocks that combine or compute values — <c>and</c>, <c>or</c>, <c>not</c> (Scratch's Operators).</summary>
+        Operators,
+
+        /// <summary>Playing and stopping sound.</summary>
+        Sound,
+
+        /// <summary>Named values the program can set and read back.</summary>
+        Variables
     }
 }

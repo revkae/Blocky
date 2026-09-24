@@ -23,11 +23,12 @@ namespace Blocky.Runtime
         private readonly Predicate<VmThread> _isDone = t => t.State == ThreadState.Done; // cached once: RemoveAll every tick must not allocate
 
         private readonly IBlockOp[] _opTable;
-        private readonly ConditionEvaluator _conditions;
+        private readonly SlotEvaluator _slots;
         private readonly List<VmThread> _threads = new();
         private readonly List<VmThread> _pending = new();
         private readonly HashSet<(CompiledProgram, int)> _loggedFailures = new();
         private float _now;
+        private float _timerOrigin;
         private bool _paused;
         private bool _stepping;
 
@@ -46,11 +47,24 @@ namespace Blocky.Runtime
         public event Action<VmThread> OnRunawayThread;
 
         /// <param name="conditionTable">Condition ops by opcode (<see cref="OpTableBuilder.BuildConditions"/>); without it every condition slot reads as false.</param>
-        public VmScheduler(IBlockOp[] opTable, IConditionOp[] conditionTable = null)
+        /// <param name="valueTable">Reporter ops by opcode (<see cref="OpTableBuilder.BuildValues"/>); without it every value slot reads as empty.</param>
+        public VmScheduler(IBlockOp[] opTable, IConditionOp[] conditionTable = null, IValueOp[] valueTable = null)
         {
             _opTable = opTable;
-            _conditions = new ConditionEvaluator(conditionTable);
+            _slots = new SlotEvaluator(conditionTable, valueTable, this);
         }
+
+        /// <summary>The script clock: seconds of un-paused, time-scaled run time since this scheduler was made.</summary>
+        public float Now => _now;
+
+        /// <summary>
+        /// Scratch's timer: seconds on the script clock since the last <see cref="ResetTimer"/> (or since the start).
+        /// It runs on the same clock as every timed block, so pausing the scene pauses the timer too.
+        /// </summary>
+        public float Timer => _now - _timerOrigin;
+
+        /// <summary>Puts the timer back to zero — <c>sensing.reset_timer</c>.</summary>
+        public void ResetTimer() => _timerOrigin = _now;
 
         /// <summary>Live threads. Finished ones are dropped at the end of each tick.</summary>
         public IReadOnlyList<VmThread> Threads => _threads;
@@ -110,6 +124,25 @@ namespace Blocky.Runtime
             _stepping = false;
         }
 
+        /// <summary>
+        /// Ends every live script without touching the thread lists — what <c>stop [all]</c> does from inside a
+        /// running block. <see cref="StopAll"/> clears the lists, which is not safe to do from inside a tick.
+        /// </summary>
+        public void StopAllThreads()
+        {
+            foreach (var t in _threads) t.State = ThreadState.Done;
+            foreach (var t in _pending) t.State = ThreadState.Done;
+        }
+
+        /// <summary>Ends every script running on <paramref name="target"/> except <paramref name="except"/> — <c>stop [other scripts in this object]</c>.</summary>
+        public void StopOtherThreadsOn(GameObject target, VmThread except)
+        {
+            foreach (var t in _threads)
+                if (t != except && t.Target == target) t.State = ThreadState.Done;
+            foreach (var t in _pending)
+                if (t != except && t.Target == target) t.State = ThreadState.Done;
+        }
+
         /// <summary>Freezes every script where it is. Script time stops too, so a half-finished wait or move resumes exactly where it left off.</summary>
         public void Pause()
         {
@@ -144,7 +177,7 @@ namespace Blocky.Runtime
         }
 
         /// <summary>Records every script's progress and the script clock, for <see cref="RestoreMoment"/>.</summary>
-        public SchedulerMoment SaveMoment() => new(_now, Save(_threads), Save(_pending));
+        public SchedulerMoment SaveMoment() => new(_now, _timerOrigin, Save(_threads), Save(_pending));
 
         /// <summary>
         /// Puts every script back exactly as it was at <paramref name="moment"/> — scripts that have finished since
@@ -170,6 +203,7 @@ namespace Blocky.Runtime
             }
 
             _now = moment.Now;
+            _timerOrigin = moment.TimerOrigin;
             _paused = true;
             _stepping = false;
         }
@@ -245,9 +279,9 @@ namespace Blocky.Runtime
                 }
             }
 
-            if (t.Pc < 0 || t.Pc >= t.Program.Code.Length)
+            if (t.Pc < 0 || t.Pc >= t.ExitPc)
             {
-                t.State = ThreadState.Done;
+                t.State = ThreadState.Done; // ran off the end of its own script, not just the end of the program
                 return;
             }
 
@@ -264,7 +298,7 @@ namespace Blocky.Runtime
 
             var instr = t.Program.Code[t.Pc];
             var span = new ReadOnlySpan<ParamValue>(t.Program.ParamTable, instr.ParamOffset, instr.ParamCount);
-            var ctx = new OpContext(t, t.Pc, instr, span, dt, _now, _conditions);
+            var ctx = new OpContext(t, t.Pc, instr, span, dt, _now, _slots, this);
             t.ActivePc = t.Pc;
 
             OpResult result;
@@ -324,12 +358,14 @@ namespace Blocky.Runtime
     public sealed class SchedulerMoment
     {
         internal readonly float Now;
+        internal readonly float TimerOrigin;
         internal readonly ThreadMoment[] Threads;
         internal readonly ThreadMoment[] Pending;
 
-        internal SchedulerMoment(float now, ThreadMoment[] threads, ThreadMoment[] pending)
+        internal SchedulerMoment(float now, float timerOrigin, ThreadMoment[] threads, ThreadMoment[] pending)
         {
             Now = now;
+            TimerOrigin = timerOrigin;
             Threads = threads;
             Pending = pending;
         }

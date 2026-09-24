@@ -45,6 +45,51 @@ namespace Blocky.Runtime.Triggers
 
         public void FireStepAll() => OnStepAll?.Invoke();
 
+        /// <summary>
+        /// Scratch's broadcast: a named message any script can send and any number of scripts can listen for.
+        /// Listeners match the name themselves (case-insensitively), the way key listeners match their key —
+        /// the broker stays a dumb channel and never has to know which messages a program uses.
+        /// </summary>
+        public event Action<string> OnBroadcast;
+
+        public void Broadcast(string message) => OnBroadcast?.Invoke(message ?? string.Empty);
+
+        private bool _pointerDownLastPoll;
+
+        /// <summary>Rising edge of a click on an object in the scene — the object the ray hit, never a UI press.</summary>
+        public event Action<GameObject> OnClicked;
+
+        /// <summary>
+        /// One raycast per frame for every <c>event.when_clicked</c> listener, on the press edge only. A press on the
+        /// Blocky editor is not a press in the game (<see cref="BlockyInput"/> filters it), so dragging a block out of
+        /// the palette can never fire a script.
+        /// </summary>
+        public void PollClicked(Camera camera)
+        {
+            var isDown = BlockyInput.IsMouseDown;
+            var wasDown = _pointerDownLastPoll;
+            _pointerDownLastPoll = isDown;
+
+            if (!isDown || wasDown || camera == null) return;
+
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+
+            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
+            if (Physics.Raycast(ray, out var hit)) OnClicked?.Invoke(hit.collider.gameObject);
+        }
+
+        /// <summary>Test seam: fires <see cref="OnClicked"/> for <paramref name="target"/> without a camera or a mouse.</summary>
+        public void RaiseClicked(GameObject target) => OnClicked?.Invoke(target);
+
+        /// <summary>
+        /// A clone has just been made and is ready to run — Scratch's <c>when I start as a clone</c>. Every runner
+        /// hears it and checks whether the clone is itself, the same way the click and collision channels work.
+        /// </summary>
+        public event Action<GameObject> OnCloneStarted;
+
+        public void RaiseCloneStarted(GameObject clone) => OnCloneStarted?.Invoke(clone);
+
         private readonly HashSet<Key> _keysDownLastPoll = new();
 
         /// <summary>Rising edge only, filtered by key id downstream by each listener (TDD §9).</summary>

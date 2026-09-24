@@ -89,7 +89,7 @@ namespace Blocky.Editor
         }
     }
 
-    /// <summary>A block's condition slot on the table, in panel (world) space — somewhere a dragged condition can go.</summary>
+    /// <summary>One of a block's inputs on the table, in panel (world) space — somewhere a dragged condition or reporter can go.</summary>
     public readonly struct ConditionSlotTarget
     {
         public readonly string StackId;
@@ -97,25 +97,31 @@ namespace Blocky.Editor
         public readonly string ParamKey;
         public readonly Rect Bounds;
 
-        public ConditionSlotTarget(string stackId, string ownerNodeId, string paramKey, Rect bounds)
+        /// <summary>A white value input, which takes a reporter or a condition. False for a hexagonal hole, which takes only conditions.</summary>
+        public readonly bool TakesReporters;
+
+        public ConditionSlotTarget(string stackId, string ownerNodeId, string paramKey, Rect bounds, bool takesReporters = false)
         {
             StackId = stackId;
             OwnerNodeId = ownerNodeId;
             ParamKey = paramKey;
             Bounds = bounds;
+            TakesReporters = takesReporters;
         }
     }
 
     /// <summary>
-    /// Where a dragged condition snaps: the slot nearest the condition's left point (its leading tip, the part
-    /// you aim with), within <c>radius</c> of the slot's outline. Filled slots count too — dropping there swaps.
-    /// On a tie (the tip inside two slots, one within the other) the smaller, innermost slot wins.
+    /// Where a dragged condition or reporter snaps: the input nearest the block's left point (its leading tip, the
+    /// part you aim with), within <c>radius</c> of the slot's outline. Filled slots count too — dropping there
+    /// swaps. On a tie (the tip inside two slots, one within the other) the smaller, innermost slot wins. A
+    /// reporter skips hexagonal holes, the one shape it cannot go in.
     /// </summary>
     public static class ConditionSlotResolver
     {
         public const float DefaultRadius = 28f;
 
-        public static ConditionSlotTarget? FindBest(IReadOnlyList<ConditionSlotTarget> slots, Vector2 tip, float radius = DefaultRadius)
+        public static ConditionSlotTarget? FindBest(IReadOnlyList<ConditionSlotTarget> slots, Vector2 tip, float radius = DefaultRadius,
+            bool draggingReporter = false)
         {
             ConditionSlotTarget? best = null;
             var bestDistance = radius;
@@ -123,6 +129,7 @@ namespace Blocky.Editor
 
             foreach (var slot in slots)
             {
+                if (draggingReporter && !slot.TakesReporters) continue; // a round block does not fit a hexagonal hole
                 var distance = DistanceToRect(tip, slot.Bounds);
                 var area = slot.Bounds.width * slot.Bounds.height;
                 if (distance > bestDistance || (Mathf.Approximately(distance, bestDistance) && area >= bestArea)) continue;
@@ -156,7 +163,7 @@ namespace Blocky.Editor
             canvas.Query<ConditionSlot>().ForEach(slot =>
             {
                 if (slot.OwnerNodeId != null)
-                    targets.Add(new ConditionSlotTarget(slot.StackId, slot.OwnerNodeId, slot.ParamKey, slot.worldBound));
+                    targets.Add(new ConditionSlotTarget(slot.StackId, slot.OwnerNodeId, slot.ParamKey, slot.worldBound, !slot.IsConditionHole));
             });
         }
     }

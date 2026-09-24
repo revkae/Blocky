@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1cec2095f06074785434437d452952, type: 3}
+  m_Name: operator_math
+  m_EditorClassIdentifier: Blocky.Compiler::Blocky.Compiler.BlockDefinition
+  blockType: operator.math
+  displayNameKey: of
+  shape: 5
+  category: 6
+  branchCount: 0
+  parameters:
+  - key: op
+    kind: 3
+    defaultText: abs
+    defaultNumber: 0
+    min: 0
+    max: 0
+    choices:
+    - stableId: abs
+      displayNameKey: abs
+    - stableId: floor
+      displayNameKey: floor
+    - stableId: ceiling
+      displayNameKey: ceiling
+    - stableId: sqrt
+      displayNameKey: sqrt
+    - stableId: sin
+      displayNameKey: sin
+    - stableId: cos
+      displayNameKey: cos
+    - stableId: tan
+      displayNameKey: tan
+    - stableId: ln
+      displayNameKey: ln
+    - stableId: log
+      displayNameKey: log
+    - stableId: e_pow
+      displayNameKey: e^
+    - stableId: ten_pow
+      displayNameKey: 10^
+  - key: n
+    kind: 0
+    defaultText: 
+    defaultNumber: 9
+    min: -1000000
+    max: 1000000
+    choices: []
+  executorKey: operator.math
+  retrigger: 0

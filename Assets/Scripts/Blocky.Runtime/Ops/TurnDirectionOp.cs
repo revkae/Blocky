@@ -9,8 +9,8 @@ namespace Blocky.Runtime.Ops
         public OpResult Execute(ref OpContext ctx)
         {
             var sign = ctx.Params[0].ChoiceIndex == 0 ? 1f : -1f;
-            var degrees = ctx.Params[1].Number;
-            var duration = ctx.Params[2].Number;
+            var degrees = ctx.GetNumber(1);
+            var duration = ctx.GetNumber(2);
             var transform = ctx.Target.transform;
 
             if (duration <= 0f)

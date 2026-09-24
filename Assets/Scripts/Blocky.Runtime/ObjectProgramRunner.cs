@@ -21,6 +21,7 @@ namespace Blocky.Runtime
         [SerializeField] private BlockProgramAsset programAsset;
 
         private CompiledProgram _compiled;
+        private bool _initialized;
         private readonly List<(BlockStack stack, BlockDefinition trigger, int entryPc)> _stacks = new();
         private readonly List<Action> _unsubscribe = new();
 
@@ -41,7 +42,15 @@ namespace Blocky.Runtime
         /// </summary>
         public void Initialize()
         {
+            // Idempotent: OnEnable and an explicit call race in edit mode, and a clone is initialised by hand so
+            // that it is subscribed before its "when I start as a clone" hat fires. Whichever runs first wins;
+            // subscribing twice would fire every hat twice. Shutdown clears the flag, so the editor's
+            // Shutdown-then-Initialize after an edit still rebuilds everything.
+            if (_initialized) return;
+            _initialized = true;
+
             BlockyRuntime.World.Capture(gameObject); // first start only: where this object began, for the editor's Reset
+            BlockyRuntime.Objects.Register(gameObject);  // so another object's "distance to [me]" never has to search the scene
 
             var registry = BlockyRuntime.Registry;
             var program = programAsset != null ? programAsset.Load() : new ObjectProgram();
@@ -69,8 +78,10 @@ namespace Blocky.Runtime
         /// <summary>Halts every thread this runner started and unsubscribes from triggers. See <see cref="Initialize"/> for why this is public.</summary>
         public void Shutdown()
         {
+            _initialized = false;
             foreach (var unsubscribe in _unsubscribe) unsubscribe();
             _unsubscribe.Clear();
+            BlockyRuntime.Objects.Unregister(gameObject);
 
             if (_compiled != null) BlockyRuntime.Scheduler.StopWhere(gameObject, _compiled);
         }
@@ -120,6 +131,37 @@ namespace Blocky.Runtime
                         }
                         broker.OnCollided += Handler;
                         _unsubscribe.Add(() => broker.OnCollided -= Handler);
+                        break;
+                    }
+                    case "event.when_clicked":
+                    {
+                        void Handler(GameObject clicked)
+                        {
+                            // The ray hits whichever collider is in front, which may be a child of the programmed object.
+                            if (clicked == gameObject || (clicked != null && clicked.transform.IsChildOf(transform))) Fire(triggerDef, entryPc);
+                        }
+                        broker.OnClicked += Handler;
+                        _unsubscribe.Add(() => broker.OnClicked -= Handler);
+                        break;
+                    }
+                    case "event.when_i_start_as_a_clone":
+                    {
+                        void Handler(GameObject clone)
+                        {
+                            if (clone == gameObject) Fire(triggerDef, entryPc);
+                        }
+                        broker.OnCloneStarted += Handler;
+                        _unsubscribe.Add(() => broker.OnCloneStarted -= Handler);
+                        break;
+                    }
+                    case "event.when_broadcast_received":
+                    {
+                        void Handler(string message)
+                        {
+                            if (MatchesMessage(stack, message)) Fire(triggerDef, entryPc);
+                        }
+                        broker.OnBroadcast += Handler;
+                        _unsubscribe.Add(() => broker.OnBroadcast -= Handler);
                         break;
                     }
                     case "event.when_looked_at":
@@ -183,6 +225,13 @@ namespace Blocky.Runtime
         {
             var keyParam = Array.Find(stack.triggerParameters, p => p.key == "key");
             return keyParam != null && Enum.TryParse<Key>(keyParam.text, true, out var wantedKey) && wantedKey == firedKey;
+        }
+
+        /// <summary>Message names are compared case- and whitespace-insensitively: a learner typing "Jump" and "jump " means one message.</summary>
+        private static bool MatchesMessage(BlockStack stack, string message)
+        {
+            var wanted = Array.Find(stack.triggerParameters, p => p.key == "message")?.text;
+            return string.Equals((wanted ?? string.Empty).Trim(), (message ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool MatchesTag(BlockStack stack, Collision collision)

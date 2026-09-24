@@ -7,7 +7,7 @@ namespace Blocky.Runtime.Ops
         public OpResult Execute(ref OpContext ctx)
         {
             var renderer = ctx.Target.GetComponent<UnityEngine.Renderer>();
-            if (renderer != null) renderer.enabled = ctx.Params[0].Boolean;
+            if (renderer != null) renderer.enabled = ctx.GetBool(0);
             return OpResult.Continue;
         }
     }

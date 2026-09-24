@@ -59,5 +59,33 @@ namespace Blocky.Editor.Tests
 
             Assert.IsNotNull(SnapResolver.FindBest(targets, Chain(new Vector2(100, 100), cap: true)));
         }
+
+        // ---- inputs: hexagonal holes vs value ovals ---------------------------------------------------
+
+        private static ConditionSlotTarget Hole(Rect bounds) => new("stk", "owner", "condition", bounds);
+        private static ConditionSlotTarget Oval(Rect bounds) => new("stk", "owner", "distance", bounds, takesReporters: true);
+
+        [Test]
+        public void ADraggedReporter_SkipsHexagonalHoles_AndLandsInAValueInput()
+        {
+            var hole = new Rect(100, 100, 40, 20);
+            var oval = new Rect(160, 100, 40, 20);
+            var slots = new List<ConditionSlotTarget> { Hole(hole), Oval(oval) };
+
+            // Aimed straight at the hexagon, a reporter still refuses it — and finds nothing else within reach.
+            Assert.IsNull(ConditionSlotResolver.FindBest(slots, hole.center, 20f, draggingReporter: true));
+            Assert.IsNotNull(ConditionSlotResolver.FindBest(slots, oval.center, 20f, draggingReporter: true));
+        }
+
+        [Test]
+        public void ADraggedCondition_FitsEitherKindOfInput()
+        {
+            var hole = new Rect(100, 100, 40, 20);
+            var oval = new Rect(160, 100, 40, 20);
+            var slots = new List<ConditionSlotTarget> { Hole(hole), Oval(oval) };
+
+            Assert.AreEqual("condition", ConditionSlotResolver.FindBest(slots, hole.center, 20f).Value.ParamKey);
+            Assert.AreEqual("distance", ConditionSlotResolver.FindBest(slots, oval.center, 20f).Value.ParamKey);
+        }
     }
 }

@@ -6,7 +6,7 @@ namespace Blocky.Runtime.Ops
     {
         public OpResult Execute(ref OpContext ctx)
         {
-            var seconds = ctx.Params[0].Number;
+            var seconds = ctx.GetNumber(0);
             if (seconds <= 0f) return OpResult.Continue;
 
             if (ctx.Scratch == 0f)

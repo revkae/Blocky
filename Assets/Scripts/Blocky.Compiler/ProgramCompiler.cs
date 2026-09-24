@@ -85,7 +85,11 @@ namespace Blocky.Compiler
                     continue;
                 }
 
-                if (spec.kind == ParamKind.Number && (param.number < spec.min || param.number > spec.max))
+                // A block in the slot replaces the typed-in value, so the literal is not the thing to check:
+                // `move (random 1 to 10)` has no number of its own, and its range is only known while it runs.
+                var filled = param.reporter != null && spec.kind != ParamKind.Choice;
+
+                if (spec.kind == ParamKind.Number && !filled && (param.number < spec.min || param.number > spec.max))
                     diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, node.id,
                         $"Param '{spec.key}' = {param.number} is out of range [{spec.min}, {spec.max}]."));
 
@@ -93,34 +97,43 @@ namespace Blocky.Compiler
                     diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, node.id,
                         $"'{param.text}' is not a valid choice for param '{spec.key}'."));
 
-                if (spec.kind == ParamKind.Reporter && param.kind == ParamKind.Reporter && param.reporter != null)
-                    ValidateReporter(stackId, param.reporter, registry, seenIds, diagnostics);
+                if (filled) ValidateSlotBlock(stackId, param.reporter, spec.kind, registry, seenIds, diagnostics);
             }
         }
 
-        /// <summary>An empty slot is valid (it reads as false); a filled one must hold a known condition block.</summary>
-        private static void ValidateReporter(string stackId, BlockNode reporter, BlockRegistry registry,
+        /// <summary>
+        /// An empty slot is valid (it reads as false / 0 / ""); a filled one must hold a block of a shape the slot
+        /// takes. A hexagonal condition slot (<see cref="ParamKind.Reporter"/>) takes only conditions; a white
+        /// input oval takes a reporter or a condition, exactly as Scratch does — a condition in an oval reads as
+        /// "true"/"false".
+        /// </summary>
+        private static void ValidateSlotBlock(string stackId, BlockNode slotBlock, ParamKind slotKind, BlockRegistry registry,
             HashSet<string> seenIds, List<CompileDiagnostic> diagnostics)
         {
-            if (!seenIds.Add(reporter.id))
-                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, reporter.id, $"Duplicate id '{reporter.id}'."));
+            if (!seenIds.Add(slotBlock.id))
+                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, slotBlock.id, $"Duplicate id '{slotBlock.id}'."));
 
-            var def = registry.Find(reporter.blockType);
+            var def = registry.Find(slotBlock.blockType);
             if (def == null)
             {
-                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, reporter.id,
-                    $"Unknown block type '{reporter.blockType}'."));
+                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, slotBlock.id,
+                    $"Unknown block type '{slotBlock.blockType}'."));
                 return;
             }
 
-            if (def.shape != BlockShape.Boolean)
+            var isCondition = def.shape == BlockShape.Boolean;
+            var fits = slotKind == ParamKind.Reporter ? isCondition : isCondition || def.shape == BlockShape.Reporter;
+
+            if (!fits)
             {
-                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, reporter.id,
-                    $"'{reporter.blockType}' is not a condition, so it can't sit in a condition slot."));
+                diagnostics.Add(new CompileDiagnostic(DiagnosticSeverity.Error, stackId, slotBlock.id,
+                    slotKind == ParamKind.Reporter
+                        ? $"'{slotBlock.blockType}' is not a condition, so it can't sit in a condition slot."
+                        : $"'{slotBlock.blockType}' is not a reporter, so it can't sit in an input."));
                 return;
             }
 
-            ValidateParams(stackId, reporter, def, registry, seenIds, diagnostics);
+            ValidateParams(stackId, slotBlock, def, registry, seenIds, diagnostics);
         }
 
         public static CompileResult Link(ObjectProgram program, BlockRegistry registry)
@@ -135,6 +148,7 @@ namespace Blocky.Compiler
             var paramTable = new List<ParamValue>();
             var debugIds = new List<string>();
             var stackEntryPoints = new int[program.stacks.Length];
+            var stackExitPoints = new int[program.stacks.Length];
 
             for (var i = 0; i < program.stacks.Length; i++)
             {
@@ -142,14 +156,16 @@ namespace Blocky.Compiler
                 if (erroredStackIds.Contains(stack.id) || ProgramQuery.IsLoose(stack))
                 {
                     stackEntryPoints[i] = -1;
+                    stackExitPoints[i] = -1;
                     continue;
                 }
 
                 stackEntryPoints[i] = code.Count;
                 EmitSequence(stack.sequence, registry, code, paramTable, debugIds);
+                stackExitPoints[i] = code.Count; // where this script ends, so its thread stops here instead of running on into the next one
             }
 
-            var compiled = new CompiledProgram(code.ToArray(), paramTable.ToArray(), stackEntryPoints, debugIds.ToArray());
+            var compiled = new CompiledProgram(code.ToArray(), paramTable.ToArray(), stackEntryPoints, debugIds.ToArray(), stackExitPoints);
             return new CompileResult(compiled, diagnostics);
         }
 
@@ -204,7 +220,8 @@ namespace Blocky.Compiler
             {
                 var spec = def.parameters[i];
                 var param = Array.Find(node.parameters, p => p.key == spec.key);
-                paramTable[offset + i] = spec.kind == ParamKind.Reporter
+                // A block in the slot wins over the typed-in literal, whatever kind the input is declared as.
+                paramTable[offset + i] = spec.kind == ParamKind.Reporter || (param?.reporter != null && spec.kind != ParamKind.Choice)
                     ? ResolveReporter(param, registry, paramTable)
                     : ResolveParamValue(param, spec);
             }

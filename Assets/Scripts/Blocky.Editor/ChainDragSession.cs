@@ -181,8 +181,9 @@ namespace Blocky.Editor
             if (overCanvas)
             {
                 RefreshTargetsIfStale();
-                if (_shape.IsCondition)
-                    _bestSlot = ConditionSlotResolver.FindBest(_slotTargets, _ghostTopLeft + new Vector2(0f, LocalHeight * scale / 2f)); // the hexagon's left tip
+                if (_shape.FitsInSlot)
+                    _bestSlot = ConditionSlotResolver.FindBest(_slotTargets, _ghostTopLeft + new Vector2(0f, LocalHeight * scale / 2f),
+                        ConditionSlotResolver.DefaultRadius, _shape.IsReporter); // aim with the block's left tip
                 else
                     _best = SnapResolver.FindBest(_snapTargets,
                         new DraggedChain(_ghostTopLeft, _ghostTopLeft + new Vector2(0f, LocalHeight * scale), _shape.HasHat, _shape.EndsWithCap));
@@ -237,7 +238,7 @@ namespace Blocky.Editor
             _targetsDirty = false;
             _targetsCanvasTransform = _context.Canvas.worldTransform;
 
-            if (_shape.IsCondition)
+            if (_shape.FitsInSlot)
             {
                 ConditionSlotResolver.Collect(_context.Canvas, _slotTargets);
                 return;
@@ -252,7 +253,7 @@ namespace Blocky.Editor
         /// the three places that band offers. A condition belongs in a hole and a hat starts its own script, so
         /// neither reads the rows.
         /// </summary>
-        private bool UsesRows => _context.Mode == WorkspaceMode.Simple && !_shape.IsCondition && !_shape.HasHat;
+        private bool UsesRows => _context.Mode == WorkspaceMode.Simple && !_shape.FitsInSlot && !_shape.HasHat;
 
         /// <summary>Any stack or condition slot left on the table re-flowing means cached snap targets moved.</summary>
         private void WatchTableLayout()
@@ -276,7 +277,7 @@ namespace Blocky.Editor
 
             if (_bestSlot is { } slot)
             {
-                // A condition already in the slot pops out just below-right of it: still in view, clear of the one dropped.
+                // A block already in the slot pops out just below-right of it: still in view, clear of the one dropped.
                 var eject = _context.Canvas.WorldToLocal(new Vector2(slot.Bounds.xMax, slot.Bounds.yMax)) + new Vector2(24f, 24f);
                 return ChainTarget.IntoConditionSlot(slot.StackId, slot.OwnerNodeId, slot.ParamKey, eject);
             }

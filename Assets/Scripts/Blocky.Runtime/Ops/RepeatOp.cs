@@ -26,7 +26,7 @@ namespace Blocky.Runtime.Ops
                 return OpResult.Jump;
             }
 
-            var times = (int)ctx.Params[0].Number;
+            var times = (int)ctx.GetNumber(0);
             if (times <= 0)
             {
                 ctx.NextPc = ctx.Instruction.JumpAExit;

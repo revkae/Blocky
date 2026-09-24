@@ -533,6 +533,28 @@
     align-items: flex-end;
 }
 
+/* Variable watchers: Scratch's stage monitors, in the table's top-left corner where nothing else sits.
+   Pinned above the blocks but never pickable, so a script underneath is still draggable. */
+.blocky-watchers {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    background-color: var(--bk-surface);
+    border-color: var(--bk-line);
+    border-width: 1px;
+    border-radius: 8px;
+    padding: 6px 4px 6px 8px;
+}
+
+.blocky-watchers__row {
+    font-size: 11px;
+    color: var(--bk-ink);
+    -unity-font-style: bold;
+    padding: 2px 8px 2px 0;
+}
+
 
 .blocky-table-tools__button {
     height: 30px;

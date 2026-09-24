@@ -10,8 +10,8 @@ namespace Blocky.Runtime
     /// Reflection-once binding of <c>executorKey</c> -> op instance (TDD §7). Chosen over a source generator for
     /// now — cheapest path TDD §14 allows; revisit only if an IL2CPP/WebGL build shows stripping problems with
     /// reflection-bound ops. Two tables, both indexed by opcode: steps the VM runs (<see cref="IBlockOp"/>) and
-    /// condition blocks (<see cref="IConditionOp"/>), which are only ever evaluated from inside another block's
-    /// slot. <see cref="BuildBoth"/> fills both from a single scan.
+    /// condition blocks (<see cref="IConditionOp"/>) and reporters (<see cref="IValueOp"/>), which are only ever
+    /// evaluated from inside another block's input. <see cref="BuildAll"/> fills all three from a single scan.
     /// </summary>
     public static class OpTableBuilder
     {
@@ -21,17 +21,32 @@ namespace Blocky.Runtime
         public static IConditionOp[] BuildConditions(BlockRegistry registry, params Assembly[] assembliesToScan) =>
             BuildTable<IConditionOp>(registry, ScanExecutors(assembliesToScan), IsCondition);
 
-        /// <summary>Both tables from one reflection scan — what <see cref="BlockyRuntime"/> uses at boot.</summary>
+        public static IValueOp[] BuildValues(BlockRegistry registry, params Assembly[] assembliesToScan) =>
+            BuildTable<IValueOp>(registry, ScanExecutors(assembliesToScan), IsValue);
+
+        /// <summary>Steps and conditions from one reflection scan.</summary>
         public static (IBlockOp[] steps, IConditionOp[] conditions) BuildBoth(BlockRegistry registry, params Assembly[] assembliesToScan)
         {
             var byKey = ScanExecutors(assembliesToScan);
             return (BuildTable<IBlockOp>(registry, byKey, IsStep), BuildTable<IConditionOp>(registry, byKey, IsCondition));
         }
 
-        // Triggers aren't dispatched by the VM (TriggerBroker looks them up); conditions live in their own table.
-        private static bool IsStep(BlockShape shape) => shape != BlockShape.Trigger && shape != BlockShape.Boolean;
+        /// <summary>All three tables from one reflection scan — what <see cref="BlockyRuntime"/> uses at boot.</summary>
+        public static (IBlockOp[] steps, IConditionOp[] conditions, IValueOp[] values) BuildAll(BlockRegistry registry, params Assembly[] assembliesToScan)
+        {
+            var byKey = ScanExecutors(assembliesToScan);
+            return (BuildTable<IBlockOp>(registry, byKey, IsStep), BuildTable<IConditionOp>(registry, byKey, IsCondition),
+                BuildTable<IValueOp>(registry, byKey, IsValue));
+        }
+
+        // Triggers aren't dispatched by the VM (TriggerBroker looks them up); conditions and reporters live in
+        // their own tables, because they are only ever evaluated from inside another block's input.
+        private static bool IsStep(BlockShape shape) =>
+            shape != BlockShape.Trigger && shape != BlockShape.Boolean && shape != BlockShape.Reporter;
 
         private static bool IsCondition(BlockShape shape) => shape == BlockShape.Boolean;
+
+        private static bool IsValue(BlockShape shape) => shape == BlockShape.Reporter;
 
         private static T[] BuildTable<T>(BlockRegistry registry, Dictionary<string, object> byKey, Func<BlockShape, bool> include) where T : class
         {
@@ -58,8 +73,8 @@ namespace Blocky.Runtime
                 var attr = type.GetCustomAttribute<BlockExecutorAttribute>();
                 if (attr == null) continue;
 
-                if (!typeof(IBlockOp).IsAssignableFrom(type) && !typeof(IConditionOp).IsAssignableFrom(type))
-                    throw new InvalidOperationException($"{type.FullName} has [BlockExecutor] but implements neither IBlockOp nor IConditionOp.");
+                if (!typeof(IBlockOp).IsAssignableFrom(type) && !typeof(IConditionOp).IsAssignableFrom(type) && !typeof(IValueOp).IsAssignableFrom(type))
+                    throw new InvalidOperationException($"{type.FullName} has [BlockExecutor] but implements none of IBlockOp, IConditionOp, IValueOp.");
                 if (!byKey.TryAdd(attr.ExecutorKey, Activator.CreateInstance(type)))
                     throw new InvalidOperationException($"Duplicate executorKey '{attr.ExecutorKey}'.");
             }

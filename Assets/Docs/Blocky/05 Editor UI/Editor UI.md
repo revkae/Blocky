@@ -72,6 +72,12 @@ Source: [[Welcome|TDD §8]]. Status: **Milestones 4 and 5 done.** `PaletteView`,
 
 **Deliberately not built yet:** `PaletteView`, `ProgramCanvasView`'s pan/zoom and `OnChanged` subscription, `BlockDragManipulator`, `DragLayer`, `BlockViewPool` — all Milestone 5. No `EditorWindow`/`UIDocument` host exists yet either, so nothing is actually visible on screen — tests exercise the VisualElement tree directly (`Query<T>()`), which works fine without a live panel.
 
+**Update — variables have a watcher.** `BuildWatchers` adds a card to the table's top-left corner listing every shared variable and its value, refreshed each frame the workspace is open (rows are reused; only the text is rewritten, because assigning a `Label`'s text rebuilds its mesh whether or not it changed). It hides itself when nothing has set a variable. It cannot sit over the game: the panel's root *is* the `UIDocument` root, so anything added to it disappears with the workspace — see [[09 Decisions/Decisions#ADR-024|ADR-024]].
+
+**Update — reporters.** `ConditionView` draws a hexagon for a condition and a pill for a reporter, and `ConditionSlot` is now either a hexagonal hole (condition-only, click to pick one) or a **value input that keeps its own control until a block lands on it** — so typing a number works exactly as it did, and dropping `pick random` on the same oval replaces the field with the block. `ChainShape` tells the two apart, and `ConditionSlotResolver` refuses a reporter over a hexagon. See [[09 Decisions/Decisions#ADR-021|ADR-021]].
+
+**Update — the palette grows itself.** The tab rail and the palette are built from `BlockCategory` in enum order, skipping empty categories, so a new block needs no UI change at all: drop the `.asset` in `Assets/Resources/Blocks/` and it appears under its category with that category's color. Since [[09 Decisions/Decisions#ADR-020|ADR-020]] the rail reads **Event · Motion · Looks · Control · Sensing · Operators**; `Sound` and `Variables` exist in the enum and show nothing until they have blocks. Colors for the categories added after the first four live in `blocky-base.uss` rather than one sheet each, so the scene's serialized stylesheet list and the Editor window's list need no new entry.
+
 UI Toolkit, not UGUI — see [[09 Decisions/Decisions#ADR-001 UI Toolkit vs UGUI|ADR-001]].
 
 ## Components

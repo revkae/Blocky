@@ -167,13 +167,15 @@ namespace Blocky.Editor
             var zoom = Context.CanvasZoom();
             var program = Context.Store.Program;
 
-            if (target is ConditionView { IsInSlot: true } condition)
+            if (target is ConditionView { IsInSlot: true } slotBlock)
             {
-                // Out of its slot: the slot is left empty (and redraws as a hole) while the condition follows the pointer.
-                var grab = pointer - condition.worldBound.position;
-                var (stackId, ownerId, paramKey) = (condition.StackId, condition.OwnerNodeId, condition.ParamKey);
-                condition.RemoveFromHierarchy();
-                return new ChainDragSession(Context, condition, grab, zoom, ChainShape.Condition, fromCanvas: true,
+                // Out of its slot: the slot is left empty (a hole redraws, a value input shows its field again)
+                // while the block follows the pointer.
+                var grab = pointer - slotBlock.worldBound.position;
+                var (stackId, ownerId, paramKey) = (slotBlock.StackId, slotBlock.OwnerNodeId, slotBlock.ParamKey);
+                slotBlock.RemoveFromHierarchy();
+                return new ChainDragSession(Context, slotBlock, grab, zoom,
+                    slotBlock.IsCondition ? ChainShape.Condition : ChainShape.Reporter, fromCanvas: true,
                     t => DropChain.FromConditionSlot(stackId, ownerId, paramKey, t));
             }
 

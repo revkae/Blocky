@@ -17,6 +17,13 @@ namespace Blocky.Compiler
         /// of blocks like <c>if</c> and <c>repeat until</c>. Bound to an <c>IConditionOp</c>, not an <c>IBlockOp</c>.
         /// Appended last so existing assets' serialized shape values keep their meaning.
         /// </summary>
-        Boolean
+        Boolean,
+
+        /// <summary>
+        /// A reporter (Scratch's round block): answers a value — a number or a string — and never runs as a step.
+        /// It fits any white input oval, and a <see cref="Boolean"/> fits there too (it reads as true/false).
+        /// Bound to an <c>IValueOp</c>. Appended after <see cref="Boolean"/>, again so no stored value shifts.
+        /// </summary>
+        Reporter
     }
 }

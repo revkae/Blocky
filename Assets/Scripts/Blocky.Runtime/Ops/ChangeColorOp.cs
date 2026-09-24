@@ -15,9 +15,9 @@ namespace Blocky.Runtime.Ops
         {
             var renderer = ctx.Target.GetComponent<Renderer>();
             if (renderer == null) return OpResult.Continue;
-            if (!ColorUtility.TryParseHtmlString(ctx.Params[0].Text, out var target)) return OpResult.Continue;
+            if (!ColorUtility.TryParseHtmlString(ctx.GetText(0), out var target)) return OpResult.Continue;
 
-            var duration = ctx.Params[1].Number;
+            var duration = ctx.GetNumber(1);
             if (duration <= 0f)
             {
                 renderer.material.color = target;

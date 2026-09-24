@@ -15,7 +15,7 @@ MonoBehaviour:
   blockType: condition.mouse_down
   displayNameKey: mouse down?
   shape: 4
-  category: 4
+  category: 5
   branchCount: 0
   parameters: []
   executorKey: condition.mouse_down

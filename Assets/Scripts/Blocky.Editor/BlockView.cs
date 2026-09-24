@@ -31,21 +31,21 @@ namespace Blocky.Editor
         public IReadOnlyList<VisualElement> BodySlots => _bodySlots;
 
         /// <summary>
-        /// Builds a normal block view, a <see cref="ConditionView"/> for a condition lying loose on the table, or an
+        /// Builds a normal block view, a <see cref="ConditionView"/> for a condition or reporter lying loose on the table, or an
         /// <see cref="UnknownBlockView"/> if the block type no longer resolves.
         /// </summary>
         public static VisualElement Create(BlockNode node, BlockRegistry registry, string stackId = null, ProgramStore store = null, bool buttons = true)
         {
             var definition = registry.Find(node.blockType);
             if (definition == null) return new UnknownBlockView(node);
-            return definition.shape == BlockShape.Boolean
+            return definition.shape is BlockShape.Boolean or BlockShape.Reporter
                 ? new ConditionView(node, definition, registry, stackId, store)
                 : new BlockView(node, definition, registry, stackId, store, buttons, prototype: false);
         }
 
-        /// <summary>What the Editor window's "+ Add" pickers offer inside a sequence: no hats, no conditions.</summary>
+        /// <summary>What the Editor window's "+ Add" pickers offer inside a sequence: no hats, and nothing that belongs in an input.</summary>
         internal static bool IsSequenceBlock(BlockDefinition definition) =>
-            definition.shape != BlockShape.Trigger && definition.shape != BlockShape.Boolean;
+            definition.shape is not (BlockShape.Trigger or BlockShape.Boolean or BlockShape.Reporter);
 
         /// <summary>A palette entry: the definition with its default values, as static chips.</summary>
         public static BlockView CreatePrototype(BlockDefinition definition, BlockRegistry registry) =>

@@ -8,7 +8,7 @@ namespace Blocky.Runtime
     public ref struct OpContext
     {
         private readonly VmThread _thread;
-        private readonly ConditionEvaluator _conditions;
+        private readonly SlotEvaluator _slots;
 
         public readonly int Pc;
         public readonly Instruction Instruction;
@@ -22,6 +22,9 @@ namespace Blocky.Runtime
         public VmThread Thread => _thread;
         public GameObject Target => _thread.Target;
 
+        /// <summary>The scheduler running this thread — what <c>stop</c> and <c>reset timer</c> reach for. Never null in play.</summary>
+        public readonly VmScheduler Scheduler;
+
         /// <summary>One persistent float slot per instruction (timers, progress) — TDD §6.3.</summary>
         public float Scratch
         {
@@ -30,10 +33,11 @@ namespace Blocky.Runtime
         }
 
         public OpContext(VmThread thread, int pc, Instruction instruction, ReadOnlySpan<ParamValue> parameters, float deltaTime, float now,
-            ConditionEvaluator conditions)
+            SlotEvaluator slots, VmScheduler scheduler = null)
         {
             _thread = thread;
-            _conditions = conditions;
+            _slots = slots;
+            Scheduler = scheduler;
             Pc = pc;
             Instruction = instruction;
             Params = parameters;
@@ -43,9 +47,22 @@ namespace Blocky.Runtime
         }
 
         /// <summary>
-        /// Reads a true/false param. A condition slot is evaluated right now — so <c>repeat until &lt;mouse down?&gt;</c>
+        /// Reads a true/false input. A slot is evaluated right now — so <c>repeat until &lt;mouse down?&gt;</c>
         /// sees the mouse as it is on this lap, not as it was when the program compiled. Empty slots read as false.
         /// </summary>
-        public bool GetBool(int index) => _conditions.Evaluate(Params[index], _thread);
+        public bool GetBool(int index) => _slots.Evaluate(Params[index], _thread);
+
+        /// <summary>
+        /// Reads a numeric input. **Every op should read its numbers through this, never <c>Params[i].Number</c>**:
+        /// a learner can drop a reporter into any white oval, and only this resolves it. A typed-in number costs
+        /// one switch; an empty slot reads as 0.
+        /// </summary>
+        public float GetNumber(int index) => _slots.EvaluateValue(Params[index], _thread).AsNumber();
+
+        /// <summary>Reads a text input, running whatever reporter may be in it. An empty slot reads as "".</summary>
+        public string GetText(int index) => _slots.EvaluateValue(Params[index], _thread).AsText();
+
+        /// <summary>The whole value of an input, for an op that cares what it actually is.</summary>
+        public BlockValue GetValue(int index) => _slots.EvaluateValue(Params[index], _thread);
     }
 }

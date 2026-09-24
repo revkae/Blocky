@@ -15,7 +15,7 @@ MonoBehaviour:
   blockType: condition.false
   displayNameKey: false
   shape: 4
-  category: 4
+  category: 6
   branchCount: 0
   parameters: []
   executorKey: condition.false

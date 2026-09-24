@@ -14,6 +14,10 @@ namespace Blocky.Runtime
         private static VmScheduler _scheduler;
         private static TriggerBroker _triggers;
         private static WorldSnapshot _world;
+        private static BlockyVariables _variables;
+        private static BlockyObjects _objects;
+        private static BlockyClones _clones;
+        private static BlockyAudio _audio;
         private static Playback _playback;
 
         public static BlockRegistry Registry => _registry ??= BlockRegistry.LoadFromResources();
@@ -23,13 +27,25 @@ namespace Blocky.Runtime
         /// <summary>Every programmed object's start (for Reset) — runners record their object when they first start.</summary>
         public static WorldSnapshot World => _world ??= new WorldSnapshot();
 
+        /// <summary>Named values every script can set and read back, shared or per-object (Scratch's variables).</summary>
+        public static BlockyVariables Variables => _variables ??= new BlockyVariables();
+
+        /// <summary>Name -> GameObject, for the blocks where one object talks about another.</summary>
+        public static BlockyObjects Objects => _objects ??= new BlockyObjects();
+
+        /// <summary>Copies of objects made while the game runs, and the cap that keeps a runaway loop from taking the machine with it.</summary>
+        public static BlockyClones Clones => _clones ??= new BlockyClones();
+
+        /// <summary>Notes and clips, generated rather than imported — see <see cref="BlockyAudio"/>.</summary>
+        public static BlockyAudio Audio => _audio ??= new BlockyAudio();
+
         /// <summary>Go / Stop / Reset / Pause / Step forward and back / speed, for every script in the scene.</summary>
-        public static Playback Playback => _playback ??= new Playback(Scheduler, Triggers, World);
+        public static Playback Playback => _playback ??= new Playback(Scheduler, Triggers, World, Clones, Audio);
 
         private static VmScheduler CreateScheduler()
         {
-            var (steps, conditions) = OpTableBuilder.BuildBoth(Registry);
-            return new VmScheduler(steps, conditions);
+            var (steps, conditions, values) = OpTableBuilder.BuildAll(Registry);
+            return new VmScheduler(steps, conditions, values);
         }
 
         /// <summary>Test-only hook: injects fixtures instead of the Resources-scanned registry/reflection-bound op table.</summary>
@@ -57,6 +73,10 @@ namespace Blocky.Runtime
             _triggers = null;
             _world = null;
             _playback = null;
+            _variables = null;
+            _objects = null;
+            _clones = null;
+            _audio = null;
         }
     }
 }

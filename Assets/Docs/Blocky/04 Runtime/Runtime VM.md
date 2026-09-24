@@ -27,7 +27,10 @@ Async recursion (`UniTask Execute(BlockNode, ...)`) is the obvious design and th
 - Tick order: `(objectRegistrationIndex, stackIndex)`, stable per object lifetime; threads started mid-tick begin next tick
 - Physics-affecting ops write to a deferred queue flushed in `FixedUpdate`
 - Destroyed target → scheduler kills its threads before stepping; ops never need destroyed-object guards
-- `StopAll` clears all threads; disabling does not auto-resume on re-enable
+- `StopAll` clears all threads; disabling does not auto-resume on re-enable. `StopAllThreads()` and `StopOtherThreadsOn(target, except)` are the in-tick versions behind `control.stop` — they mark threads `Done` without touching the lists, which is the only safe thing to do from inside a running block.
+- Ops read their inputs through `OpContext.GetNumber` / `GetText` / `GetBool`, never `Params[i].Number` — that is what lets a reporter sit in any white oval ([[09 Decisions/Decisions#ADR-021|ADR-021]]). `SlotEvaluator` resolves a slot to a `BlockValue`, running an `IConditionOp` or an `IValueOp` as needed, and coercing between them
+- A thread ends at **its own stack's** exit pc (`VmThread.ExitPc`, from `CompiledProgram.StackExitPoints`), not at the end of the program's instruction array — every stack is emitted into one shared array, see [[09 Decisions/Decisions#ADR-019|ADR-019]]
+- The **timer** (`Timer`, `ResetTimer()`) runs on the script clock `Now`, so it pauses with the scene, scales with speed, and is saved and restored by Step back. `SlotContext.Timer` is how `timer > n?` reads it; `OpContext.Scheduler` is how `reset timer` and `stop` reach the scheduler at all.
 
 ## Playback controls (learning aids)
 Scene-wide, in `VmScheduler` — see [[09 Decisions/Decisions#ADR-012|ADR-012]]:
@@ -44,6 +47,8 @@ Scene-wide, in `VmScheduler` — see [[09 Decisions/Decisions#ADR-012|ADR-012]]:
 `IAsyncBlockOp.ExecuteAsync` behind `AsyncOpBridge` — starts on first execution, returns `Retry` until done (one allocation at start, zero per frame). Cancellation tokens pooled per thread, linked to `Generation`. This is the **only** place UniTask is used (see [[00 Overview/Goals and Non-Goals|dependencies]]).
 
 ## Trigger system
-`TriggerBroker` typed channels, subscribe on enable/unsubscribe on disable. `WhenLookedAt` is one shared camera raycast per frame compared against the listener set — never per-object.
+`TriggerBroker` typed channels, subscribe on enable/unsubscribe on disable. `WhenLookedAt` is one shared camera raycast per frame compared against the listener set — never per-object. `OnClicked` is the same idea for `when clicked`: one raycast per frame, on the press edge only, through `BlockyInput` so a press on the editor never counts; the runner treats a hit on a child collider as a hit on itself. `OnBroadcast` carries a name and nothing else — listeners match it themselves (case- and space-insensitively), so the broker never has to know which messages a program uses.
+
+`OnCloneStarted` is raised by `create clone` itself, once the copy exists and its runner has been initialised by hand — a clone that heard its own hat a frame late would never start ([[09 Decisions/Decisions#ADR-026|ADR-026]]).
 
 One channel is **not** tied to a hat: `OnStepAll`, which every compiled non-loose stack subscribes to as well as its own. `Playback.StepForward` fires it, so Step ▶ can walk a script whose trigger the learner cannot produce while the scene is frozen (a key press, a bump, a look). `ObjectProgramRunner.FireForStep` starts such a stack only when `VmScheduler.FindLive` finds nothing running it — stepping ignores `RetriggerPolicy` on purpose. See [[09 Decisions/Decisions#ADR-015|ADR-015]].

@@ -4,6 +4,10 @@
     --blocky-color-control: rgb(255, 171, 25);
     --blocky-color-event: rgb(255, 191, 0);
     --blocky-color-conditions: rgb(92, 177, 214);
+    --blocky-color-sensing: rgb(92, 177, 214);
+    --blocky-color-operators: rgb(89, 192, 89);
+    --blocky-color-sound: rgb(207, 99, 207);
+    --blocky-color-variables: rgb(255, 140, 26);
     --blocky-color-error: rgb(190, 60, 60);
     --blocky-color-neutral: rgb(90, 90, 90);
 }
@@ -49,11 +53,32 @@
     padding: 6px 10px 4px 10px;
 }
 
-/* Conditions category. Kept in this sheet rather than its own file so the scene's stylesheet list and the
-   Editor window's sheet list need no new entry. */
+/* The categories added after the first four. Kept in this sheet rather than each in its own file so the
+   scene's stylesheet list and the Editor window's sheet list need no new entry. Sensing shares Scratch's
+   light blue with the older Conditions category, which no block uses any more. */
 .blocky-block--category-conditions {
     background-color: var(--blocky-color-conditions);
     --blocky-fill: rgb(92, 177, 214);
+}
+
+.blocky-block--category-sensing {
+    background-color: var(--blocky-color-sensing);
+    --blocky-fill: rgb(92, 177, 214);
+}
+
+.blocky-block--category-operators {
+    background-color: var(--blocky-color-operators);
+    --blocky-fill: rgb(89, 192, 89);
+}
+
+.blocky-block--category-sound {
+    background-color: var(--blocky-color-sound);
+    --blocky-fill: rgb(207, 99, 207);
+}
+
+.blocky-block--category-variables {
+    background-color: var(--blocky-color-variables);
+    --blocky-fill: rgb(255, 140, 26);
 }
 
 /* Condition block: a hexagon, shorter than a stack block, with room for the pointed ends. */
@@ -72,6 +97,24 @@
     background-color: rgba(0, 0, 0, 0);
     min-width: 44px;
     min-height: 24px;
+}
+
+/* Reporter block: Scratch's round block. Same compact header as a condition; the pill is painted, so the
+   element itself stays transparent. */
+.blocky-block--shape-reporter.blocky-shaped {
+    min-width: 0;
+}
+
+.blocky-block--shape-reporter > .blocky-block__header {
+    min-height: 22px;
+    padding: 2px 10px;
+}
+
+/* A value input: just a wrapper around the param's own control, or around the reporter dropped onto it. It
+   carries no padding of its own — the control inside already has blocky-param-field. */
+.blocky-value-slot {
+    flex-direction: row;
+    align-items: center;
 }
 
 /* Room for the hat's rounded bump above the text. */

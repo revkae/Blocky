@@ -19,6 +19,13 @@ namespace Blocky.Runtime
         /// <summary>Where this thread's stack starts in <see cref="Program"/> — together with the two above, which stack it is running.</summary>
         public readonly int EntryPc;
 
+        /// <summary>
+        /// The pc just past this stack's last block. Reaching it ends the thread: every stack of a program is
+        /// emitted into one instruction array, so a script that simply runs out of blocks would otherwise carry on
+        /// into whatever script was compiled after it (ADR-019).
+        /// </summary>
+        public readonly int ExitPc;
+
         public int Pc;
         public readonly Frame[] Frames = new Frame[MaxNestingDepth];
         public int FrameCount;
@@ -44,9 +51,10 @@ namespace Blocky.Runtime
             Program = program;
             Target = target;
             EntryPc = entryPc;
+            ExitPc = program.ExitPcFor(entryPc);
             Pc = entryPc;
             Scratch = new float[program.Code.Length];
-            State = entryPc >= 0 && entryPc < program.Code.Length ? ThreadState.Running : ThreadState.Done;
+            State = entryPc >= 0 && entryPc < ExitPc ? ThreadState.Running : ThreadState.Done;
         }
 
         /// <summary>Part-way through a block that takes time: the next op call continues it rather than starting a new one.</summary>
