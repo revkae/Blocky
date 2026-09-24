@@ -27,6 +27,7 @@ Every goal in the TDD's own §1.2 Goals section is met: data-driven extensibilit
 - [[08 Build Log/Build Log|Build Log]] — chronological progress, what shipped when
 - [[09 Decisions/Decisions|Decisions]] — ADR-style records for anything that deviates from or extends the TDD
 - [[10 Localization/Localization|Localization]] — English and Türkçe, and how to add a language (one file)
+- [[11 Release/Release Readiness|Release Readiness]] — what's left before the Asset Store and the classroom, as a checklist
 
 ## Build Order (from the TDD, §13)
 

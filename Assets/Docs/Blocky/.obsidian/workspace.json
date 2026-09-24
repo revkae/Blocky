@@ -33,10 +33,14 @@
             "id": "c33690699bb02865",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "00 Overview/Goals and Non-Goals.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Goals and Non-Goals"
             }
           }
         ]
@@ -203,8 +207,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "c33690699bb02865",
+  "active": "e0a1790a99354069",
   "lastOpenFiles": [
+    "11 Release/Release Readiness.md.meta",
+    "11 Release/Release Readiness.md",
+    "11 Release",
+    "11 Release.meta",
     "08 Build Log/Build Log.md.tmp.30180.1e0a37a12536",
     "08 Build Log/Build Log.md.tmp.30180.abc13f01cdb8",
     "05 Editor UI/Editor UI.md.tmp.30180.57e78ff56208",
@@ -214,9 +222,6 @@
     "Welcome.md",
     "08 Build Log/Build Log.md.tmp.30180.53a491c8d306",
     "05 Editor UI/Editor UI.md.tmp.30180.1a9d6f1be9d6",
-    "08 Build Log/Build Log.md.tmp.30180.a54a6eb61827",
-    "09 Decisions/Decisions.md.tmp.30180.e437546cf0e9",
-    "08 Build Log/Build Log.md.tmp.30180.41a3e72570d5",
     "08 Build Log/Demo Scene.md",
     "07 Testing/Testing Strategy.md",
     "06 Block Catalog/Block Catalog.md",
