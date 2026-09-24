@@ -1,6 +1,7 @@
 using System;
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine.UIElements;
 
 namespace Blocky.Editor
@@ -31,7 +32,7 @@ namespace Blocky.Editor
 
             Header = new VisualElement();
             Header.AddToClassList("blocky-block__header");
-            Header.Add(new Label(definition != null ? BlockView.DisplayName(definition) : $"Unknown trigger: {triggerBlockType}"));
+            Header.Add(new Label(definition != null ? BlockView.DisplayName(definition) : BlockyText.Format("block.unknown_trigger", triggerBlockType)));
 
             // A null node id targets the stack's trigger params. No registry: triggers have no condition slots.
             if (definition != null)

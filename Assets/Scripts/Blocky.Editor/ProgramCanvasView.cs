@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -389,7 +390,7 @@ namespace Blocky.Editor
                 _store.Apply(new CreateStack(stack));
             });
 
-            var addButton = new Button(popup.Toggle) { text = "+ Add Stack" };
+            var addButton = new Button(popup.Toggle) { text = BlockyText.Get("editor.add_stack") };
             addButton.AddToClassList("blocky-block__add-button");
 
             container.Add(addButton);

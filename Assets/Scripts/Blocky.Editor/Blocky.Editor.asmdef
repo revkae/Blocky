@@ -3,7 +3,8 @@
     "rootNamespace": "Blocky.Editor",
     "references": [
         "Blocky.Data",
-        "Blocky.Compiler"
+        "Blocky.Compiler",
+        "Blocky.Localization"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

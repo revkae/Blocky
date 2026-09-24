@@ -1,4 +1,5 @@
 using System;
+using Blocky.Localization;
 using UnityEngine;
 
 namespace Blocky.Compiler
@@ -20,7 +21,10 @@ namespace Blocky.Compiler
         public string executorKey;
         public RetriggerPolicy retrigger = RetriggerPolicy.RestartOnRetrigger;
 
-        /// <summary>The name a player sees on the block ("Repeat", "when Go clicked"); the block type if none is set.</summary>
-        public string DisplayName => string.IsNullOrEmpty(displayNameKey) ? blockType : displayNameKey;
+        /// <summary>
+        /// The name a player sees on the block, in their language ("Repeat", "Tekrarla"): the <c>block.&lt;blockType&gt;</c>
+        /// string. A block no language file names yet shows <see cref="displayNameKey"/> (its English name), else its type.
+        /// </summary>
+        public string DisplayName => BlockyText.Get("block." + blockType, string.IsNullOrEmpty(displayNameKey) ? blockType : displayNameKey);
     }
 }

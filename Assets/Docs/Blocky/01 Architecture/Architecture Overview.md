@@ -41,4 +41,7 @@ Assets/Scripts/
   Blocky.Compiler/   ProgramCompiler, BlockRegistry, CompiledProgram
   Blocky.Runtime/    VmScheduler, Thread, IBlockOp, TriggerBroker, ObjectProgramRunner
   Blocky.Editor/     BlockView, PaletteView, ProgramCanvasView, drag/drop
+  Blocky.Localization/  BlockyText, BlockyLanguages, LanguageFileProvider — a leaf the Compiler, Editor and Game read words from
 ```
+
+Player-facing words live in `Assets/Resources/Languages/<code>.json`, never in code — see [[10 Localization/Localization|Localization]].

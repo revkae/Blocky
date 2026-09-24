@@ -1,3 +1,5 @@
+using Blocky.Localization;
+
 namespace Blocky.Compiler
 {
     /// <summary>Drives block color via a USS class in the editor (TDD §7, §9). Extend as the catalog grows — append only, assets store the number.</summary>
@@ -20,5 +22,12 @@ namespace Blocky.Compiler
 
         /// <summary>Named values the program can set and read back.</summary>
         Variables
+    }
+
+    public static class BlockCategoryNames
+    {
+        /// <summary>The category's name in the player's language ("Motion", "Hareket"): the <c>category.&lt;name&gt;</c> string.</summary>
+        public static string DisplayName(this BlockCategory category) =>
+            BlockyText.Get("category." + category.ToString().ToLowerInvariant(), category.ToString());
     }
 }

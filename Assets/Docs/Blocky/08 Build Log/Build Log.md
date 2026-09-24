@@ -6,6 +6,18 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-24 — Languages: English and Türkçe, switchable in the title bar
+Design in [[09 Decisions/Decisions#ADR-030|ADR-030]]; how-to in [[10 Localization/Localization|Localization]].
+
+- **New assembly `Blocky.Localization`** on Unity 6.7's built-in localization runtime: `BlockyText` (lookups), `BlockyLanguages` (settings, locales, switching, a test override), `LanguageFileProvider` (one `ResourceTable` per language file).
+- **`Assets/Resources/Languages/en.json` and `tr.json`** — 222 strings each: the whole in-game chrome, tips, advice, all 71 block names, 38 input labels, 35 dropdown choices, 9 categories. A new language is a new file there.
+- **Language buttons** in the title bar, next to Free / Simple and drawn like them: **English | Türkçe**, the lit one on show. (A first cut used Unity's `LanguageDropdown`; it was too easy to miss and hid itself, so it became buttons.) Switching rewords the workspace in place; the choice is remembered. First run follows the computer's language.
+- Dropdown choices now show names ("this script", "bu betik") instead of raw ids, and the English labels `tag_filter` / `angle_threshold` read "tag filter" / "angle threshold". Turkish capitals are Turkish (`DEĞİŞKENLER`), and the zoom reads `%150` in Turkish.
+- Tab rail widened 72 → 78px so "Değişkenler" fits.
+- **Tests:** `EnglishForTests` pins English for the Compiler and Editor suites (a Turkish machine would otherwise fail the English advice assertions); new `Blocky.Localization.Tests` checks the files (every key translated, placeholders kept, every block/input/choice named) and Turkish lookups.
+- **Verified outside Unity only** — compiled against stubs from the 6.7 reference source and run against fakes of its lookup code (45/45). Not yet opened in the editor; see the ADR for what still needs a look in Play mode.
+
+
 ## 2026-09-18 (seventh) — Sound, generated rather than imported
 Same user request, seventh pass. Catalog now at **71 blocks** (31 steps, 15 conditions, 17 reporters, 8 triggers).
 

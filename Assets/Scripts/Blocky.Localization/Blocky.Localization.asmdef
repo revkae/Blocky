@@ -1,9 +1,8 @@
 {
-    "name": "Blocky.Compiler",
-    "rootNamespace": "Blocky.Compiler",
+    "name": "Blocky.Localization",
+    "rootNamespace": "Blocky.Localization",
     "references": [
-        "Blocky.Data",
-        "Blocky.Localization"
+        "Newtonsoft.Json"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

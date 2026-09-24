@@ -147,6 +147,11 @@
     color: rgb(255, 255, 255);
 }
 
+/* The language buttons: the same segmented pill as Free / Simple (.blocky-ingame-mode), set a little closer. */
+.blocky-ingame-language {
+    margin-left: 8px;
+}
+
 .blocky-ingame-keyhint {
     flex-direction: row;
     align-items: center;
@@ -325,7 +330,7 @@
 
 .blocky-ingame-tabrail {
     flex-shrink: 0; /* the body is a row: the rail keeps its width, the palette and the table share what is left */
-    width: 72px;
+    width: 78px; /* the longest category name in any language (Turkish "Değişkenler") fits on one line */
     padding: 8px 6px;
     border-right-width: 1px;
     border-color: var(--bk-line);

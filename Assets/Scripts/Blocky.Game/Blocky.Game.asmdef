@@ -6,6 +6,7 @@
         "Blocky.Compiler",
         "Blocky.Editor",
         "Blocky.Runtime",
+        "Blocky.Localization",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Blocky.Data;
+using Blocky.Localization;
 
 namespace Blocky.Compiler
 {
@@ -39,6 +40,8 @@ namespace Blocky.Compiler
     /// says what will happen ("never runs", "counts as false") and what to do about it, using the names printed
     /// on the blocks. Anything the compiler rejects that no rule here explains still gets a general message, so
     /// a script never fails to run without saying so.
+    /// Messages are in the player's language (<see cref="BlockyText"/>, <c>advice.*</c>), each one a whole sentence
+    /// with the block names as placeholders, so a translation can put them where its grammar wants them.
     /// </summary>
     public static class ProgramAdvice
     {
@@ -59,13 +62,12 @@ namespace Blocky.Compiler
                 var trigger = registry.Find(stack.triggerBlockType);
                 if (trigger == null)
                 {
-                    advice.Add(new Advice(AdviceKind.Problem, stack.id, null, "This event block doesn't exist any more, so this script won't run."));
+                    advice.Add(new Advice(AdviceKind.Problem, stack.id, null, BlockyText.Get("advice.event_missing")));
                     continue;
                 }
 
                 if (stack.sequence.Length == 0)
-                    advice.Add(new Advice(AdviceKind.Hint, stack.id, null,
-                        $"Nothing is under “{trigger.DisplayName}” yet, so nothing happens. Snap blocks under it."));
+                    advice.Add(new Advice(AdviceKind.Hint, stack.id, null, BlockyText.Format("advice.empty_script", trigger.DisplayName)));
 
                 AdviseSequence(stack.id, stack.sequence, registry, advice);
             }
@@ -83,14 +85,16 @@ namespace Blocky.Compiler
             if (stack.sequence.Length == 1 && definition != null && definition.shape == BlockShape.Boolean)
             {
                 var host = FirstBlockWithConditionHole(registry);
-                var where = host != null ? $"like the one in “{host.DisplayName}”" : "in a block";
-                advice.Add(new Advice(AdviceKind.Hint, stack.id, first.id, $"“{definition.DisplayName}” is a condition. It goes in a ⬡ hole, {where}."));
+                var message = host != null
+                    ? BlockyText.Format("advice.loose_condition.example", definition.DisplayName, host.DisplayName)
+                    : BlockyText.Format("advice.loose_condition", definition.DisplayName);
+                advice.Add(new Advice(AdviceKind.Hint, stack.id, first.id, message));
                 return;
             }
 
             var go = registry.Find(GoTriggerType);
-            var fix = go != null ? $"Snap them under “{go.DisplayName}”." : "Snap them under an event block.";
-            advice.Add(new Advice(AdviceKind.Hint, stack.id, first.id, $"These blocks have no event on top, so they never run. {fix}"));
+            var hint = go != null ? BlockyText.Format("advice.loose_blocks.go", go.DisplayName) : BlockyText.Get("advice.loose_blocks");
+            advice.Add(new Advice(AdviceKind.Hint, stack.id, first.id, hint));
         }
 
         private static void AdviseSequence(string stackId, BlockNode[] sequence, BlockRegistry registry, List<Advice> advice)
@@ -100,14 +104,14 @@ namespace Blocky.Compiler
                 var definition = registry.Find(node.blockType);
                 if (definition == null)
                 {
-                    advice.Add(new Advice(AdviceKind.Problem, stackId, node.id, "This block doesn't exist any more, so this script won't run. Delete it."));
+                    advice.Add(new Advice(AdviceKind.Problem, stackId, node.id, BlockyText.Get("advice.block_missing")));
                     continue;
                 }
 
                 AdviseParams(stackId, node, node, definition, registry, advice);
 
                 if (definition.branchCount > 0 && AllBranchesEmpty(node))
-                    advice.Add(new Advice(AdviceKind.Hint, stackId, node.id, $"“{definition.DisplayName}” has nothing inside it yet. Put blocks in its gap."));
+                    advice.Add(new Advice(AdviceKind.Hint, stackId, node.id, BlockyText.Format("advice.empty_branch", definition.DisplayName)));
 
                 foreach (var branch in node.branches)
                     AdviseSequence(stackId, branch, registry, advice);
@@ -127,7 +131,7 @@ namespace Blocky.Compiler
                 var param = Array.Find(node.parameters, p => p.key == spec.key);
                 if (param == null)
                 {
-                    advice.Add(new Advice(AdviceKind.Problem, stackId, shownOn.id, $"“{name}” is missing its “{spec.key}” value, so this script won't run."));
+                    advice.Add(new Advice(AdviceKind.Problem, stackId, shownOn.id, BlockyText.Format("advice.missing_value", name, spec.DisplayName)));
                     continue;
                 }
 
@@ -135,12 +139,12 @@ namespace Blocky.Compiler
                 {
                     case ParamKind.Number when param.number < spec.min || param.number > spec.max:
                         advice.Add(new Advice(AdviceKind.Problem, stackId, shownOn.id,
-                            $"“{spec.key}” in “{name}” must be from {Format(spec.min)} to {Format(spec.max)}, so this script won't run."));
+                            BlockyText.Format("advice.out_of_range", spec.DisplayName, name, Format(spec.min), Format(spec.max))));
                         break;
 
                     case ParamKind.Choice when Array.FindIndex(spec.choices, c => c.stableId == param.text) < 0:
                         advice.Add(new Advice(AdviceKind.Problem, stackId, shownOn.id,
-                            $"“{param.text}” isn't one of the choices for “{spec.key}” in “{name}”, so this script won't run."));
+                            BlockyText.Format("advice.bad_choice", param.text, spec.DisplayName, name)));
                         break;
 
                     case ParamKind.Reporter:
@@ -155,15 +159,14 @@ namespace Blocky.Compiler
             var condition = param.kind == ParamKind.Reporter ? param.reporter : null;
             if (condition == null)
             {
-                advice.Add(new Advice(AdviceKind.Hint, stackId, owner.id,
-                    $"The ⬡ hole in “{ownerName}” is empty, and an empty hole counts as “false”. Drag a condition into it."));
+                advice.Add(new Advice(AdviceKind.Hint, stackId, owner.id, BlockyText.Format("advice.empty_hole", ownerName, BlockyText.Get("value.false"))));
                 return;
             }
 
             var definition = registry.Find(condition.blockType);
             if (definition == null)
             {
-                advice.Add(new Advice(AdviceKind.Problem, stackId, owner.id, "The condition in this ⬡ hole doesn't exist any more, so this script won't run."));
+                advice.Add(new Advice(AdviceKind.Problem, stackId, owner.id, BlockyText.Get("advice.condition_missing")));
                 return;
             }
 
@@ -186,7 +189,7 @@ namespace Blocky.Compiler
                     : diagnostic.NodeId;
                 if (HasProblem(advice, diagnostic.StackId, shownOn)) continue;
 
-                advice.Add(new Advice(AdviceKind.Problem, diagnostic.StackId, shownOn, "Something is wrong with this block, so this script won't run."));
+                advice.Add(new Advice(AdviceKind.Problem, diagnostic.StackId, shownOn, BlockyText.Get("advice.something_wrong")));
             }
         }
 

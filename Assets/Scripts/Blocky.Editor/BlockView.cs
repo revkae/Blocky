@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -82,7 +83,7 @@ namespace Blocky.Editor
 
             for (var branchIndex = 0; branchIndex < definition.branchCount; branchIndex++)
             {
-                if (branchIndex > 0) Add(BuildArm(definition.branchCount == 2 ? "else" : null, footer: false));
+                if (branchIndex > 0) Add(BuildArm(definition.branchCount == 2 ? BlockyText.Get("block.else") : null, footer: false));
 
                 var slot = new VisualElement();
                 slot.AddToClassList("blocky-block__body-slot");
@@ -132,7 +133,7 @@ namespace Blocky.Editor
                 store.Apply(new InsertNode(location, PaletteView.InstantiatePrototype(def)));
             });
 
-            var addButton = new Button(popup.Toggle) { text = "+ Add" };
+            var addButton = new Button(popup.Toggle) { text = BlockyText.Get("editor.add") };
             addButton.AddToClassList("blocky-block__add-button");
 
             container.Add(addButton);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -124,6 +125,7 @@ namespace Blocky.Editor
 
         private VisualElement _indicator;
         private Label _indicatorLabel;
+        private string[] _rowCaptions; // by RowIntent, looked up once per drag rather than on every move
         private SnapTarget? _best;
         private ConditionSlotTarget? _bestSlot;
         private RowTarget? _bestRow;
@@ -344,15 +346,15 @@ namespace Blocky.Editor
                 {
                     case RowIntent.Above:
                         edge = RowBar(row.Bounds, row.Bounds.yMin);
-                        caption = "Above";
+                        caption = RowCaption(RowIntent.Above);
                         break;
                     case RowIntent.Below:
                         edge = RowBar(row.Bounds, row.Bounds.yMax);
-                        caption = "Below";
+                        caption = RowCaption(RowIntent.Below);
                         break;
                     default:
                         edge = row.Bounds;
-                        caption = "Replace";
+                        caption = RowCaption(RowIntent.Replace);
                         replacing = true;
                         break;
                 }
@@ -387,6 +389,12 @@ namespace Blocky.Editor
             _indicator.style.top = local.y;
             _indicator.style.width = edge.width;
             _indicator.style.height = edge.height;
+        }
+
+        private string RowCaption(RowIntent intent)
+        {
+            _rowCaptions ??= new[] { BlockyText.Get("drop.above"), BlockyText.Get("drop.replace"), BlockyText.Get("drop.below") };
+            return _rowCaptions[(int)intent];
         }
 
         /// <summary>The bar drawn across a row at <paramref name="y"/>, centred on the edge the chain goes in at.</summary>

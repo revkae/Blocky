@@ -1,5 +1,6 @@
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine.UIElements;
 
 namespace Blocky.Editor
@@ -33,7 +34,7 @@ namespace Blocky.Editor
                 Hat = new HatView(registry.Find(stack.triggerBlockType), stack.triggerBlockType, stack.triggerParameters, stack.id, store);
                 if (store != null && buttons)
                 {
-                    var deleteButton = new Button(() => store.Apply(new DeleteStack(stack.id))) { text = "✕ Delete Stack" };
+                    var deleteButton = new Button(() => store.Apply(new DeleteStack(stack.id))) { text = BlockyText.Get("editor.delete_stack") };
                     deleteButton.AddToClassList("blocky-stack__delete");
                     Hat.Header.Add(deleteButton);
                 }
@@ -53,7 +54,7 @@ namespace Blocky.Editor
                     var index = current?.sequence.Length ?? 0;
                     store.Apply(new InsertNode(NodeLocation.InStack(stack.id, index), PaletteView.InstantiatePrototype(def)));
                 });
-                var addButton = new Button(popup.Toggle) { text = "+ Add" };
+                var addButton = new Button(popup.Toggle) { text = BlockyText.Get("editor.add") };
                 addButton.AddToClassList("blocky-block__add-button");
                 var addContainer = new VisualElement();
                 addContainer.AddToClassList("blocky-block__add-container");

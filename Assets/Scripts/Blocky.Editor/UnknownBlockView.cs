@@ -1,4 +1,5 @@
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine.UIElements;
 
 namespace Blocky.Editor
@@ -17,7 +18,7 @@ namespace Blocky.Editor
             AddToClassList("blocky-block");
             AddToClassList("blocky-block--error");
 
-            Add(new Label($"Unknown block type: {node.blockType}"));
+            Add(new Label(BlockyText.Format("block.unknown", node.blockType)));
             foreach (var param in node.parameters)
                 Add(new Label($"{param.key} = {DescribeValue(param)}"));
         }

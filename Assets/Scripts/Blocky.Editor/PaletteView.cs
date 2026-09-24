@@ -13,6 +13,7 @@ namespace Blocky.Editor
         {
             AddToClassList("blocky-palette");
 
+            // Sorted by the category's id, so the order stays put whatever language the names are in.
             var byCategory = new SortedDictionary<string, List<BlockDefinition>>(StringComparer.Ordinal);
             for (var opcode = 0; opcode < registry.Count; opcode++)
             {
@@ -22,11 +23,11 @@ namespace Blocky.Editor
                 list.Add(def);
             }
 
-            foreach (var (category, defs) in byCategory)
+            foreach (var defs in byCategory.Values)
             {
                 var section = new VisualElement();
                 section.AddToClassList("blocky-palette__section");
-                section.Add(new Label(category));
+                section.Add(new Label(defs[0].category.DisplayName()));
 
                 foreach (var def in defs)
                 {

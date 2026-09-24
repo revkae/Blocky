@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
 using Blocky.Editor;
+using Blocky.Localization;
 using Blocky.Runtime;
 using Blocky.Runtime.Persistence;
+using Unity.Localization;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
@@ -34,6 +36,8 @@ namespace Blocky.Game
     /// 1x–4x speed — and the block a script is on lights up while it runs.
     /// Undo (button or Ctrl+Z) takes back the last edit, and plain-language advice under the table, with a badge
     /// on the block, says why a script won't do anything.
+    /// Every word is in the language picked in the title bar (<see cref="BlockyLanguages"/>); switching it redraws
+    /// the workspace in place, keeping the object, its undo history and the view.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public sealed class BlockyInGamePanel : MonoBehaviour
@@ -87,6 +91,7 @@ namespace Blocky.Game
         private Button _undoButton;
         private Button _redoButton;
         private readonly List<(WorkspaceMode mode, Button button)> _modeButtons = new();
+        private readonly List<(string code, Button button)> _languageButtons = new();
         private VisualElement _adviceList;
         private VisualElement _zoomControls;
         private VisualElement _tipsRow;
@@ -148,6 +153,9 @@ namespace Blocky.Game
         private bool _shownCanStepBack;
         private bool _shownStepping;
 
+        private readonly List<Action> _languageTexts = new(); // re-run when the language changes: each puts one element's words back
+        private int _zoomLabelPercent = -1;                    // what the zoom label says, so panning doesn't re-format it
+
         private readonly List<string> _runningNow = new();      // filled every frame, never reallocated
         private readonly HashSet<string> _runningShown = new(); // what the table currently lights up
 
@@ -161,6 +169,10 @@ namespace Blocky.Game
             SetVisible(false);
             BlockyInput.IsPointerOverUi = IsPointerOverEditor; // presses on this workspace aren't "mouse down?" in the game
         }
+
+        private void OnEnable() => LocalizationSettings.SelectedLocaleChanged += OnLanguageChanged;
+
+        private void OnDisable() => LocalizationSettings.SelectedLocaleChanged -= OnLanguageChanged;
 
         private void OnDestroy()
         {
@@ -420,8 +432,12 @@ namespace Blocky.Game
             var dot = new VisualElement();
             dot.AddToClassList("blocky-ingame-status__dot");
             _statusChip.Add(dot);
-            _statusLabel = new Label("Click an object in the game to code it");
+            _statusLabel = new Label();
             _statusLabel.AddToClassList("blocky-ingame-status__label");
+            Localize(() =>
+            {
+                if (_target == null) _statusLabel.text = BlockyText.Get("status.pick_object"); // once picked, it shows the object's name
+            });
             _statusChip.Add(_statusLabel);
             bar.Add(_statusChip);
 
@@ -431,27 +447,101 @@ namespace Blocky.Game
 
             var mode = new VisualElement();
             mode.AddToClassList("blocky-ingame-mode");
-            mode.Add(ModeButton("Free", WorkspaceMode.Free, "The Scratch table: blocks go anywhere, and you can spread out, pan and zoom"));
-            mode.Add(ModeButton("Simple", WorkspaceMode.Simple, "One numbered column: every block joins the script, and the table only scrolls"));
+            mode.Add(ModeButton("mode.free", WorkspaceMode.Free));
+            mode.Add(ModeButton("mode.simple", WorkspaceMode.Simple));
             bar.Add(mode);
+
+            bar.Add(BuildLanguageButtons());
 
             var keyHint = new VisualElement();
             keyHint.AddToClassList("blocky-ingame-keyhint");
             var key = new Label(toggleKey.ToString());
             key.AddToClassList("blocky-ingame-key");
             keyHint.Add(key);
-            var hides = new Label("hides this");
+            var hides = new Label();
             hides.AddToClassList("blocky-ingame-keyhint__label");
+            Localize(() => hides.text = BlockyText.Get("keyhint.hides"));
             keyHint.Add(hides);
             bar.Add(keyHint);
 
             return bar;
         }
 
-        private Button ModeButton(string text, WorkspaceMode mode, string tooltip)
+        /// <summary>
+        /// One button per language, beside Free / Simple and drawn like them: the lit one is the language on show,
+        /// and clicking another switches the whole workspace (<see cref="OnLanguageChanged"/>) and is remembered for
+        /// next time. Each is named the way the language names itself ("English", "Türkçe"); past three languages
+        /// they show just the code ("DE") to stay narrow, with the name in the tooltip. A language file added to
+        /// <c>Resources/Languages</c> gets its button with no change here.
+        /// </summary>
+        private VisualElement BuildLanguageButtons()
         {
-            var button = new Button(() => SetWorkspaceMode(mode)) { text = text, tooltip = tooltip };
+            var group = new VisualElement();
+            group.AddToClassList("blocky-ingame-mode"); // the same segmented pill as Free / Simple
+            group.AddToClassList("blocky-ingame-language");
+
+            var locales = BlockyLanguages.Available;
+            foreach (var locale in locales)
+            {
+                var code = locale.Code;
+                var name = locale.LocaleName;
+                var button = new Button(() => BlockyLanguages.Select(code))
+                {
+                    text = locales.Count <= 3 ? name : code.ToUpperInvariant() // an id, so invariant casing
+                };
+                button.AddToClassList("blocky-ingame-mode__button");
+                Localize(() => button.tooltip = $"{BlockyText.Get("language.tooltip")}: {name}");
+                _languageButtons.Add((code, button));
+                group.Add(button);
+            }
+
+            ShowLanguage();
+            return group;
+        }
+
+        /// <summary>Lights the button of the language on show.</summary>
+        private void ShowLanguage()
+        {
+            var current = BlockyLanguages.Current?.Code;
+            foreach (var (code, button) in _languageButtons)
+                button.EnableInClassList(ActiveModeClass, string.Equals(code, current, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>Puts words on an element now, and again whenever the language changes.</summary>
+        private void Localize(Action apply)
+        {
+            _languageTexts.Add(apply);
+            apply();
+        }
+
+        private void OnLanguageChanged(Locale _) => ApplyLanguage();
+
+        /// <summary>
+        /// Rewords the workspace in place: the chrome, the tips, the palette and the table (block names, fields and
+        /// advice). The object being edited, its undo history, the mode and the view all stay as they were.
+        /// </summary>
+        private void ApplyLanguage()
+        {
+            ShowLanguage();
+            foreach (var apply in _languageTexts) apply();
+            FillTips();
+            RebuildPalette();
+            _runStateShown = false; // Pause/Resume is re-worded with the run state next frame
+            _zoomLabelPercent = -1;
+            ShowZoom();
+            _canvasView?.Refresh(); // raises Rebuilt, which re-works the advice too
+        }
+
+        /// <summary><paramref name="key"/> names the button; <c>key.tooltip</c> says what the mode is.</summary>
+        private Button ModeButton(string key, WorkspaceMode mode)
+        {
+            var button = new Button(() => SetWorkspaceMode(mode));
             button.AddToClassList("blocky-ingame-mode__button");
+            Localize(() =>
+            {
+                button.text = BlockyText.Get(key);
+                button.tooltip = BlockyText.Get(key + ".tooltip");
+            });
             _modeButtons.Add((mode, button));
             return button;
         }
@@ -533,27 +623,29 @@ namespace Blocky.Game
             bar.AddToClassList("blocky-runbar");
 
             var transport = Tray(bar);
-            transport.Add(RunButton("▶ Go", () => BlockyRuntime.Playback.Go(), "blocky-runbar__go"));
-            transport.Add(RunButton("Stop", () => BlockyRuntime.Playback.Stop(), "blocky-runbar__stop"));
-            transport.Add(RunButton("Reset", () => BlockyRuntime.Playback.ResetWorld(), null));
+            transport.Add(RunButton("run.go", () => BlockyRuntime.Playback.Go(), "blocky-runbar__go"));
+            transport.Add(RunButton("run.stop", () => BlockyRuntime.Playback.Stop(), "blocky-runbar__stop"));
+            transport.Add(RunButton("run.reset", () => BlockyRuntime.Playback.ResetWorld(), null));
 
             var stepping = Tray(bar);
-            _pauseButton = RunButton("Pause", TogglePause, null);
+            _pauseButton = RunButton(null, TogglePause, null); // Pause or Resume: RefreshRunState words it
             stepping.Add(_pauseButton);
-            _stepBackButton = RunButton("◀ Step", () => BlockyRuntime.Playback.StepBack(), "blocky-runbar__step");
+            _stepBackButton = RunButton("run.step_back", () => BlockyRuntime.Playback.StepBack(), "blocky-runbar__step");
             stepping.Add(_stepBackButton);
-            _stepButton = RunButton("Step ▶", () => BlockyRuntime.Playback.StepForward(), null);
+            _stepButton = RunButton("run.step_forward", () => BlockyRuntime.Playback.StepForward(), null);
             stepping.Add(_stepButton);
 
-            _pausedFlag = new Label("Paused") { pickingMode = PickingMode.Ignore };
+            _pausedFlag = new Label { pickingMode = PickingMode.Ignore };
             _pausedFlag.AddToClassList("blocky-runbar__flag");
+            Localize(() => _pausedFlag.text = BlockyText.Get("run.paused"));
             _pausedFlag.style.display = DisplayStyle.None;
             bar.Add(_pausedFlag);
 
             var speed = new VisualElement();
             speed.AddToClassList("blocky-runbar__speed");
-            var speedLabel = new Label("SPEED");
+            var speedLabel = new Label();
             speedLabel.AddToClassList("blocky-runbar__speed-label");
+            Localize(() => speedLabel.text = BlockyText.ToUpper(BlockyText.Get("run.speed"))); // a small-caps caption, like the palette's
             speed.Add(speedLabel);
             for (var value = 1; value <= Playback.MaxSpeed; value++)
             {
@@ -578,11 +670,13 @@ namespace Blocky.Game
             return tray;
         }
 
-        private static Button RunButton(string text, Action onClick, string modifierClass)
+        /// <summary>A run-bar button named by the string <paramref name="key"/>; a null key leaves the wording to the caller.</summary>
+        private Button RunButton(string key, Action onClick, string modifierClass)
         {
-            var button = new Button(onClick) { text = text };
+            var button = new Button(onClick);
             button.AddToClassList("blocky-runbar__button");
             if (modifierClass != null) button.AddToClassList(modifierClass);
+            if (key != null) Localize(() => button.text = BlockyText.Get(key));
             return button;
         }
 
@@ -678,7 +772,7 @@ namespace Blocky.Game
             _shownCanStepBack = canStepBack;
             _shownStepping = stepping;
 
-            _pauseButton.text = paused ? "Resume" : "Pause";
+            _pauseButton.text = BlockyText.Get(paused ? "run.resume" : "run.pause");
             _pauseButton.style.display = running ? DisplayStyle.Flex : DisplayStyle.None;
             _pausedFlag.style.display = paused ? DisplayStyle.Flex : DisplayStyle.None;
             _stepBackButton.SetEnabled(canStepBack);
@@ -734,8 +828,9 @@ namespace Blocky.Game
 
             _tipsRow = new VisualElement();
             _tipsRow.AddToClassList("blocky-tips");
-            _tipsToggle = new Button(ToggleTips) { text = "?", tooltip = "How the table works" };
+            _tipsToggle = new Button(ToggleTips) { text = "?" };
             _tipsToggle.AddToClassList("blocky-tips__toggle");
+            Localize(() => _tipsToggle.tooltip = BlockyText.Get("tips.toggle.tooltip"));
             _tipsRow.Add(_tipsToggle); // always the first child: FillTips replaces everything after it
             footer.Add(_tipsRow);
             return footer;
@@ -749,7 +844,7 @@ namespace Blocky.Game
             _tipsCard.Clear();
             foreach (var line in simple ? SimpleTipLines : FreeTipLines)
             {
-                var row = new Label(line) { pickingMode = PickingMode.Ignore };
+                var row = new Label(BlockyText.Get(line)) { pickingMode = PickingMode.Ignore };
                 row.AddToClassList("blocky-tips-card__line");
                 _tipsCard.Add(row);
             }
@@ -757,43 +852,24 @@ namespace Blocky.Game
             while (_tipsRow.childCount > 1) _tipsRow.RemoveAt(_tipsRow.childCount - 1);
             foreach (var chip in simple ? SimpleTipChips : FreeTipChips)
             {
-                var label = new Label(chip) { pickingMode = PickingMode.Ignore };
+                var label = new Label(BlockyText.Get(chip)) { pickingMode = PickingMode.Ignore };
                 label.AddToClassList("blocky-tip");
                 _tipsRow.Add(label);
             }
         }
 
-        /// <summary>Always on show, one glance each — the whole list is behind the "?".</summary>
-        private static readonly string[] FreeTipChips =
-        {
-            "Drag to build", "Shift+click for several", "Right-drag to move", "Scroll to zoom"
-        };
+        /// <summary>Always on show, one glance each — the whole list is behind the "?". String keys, as are the lines.</summary>
+        private static readonly string[] FreeTipChips = TipKeys("tips.free.chip", 4);
+        private static readonly string[] SimpleTipChips = TipKeys("tips.simple.chip", 4);
+        private static readonly string[] FreeTipLines = TipKeys("tips.free.line", 6);
+        private static readonly string[] SimpleTipLines = TipKeys("tips.simple.line", 7);
 
-        private static readonly string[] SimpleTipChips =
+        private static string[] TipKeys(string prefix, int count)
         {
-            "Drag to build", "Click a line to pick it", "Drop on a line: above, replace, below", "Drag or scroll to move"
-        };
-
-        private static readonly string[] SimpleTipLines =
-        {
-            "Every block belongs to the script. Drop one anywhere and it joins the end of the script it landed nearest — bring it close to another block first and the edge glows, to put it exactly where you want it.",
-            "There is one column, numbered like the lines of a program. Each line is a band across the table: click anywhere on it, not just on the block, to pick that block. Nothing can be left lying loose, and nothing can be hidden away off to one side.",
-            "Drop a block onto a line and where on the line you let go decides what happens: near the top it goes in above, near the bottom it goes in below, and in the middle it takes that block's place. The bar — or the outline, for a replace — shows which before you let go.",
-            "Delete or Backspace throws away the block you picked, and so does dropping it back on the palette. Ctrl+Z undoes the last change, and Ctrl+Y (or the Redo button) puts it back.",
-            "Click an empty ⬡ hole to choose a condition. A condition dropped anywhere else goes back where it came from — a hole is the only place one fits.",
-            "Drag empty space, or scroll, to move up and down the script. Switch to Free at the top for a table you can spread out on.",
-            "Step ▶ runs one block of every script — including scripts that wait for a key press, a bump or a look, which can't happen while everything is frozen."
-        };
-
-        private static readonly string[] FreeTipLines =
-        {
-            "Drag a block out of the palette onto the table. Bring two blocks close and the edge they will join glows - let go to snap them together.",
-            "Click a block to pick it. Shift+click, or drag a box over empty table, to pick several and move them as one.",
-            "Delete or Backspace throws away what's picked, and so does dropping it back on the palette. Ctrl+Z undoes the last change, and Ctrl+Y (or the Redo button) puts it back.",
-            "Click an empty ⬡ hole to choose a condition, or drag one into it.",
-            "Right-drag (or middle-drag) empty table to move around it, scroll to zoom, or use + - = in the corner.",
-            "Step ▶ runs one block of every script - including scripts that wait for a key press, a bump or a look, which can't happen while everything is frozen."
-        };
+            var keys = new string[count];
+            for (var i = 0; i < count; i++) keys[i] = $"{prefix}.{i + 1}";
+            return keys;
+        }
 
         private void ToggleTips()
         {
@@ -807,13 +883,23 @@ namespace Blocky.Game
             var tools = new VisualElement { pickingMode = PickingMode.Ignore };
             tools.AddToClassList("blocky-table-tools");
 
-            _undoButton = new Button(UndoLastEdit) { text = "Undo", tooltip = "Take back the last change (Ctrl+Z)" };
+            _undoButton = new Button(UndoLastEdit);
             _undoButton.AddToClassList("blocky-table-tools__button");
+            Localize(() =>
+            {
+                _undoButton.text = BlockyText.Get("table.undo");
+                _undoButton.tooltip = BlockyText.Get("table.undo.tooltip");
+            });
             _undoButton.SetEnabled(false);
             tools.Add(_undoButton);
 
-            _redoButton = new Button(RedoLastEdit) { text = "Redo", tooltip = "Put back what Undo took away (Ctrl+Y)" };
+            _redoButton = new Button(RedoLastEdit);
             _redoButton.AddToClassList("blocky-table-tools__button");
+            Localize(() =>
+            {
+                _redoButton.text = BlockyText.Get("table.redo");
+                _redoButton.tooltip = BlockyText.Get("table.redo.tooltip");
+            });
             _redoButton.SetEnabled(false);
             tools.Add(_redoButton); // under Undo: the tools column reads top to bottom
             return tools;
@@ -835,7 +921,7 @@ namespace Blocky.Game
 
             if (advice.Count > shown)
             {
-                var more = new Label($"…and {advice.Count - shown} more — look for the ! and ? badges on the blocks.") { pickingMode = PickingMode.Ignore };
+                var more = new Label(BlockyText.Format("advice.more", advice.Count - shown)) { pickingMode = PickingMode.Ignore };
                 more.AddToClassList("blocky-advice-more");
                 _adviceList.Add(more);
             }
@@ -860,10 +946,19 @@ namespace Blocky.Game
             controls.Add(ZoomButton("−", () => ZoomAround(ViewportCenter, _zoom / ZoomStep)));
             controls.Add(ZoomButton("=", ResetView));
 
-            _zoomLabel = new Label("100%") { pickingMode = PickingMode.Ignore };
+            _zoomLabel = new Label { pickingMode = PickingMode.Ignore }; // worded by ShowZoom
             _zoomLabel.AddToClassList("blocky-zoom-level");
             controls.Add(_zoomLabel);
             return controls;
+        }
+
+        /// <summary>The zoom as a percentage, written the language's way ("%150" in Turkish) — only when it changes.</summary>
+        private void ShowZoom()
+        {
+            var percent = Mathf.RoundToInt(_zoom * 100f);
+            if (_zoomLabel == null || percent == _zoomLabelPercent) return;
+            _zoomLabelPercent = percent;
+            _zoomLabel.text = BlockyText.Format("table.zoom", percent);
         }
 
         private static Button ZoomButton(string text, Action onClick)
@@ -1043,7 +1138,7 @@ namespace Blocky.Game
         private void ApplyCanvasTransform()
         {
             _canvasViewport.MarkDirtyRepaint(); // the dot grid is painted from _pan and _zoom
-            if (_zoomLabel != null) _zoomLabel.text = $"{Mathf.RoundToInt(_zoom * 100f)}%";
+            ShowZoom();
             if (_canvasView == null) return;
             if (_dragContext?.ActiveDrag == null) _pan = ClampPan(_pan); // mid-drag, the grabbed stack isn't on the table — don't clamp to what's left
             _canvasView.style.translate = new Translate(new Length(_pan.x), new Length(_pan.y), 0f);
@@ -1185,7 +1280,7 @@ namespace Blocky.Game
                 dot.AddToClassList(BlockClasses.Category(category));
                 tab.Add(dot);
 
-                var label = new Label(category.ToString());
+                var label = new Label(category.DisplayName());
                 label.AddToClassList("blocky-ingame-tab__label");
                 tab.Add(label);
 
@@ -1211,6 +1306,23 @@ namespace Blocky.Game
                 tab.EnableInClassList(ActiveTabClass, candidate == category);
         }
 
+        /// <summary>Builds the tab rail and the palette again in the current language, staying on the same category and scroll.</summary>
+        private void RebuildPalette()
+        {
+            var active = _tabs.Find(t => t.tab.ClassListContains(ActiveTabClass)).category;
+            var scroll = _paletteScroll.scrollOffset;
+
+            _tabRail.Clear();
+            _tabs.Clear();
+            BuildTabRail();
+            foreach (var (category, tab) in _tabs) tab.EnableInClassList(ActiveTabClass, category == active);
+
+            _paletteScroll.Clear();
+            _paletteSections.Clear();
+            BuildPalette();
+            _paletteScroll.scrollOffset = scroll;
+        }
+
         private void BuildPalette()
         {
             foreach (var (category, defs) in _blocksByCategory)
@@ -1219,14 +1331,14 @@ namespace Blocky.Game
                 section.AddToClassList("blocky-palette__section");
 
                 // A caption with the category's own dot in front of it - USS has no text-transform, so the
-                // capitals are made here.
+                // capitals are made here, the way the language writes them (Turkish i is İ).
                 var title = new VisualElement { pickingMode = PickingMode.Ignore };
                 title.AddToClassList("blocky-palette__section-title");
                 var dot = new VisualElement();
                 dot.AddToClassList("blocky-palette__section-dot");
                 dot.AddToClassList(BlockClasses.Category(category));
                 title.Add(dot);
-                var caption = new Label(category.ToString().ToUpperInvariant());
+                var caption = new Label(BlockyText.ToUpper(category.DisplayName()));
                 caption.AddToClassList("blocky-palette__section-label");
                 title.Add(caption);
                 section.Add(title);

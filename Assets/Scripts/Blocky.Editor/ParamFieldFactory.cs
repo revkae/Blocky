@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Blocky.Compiler;
 using Blocky.Data;
+using Blocky.Localization;
 using UnityEngine.UIElements;
 
 namespace Blocky.Editor
@@ -12,6 +13,8 @@ namespace Blocky.Editor
     /// <see cref="CreateLiveField"/> wires the same control types live, dispatching a new <see cref="BlockParam"/>
     /// through a callback on every edit rather than through the UI Toolkit binding system, so the caller decides
     /// how to turn that into a <c>SetParam</c> command.
+    /// Labels and choice names are in the player's language (<see cref="ParamSpec.DisplayName"/>,
+    /// <see cref="ParamSpec.ChoiceDisplayName"/>); what gets stored is always the stable key and choice id.
     /// </summary>
     public static class ParamFieldFactory
     {
@@ -55,7 +58,7 @@ namespace Blocky.Editor
             var row = new VisualElement();
             row.AddToClassList("blocky-param-field");
 
-            var key = new Label(spec.key);
+            var key = new Label(spec.DisplayName);
             key.AddToClassList("blocky-param-chip__key");
             row.Add(key);
 
@@ -70,7 +73,8 @@ namespace Blocky.Editor
             switch (spec.kind)
             {
                 case ParamKind.Number: return (value?.number ?? spec.defaultNumber).ToString("0.##");
-                case ParamKind.Bool: return (value?.boolean ?? false) ? "true" : "false";
+                case ParamKind.Bool: return BlockyText.Get((value?.boolean ?? false) ? "value.true" : "value.false");
+                case ParamKind.Choice: return spec.ChoiceDisplayName(value?.text ?? spec.defaultText ?? string.Empty);
                 default: return value?.text ?? spec.defaultText ?? string.Empty;
             }
         }
@@ -81,14 +85,14 @@ namespace Blocky.Editor
             {
                 case ParamKind.Number:
                 {
-                    var field = new FloatField(spec.key) { value = value?.number ?? spec.defaultNumber };
+                    var field = new FloatField(spec.DisplayName) { value = value?.number ?? spec.defaultNumber };
                     if (onChanged != null)
                         field.RegisterValueChangedCallback(evt => onChanged(new BlockParam { key = spec.key, kind = ParamKind.Number, number = evt.newValue }));
                     return field;
                 }
                 case ParamKind.Bool:
                 {
-                    var field = new Toggle(spec.key) { value = value?.boolean ?? false };
+                    var field = new Toggle(spec.DisplayName) { value = value?.boolean ?? false };
                     if (onChanged != null)
                         field.RegisterValueChangedCallback(evt => onChanged(new BlockParam { key = spec.key, kind = ParamKind.Bool, boolean = evt.newValue }));
                     return field;
@@ -96,17 +100,18 @@ namespace Blocky.Editor
                 case ParamKind.Text:
                 case ParamKind.ObjectRef:
                 {
-                    var field = new TextField(spec.key) { value = value?.text ?? spec.defaultText };
+                    var field = new TextField(spec.DisplayName) { value = value?.text ?? spec.defaultText };
                     if (onChanged != null)
                         field.RegisterValueChangedCallback(evt => onChanged(new BlockParam { key = spec.key, kind = spec.kind, text = evt.newValue }));
                     return field;
                 }
                 case ParamKind.Choice:
                 {
-                    var labels = new List<string>(spec.choices.Length);
-                    foreach (var choice in spec.choices) labels.Add(choice.stableId);
+                    // The choices are the stable ids — they are what the program stores — shown by their names.
+                    var ids = new List<string>(spec.choices.Length);
+                    foreach (var choice in spec.choices) ids.Add(choice.stableId);
                     var selectedIndex = value != null ? Array.FindIndex(spec.choices, c => c.stableId == value.text) : -1;
-                    var field = new DropdownField(spec.key, labels, Math.Max(selectedIndex, 0));
+                    var field = new DropdownField(spec.DisplayName, ids, Math.Max(selectedIndex, 0), spec.ChoiceDisplayName, spec.ChoiceDisplayName);
                     if (onChanged != null)
                         field.RegisterValueChangedCallback(evt => onChanged(new BlockParam { key = spec.key, kind = ParamKind.Choice, text = evt.newValue }));
                     return field;
