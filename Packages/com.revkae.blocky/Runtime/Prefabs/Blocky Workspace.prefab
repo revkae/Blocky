@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3527041242174307386
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5551949764735957593}
+  - component: {fileID: 7294154876847548871}
+  - component: {fileID: 5578774747441612117}
+  m_Layer: 0
+  m_Name: Blocky Workspace
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5551949764735957593
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3527041242174307386}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7294154876847548871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3527041242174307386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: a84dd43b891f19a42b6527778f1bb82e, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 0}
+  m_SortingOrder: 0
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+  m_GenerateAccessibilityHierarchy: 1
+--- !u!114 &5578774747441612117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3527041242174307386}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d02d0ca578ec4644b9f7ca955c7c33f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Blocky.Game::Blocky.Game.BlockyInGamePanel
+  toggleKey: 3
+  styleSheets:
+  - {fileID: 7433441132597879392, guid: a2a8d6928a1b3e143b212d2d01fa65a8, type: 3}
+  - {fileID: 7433441132597879392, guid: da38be044f084e04cbc396ad9ec814f0, type: 3}
+  - {fileID: 7433441132597879392, guid: 26c6ab444a4253e4592cf8523eb91f49, type: 3}
+  - {fileID: 7433441132597879392, guid: 6c9e720c1c0d514488030885cb52d99c, type: 3}
+  - {fileID: 7433441132597879392, guid: ddd85bc8647422646b20563e9b12222c, type: 3}
+  - {fileID: 7433441132597879392, guid: 3123c2d1f6d70054d864c9a75242dd9b, type: 3}
+  panelWidth: 420
+  paletteWidth: 280
+  workspaceMode: 0
+  toolbox: {fileID: 0}
+  theme: 0

@@ -37,13 +37,25 @@ Editor multi-select adds `BlockRef` and the group commands `MoveBlocks` / `Delet
 Recorded in [[09 Decisions/Decisions#ADR-001 UI Toolkit vs UGUI|ADR-001]].
 
 ## Folder layout (mirrors the layers)
+Blocky is a Unity package, `com.revkae.blocky`, embedded in this project ([[09 Decisions/Decisions#ADR-040 — Blocky is a Unity package, embedded in this repo and installed from git|ADR-040]]); other projects install it from the git URL in its `README.md`.
 ```
-Assets/Scripts/
-  Blocky.Data/       ObjectProgram, BlockNode, BlockStack, BlockParam, ProgramStore, commands
-  Blocky.Compiler/   ProgramCompiler, BlockRegistry, CompiledProgram
-  Blocky.Runtime/    VmScheduler, Thread, IBlockOp, TriggerBroker, ObjectProgramRunner
-  Blocky.Editor/     BlockView, PaletteView, ProgramCanvasView, drag/drop
-  Blocky.Localization/  BlockyText, BlockyLanguages, LanguageFileProvider — a leaf the Compiler, Editor and Game read words from
+Packages/com.revkae.blocky/
+  package.json          name, version, Unity 6000.7, dependencies
+  Runtime/
+    Blocky.Data/          ObjectProgram, BlockNode, BlockStack, BlockParam, ProgramStore, commands
+    Blocky.Compiler/      ProgramCompiler, BlockRegistry, CompiledProgram
+    Blocky.Runtime/       VmScheduler, Thread, IBlockOp, TriggerBroker, ObjectProgramRunner
+    Blocky.Editor/        BlockView, PaletteView, ProgramCanvasView, drag/drop — the in-game editor, so runtime
+    Blocky.Game/          BlockyInGamePanel — the workspace
+    Blocky.Localization/  BlockyText, BlockyLanguages, LanguageFileProvider — a leaf the Compiler, Editor and Game read words from
+    Resources/Blocks/     one BlockDefinition asset per block
+    Resources/Languages/  <code>.json — every word
+    UI/                   BlockyPanelSettings and its theme
+    Prefabs/              Blocky Workspace — what GameObject › Blocky › Workspace adds
+    link.xml              keeps the reflection-only ops in IL2CPP builds
+  Editor/
+    Blocky.Tooling/       Program Editor, New Block wizard, menus, BlockyPaths
 ```
+Each assembly keeps its `Tests/` beside it. The project's own content stays in `Assets/`: the demo scene and its programs, and `Assets/BlockyBlocks` (a game's own block). Tools read Blocky's files from the package and write a project's under `Assets` — installed from git, the package is read-only.
 
-Player-facing words live in `Assets/Resources/Languages/<code>.json`, never in code — see [[10 Localization/Localization|Localization]].
+Player-facing words live in `Runtime/Resources/Languages/<code>.json` in the package, never in code — see [[10 Localization/Localization|Localization]].

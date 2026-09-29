@@ -5,6 +5,7 @@
         "Blocky.Data",
         "Blocky.Compiler",
         "Blocky.Editor",
+        "Blocky.Game",
         "Blocky.Runtime",
         "Blocky.Localization",
         "Newtonsoft.Json"

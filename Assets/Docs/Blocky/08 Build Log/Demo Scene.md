@@ -26,7 +26,7 @@ All 9 `ObjectProgramRunner`s were verified via `ProgramCompiler.Link` against th
 `BlockyManager` holds the single `BlockyRuntimeTicker` that drives everything (TDD §6.5 — one scheduler tick, one keyboard poll, one look-at check per frame, shared scene-wide). A scene without one gets one added in Play mode, with a note in the console.
 
 ## In-game program editor
-`BlockyInGamePanel` (GameObject in this scene) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it.
+`BlockyInGamePanel` (GameObject in this scene — since 2026-09-29 an instance of the package's `Blocky Workspace` prefab, no overrides, the same one `GameObject › Blocky › Workspace` adds to any scene; [[09 Decisions/Decisions#ADR-040 — Blocky is a Unity package, embedded in this repo and installed from git|ADR-040]]) is a Scratch-style workspace you get **while playing** — press **Tab** to open it on the left side of the screen (the live game stays visible to its right, like Scratch's stage), then **click any object** in the game view to select it. Drag the strip on the workspace's **right edge** to resize it.
 
 - **Free / Simple** (title bar) — two ways to work, on the same program:
   - **Free** is the Scratch table described below: blocks go anywhere, several scripts side by side, blocks may lie loose, and the table pans and zooms.

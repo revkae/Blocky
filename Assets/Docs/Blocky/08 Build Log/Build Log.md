@@ -6,6 +6,17 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-29 — Blocky is a Unity package
+User request: "do the stuff you need to make this project clean to be able to use it as package" (and "why not use github for now"). Design in [[09 Decisions/Decisions#ADR-040 — Blocky is a Unity package, embedded in this repo and installed from git|ADR-040]].
+
+- **Package `com.revkae.blocky` 0.1.0**, embedded at `Packages/com.revkae.blocky/` with `package.json`, `README.md` (install, setup, own blocks, tests, builds) and `CHANGELOG.md`. Moved in with `AssetDatabase.MoveAsset`, GUIDs kept: the six runtime assemblies → `Runtime/`, Blocky.Tooling → `Editor/`, `Resources/Blocks` and `Resources/Languages` → `Runtime/Resources/`, `BlockyPanelSettings` and its theme → `Runtime/UI/`, `link.xml` → `Runtime/`. The emptied `Assets/Scripts`, `Assets/Resources` and `Assets/UI Toolkit` were deleted. The demo, its programs and `Assets/BlockyBlocks` stay in `Assets/` as this project's own content.
+- **New:** `BlockyPaths` (the package's asset paths, and the folder helper moved out of `NewBlockWizard`), `WorkspaceMenu` (`GameObject › Blocky › Workspace`; Blocky.Tooling now references Blocky.Game for its one-per-scene check), `BlockyLinkXml` (hands the package's `link.xml` to the linker), and the `Blocky Workspace` prefab, made from the demo's workspace with `SaveAsPrefabAssetAndConnect`.
+- **Fixed for a package:** the Program Editor window loaded its stylesheets from `Assets/Scripts/…` and saved programs to `Assets/Demo/Programs` — now the package path, and `Assets/Blocky/Programs`. `StyleSheetTests` searched only `Application.dataPath` — now the package's own folder, wherever it is installed.
+- **Repo `README.md`** says how to install from GitHub.
+- **Verified in Unity:** clean compile (the warnings are the analyzer's and `FindObjectsSortMode` deprecations in test files, not new); **441/441 EditMode tests** across all six test assemblies, incl. the 8 stylesheet tests reading from the package; 88 block definitions and 4 language files still load from `Resources` (same as before the move); none of the package's 311 assets references anything under `Assets/`; every file in the package has its `.meta`; the demo scene's workspace is a prefab instance with no overrides; the menu in an empty scene makes one wired workspace and refuses a second; in Play mode the demo's 11 runners run, the workspace opens fully styled (screenshot) with English/Türkçe, and the op scan still finds the project's own `JumpOp`; `BlockyLinkXml` returns the package's `link.xml`, which exists.
+- **Released:** the commit carrying this entry is tagged `v0.1.0` and pushed to GitHub (user: "ye tag it"), so the install line in the package README resolves.
+- **Not verified:** installing from the git URL into a second, clean project; an IL2CPP build with the linker hook.
+
 ## 2026-09-25 — Step moves only the open object
 User request: "Pressing step should move only the object that is open currently". Design in [[09 Decisions/Decisions#ADR-039 — Step forward steps only the object open in the editor|ADR-039]].
 

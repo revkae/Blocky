@@ -36,7 +36,7 @@ How game code talks to Blocky: hearing what the learner's scripts do, sending th
 
 ## A level's toolbox and block limit
 
-`Assets › Create › Blocky › Toolbox` makes a `BlockyToolbox`: **only these** or **all except these** — whole categories and single blocks (drag them in from `Assets/Resources/Blocks`) — and a **block limit** (0 = none). Set it on the scene's `BlockyInGamePanel` (the *Toolbox* field), or from code:
+`Assets › Create › Blocky › Toolbox` makes a `BlockyToolbox`: **only these** or **all except these** — whole categories and single blocks (drag them in from the package's `Runtime/Resources/Blocks`, under *Packages › Blocky* in the Project window) — and a **block limit** (0 = none). Set it on the scene's `BlockyInGamePanel` (the *Toolbox* field), or from code:
 
 | Call | Does |
 |---|---|

@@ -153,6 +153,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 1ae50262d3d12554bab107fe0525a9d3, type: 2}
+  motion: 0
 --- !u!54 &191862398
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -306,6 +307,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 773ce96a7c1dbb64eaf3ce24d3eb34fb, type: 2}
+  motion: 0
 --- !u!23 &247319830
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -394,84 +396,6 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 20, y: 0.5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &285563664
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 285563667}
-  - component: {fileID: 285563666}
-  - component: {fileID: 285563665}
-  m_Layer: 0
-  m_Name: BlockyInGamePanel
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &285563665
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 285563664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d02d0ca578ec4644b9f7ca955c7c33f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Blocky.Game::Blocky.Game.BlockyInGamePanel
-  toggleKey: 3
-  styleSheets:
-  - {fileID: 7433441132597879392, guid: a2a8d6928a1b3e143b212d2d01fa65a8, type: 3}
-  - {fileID: 7433441132597879392, guid: da38be044f084e04cbc396ad9ec814f0, type: 3}
-  - {fileID: 7433441132597879392, guid: 26c6ab444a4253e4592cf8523eb91f49, type: 3}
-  - {fileID: 7433441132597879392, guid: 6c9e720c1c0d514488030885cb52d99c, type: 3}
-  - {fileID: 7433441132597879392, guid: ddd85bc8647422646b20563e9b12222c, type: 3}
-  - {fileID: 7433441132597879392, guid: 3123c2d1f6d70054d864c9a75242dd9b, type: 3}
-  panelWidth: 420
---- !u!114 &285563666
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 285563664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
-  m_PanelSettings: {fileID: 11400000, guid: a84dd43b891f19a42b6527778f1bb82e, type: 2}
-  m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 0}
-  m_SortingOrder: 0
-  m_Position: 0
-  m_WorldSpaceSizeMode: 1
-  m_WorldSpaceWidth: 1920
-  m_WorldSpaceHeight: 1080
-  m_PivotReferenceSize: 0
-  m_Pivot: 0
-  m_WorldSpaceCollider: {fileID: 0}
-  m_GenerateAccessibilityHierarchy: 1
---- !u!4 &285563667
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 285563664}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -696,6 +620,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 2582b5f5def13684c9686ae2b4f0c2c3, type: 2}
+  motion: 0
 --- !u!1 &473371396
 GameObject:
   m_ObjectHideFlags: 0
@@ -730,6 +655,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 965857075}
+  motion: 0
 --- !u!23 &473371398
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -868,6 +794,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 07438f591003f11429ce00c121a417f7, type: 2}
+  motion: 0
 --- !u!23 &803479481
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -994,6 +921,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 3f4d3d5772bc40a4d95f65ee444380f5, type: 2}
+  motion: 0
 --- !u!23 &841427059
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1133,6 +1061,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 5e9ceb4ac31754d4c95582b432531547, type: 2}
+  motion: 0
 --- !u!23 &1035047385
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1259,6 +1188,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 93ff4192f8fcc2342ba343263ff2ba4b, type: 2}
+  motion: 0
 --- !u!23 &1069359113
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1385,6 +1315,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 81bf54a6d282ecc418a7d56ca59ad3c7, type: 2}
+  motion: 0
 --- !u!23 &1158452289
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1536,6 +1467,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 918da674f5d2e3b4db7bdfe5d23e0d66, type: 2}
+  motion: 0
 --- !u!1 &1509799661
 GameObject:
   m_ObjectHideFlags: 0
@@ -1696,6 +1628,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Blocky.Runtime::Blocky.Runtime.ObjectProgramRunner
   programAsset: {fileID: 11400000, guid: 4c1439d64aabd1d44a051e675f9fcbc6, type: 2}
+  motion: 0
 --- !u!23 &1560551952
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -1789,6 +1722,63 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &3152417329534294372
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3527041242174307386, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_Name
+      value: BlockyInGamePanel
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5551949764735957593, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 215605d8b824f9643a15b3832b8e935c, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1806,4 +1796,4 @@ SceneRoots:
   - {fileID: 473371401}
   - {fileID: 392610771}
   - {fileID: 1420600257}
-  - {fileID: 285563667}
+  - {fileID: 3152417329534294372}

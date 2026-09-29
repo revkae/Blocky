@@ -12,7 +12,7 @@ Milestones 1–7, the TDD's own v1, are done, and every goal in its §1.2 is met
 
 What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables, lists and a watcher, custom blocks with inputs and recursion, a `level complete` block, C# events for game code, and per-level toolboxes with block limits ([[12 Game Code/Blocky from CSharp|Blocky from C#]]), Light / Dark / High contrast themes, a New Block wizard for a game's own blocks, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
 
-**Tests:** 286/286 EditMode tests at the last full run inside Unity (2026-09-18). The language pass and the 2026-09-24 fixes added tests that have so far run only outside Unity — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
+**Tests:** 441/441 EditMode tests at the last full run inside Unity (2026-09-29, after Blocky became a package) — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
 
 **Before release:** [[11 Release/Release Readiness|Release Readiness]] lists what's left for the Asset Store and for classrooms.
 
@@ -20,6 +20,7 @@ What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 trig
 
 - [[08 Build Log/Demo Scene|▶ Demo Scene]] — `Assets/Scenes/BlockyDemo.unity`, press Play to try it
 - **✎ Program Editor** — menu `Blocky/Program Editor`: pick any GameObject, write its program directly (live fields, add/delete blocks)
+- **📦 Package** — Blocky is `Packages/com.revkae.blocky/`; another project installs it from the git URL in that folder's `README.md`, then *GameObject › Blocky › Workspace* ([[09 Decisions/Decisions#ADR-040 — Blocky is a Unity package, embedded in this repo and installed from git|ADR-040]])
 - [[00 Overview/Goals and Non-Goals|Goals & Non-Goals]]
 - [[01 Architecture/Architecture Overview|Architecture Overview]]
 - [[02 Data Model/Data Model|Data Model]]
@@ -47,7 +48,7 @@ What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 trig
 
 ## Known gaps carried forward (not silently dropped)
 - The language pass has never been compiled or run inside Unity ([[09 Decisions/Decisions#ADR-030|ADR-030]])
-- No player build yet: IL2CPP/WebGL behaviour is untested. A `link.xml` now keeps the reflection-bound ops (TDD §14), but only a real build proves it
+- No player build yet: IL2CPP/WebGL behaviour is untested. A `link.xml` now keeps the reflection-bound ops (TDD §14) — handed to the linker by the package itself since ADR-040 — but only a real build proves it
 - Touch and 2D scenes are built but have never been tried in Unity: touch on no touchscreen ([[09 Decisions/Decisions#ADR-037 — Touch goes through the last-used pointer; one finger pans the table, two pinch|ADR-037]]), 2D in no 2D scene ([[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]])
 - The Editor window (`Blocky/Program Editor`) has no undo
 - A real mouse dragging blocks in the running game can't be driven by automation (Play-mode automation stalls the player loop), so many Build Log entries end with it unverified — it needs checking by hand

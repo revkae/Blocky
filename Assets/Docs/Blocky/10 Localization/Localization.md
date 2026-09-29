@@ -7,7 +7,7 @@ tags: [localization]
 Every word Blocky shows can be read in the player's language, picked with the language buttons in the in-game title bar (next to Free / Simple). English and Turkish ship; adding a language is adding one file. Built on **Unity 6.7's built-in localization runtime** (`com.unity.modules.localizationruntime`, namespace `Unity.Localization`) — no package, no Addressables. Why this shape: [[09 Decisions/Decisions#ADR-030|ADR-030]].
 
 ## Adding a language
-1. Copy `Assets/Resources/Languages/en.json` to `Assets/Resources/Languages/<code>.json` (a locale code: `de`, `fr`, `pt-BR`).
+1. Copy the package's `Runtime/Resources/Languages/en.json` to `<code>.json` beside it (a locale code: `de`, `fr`, `pt-BR`) to ship the language with Blocky — or, for one game only, into a `Resources/Languages/` folder under that game's `Assets`: every `Resources/Languages` folder is read, the same way a project's `<code>.blocks.json` files are.
 2. Set `"locale"` to the code and `"name"` to the language's own name for itself (`"Deutsch"`) — that is what its button says.
 3. Translate the `"strings"` values. Keep the keys, and keep every `{0}`, `{1}`…: they are the block names and numbers the sentence is about, and a translation may move them anywhere in it.
 

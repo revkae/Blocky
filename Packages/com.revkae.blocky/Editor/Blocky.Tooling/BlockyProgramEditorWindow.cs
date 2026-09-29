@@ -18,9 +18,6 @@ namespace Blocky.Tooling
     /// </summary>
     public sealed class BlockyProgramEditorWindow : EditorWindow
     {
-        private const string StylesFolder = "Assets/Scripts/Blocky.Editor/Styles";
-        private const string ProgramsFolder = "Assets/Demo/Programs";
-
         [MenuItem("Blocky/Program Editor")]
         public static void Open() => GetWindow<BlockyProgramEditorWindow>("Blocky Program Editor");
 
@@ -40,7 +37,7 @@ namespace Blocky.Tooling
             root.style.paddingTop = 8;
             foreach (var sheetName in new[] { "blocky-base", "blocky-motion", "blocky-looks", "blocky-control", "blocky-event" })
             {
-                var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>($"{StylesFolder}/{sheetName}.uss");
+                var sheet = AssetDatabase.LoadAssetAtPath<StyleSheet>($"{BlockyPaths.StylesFolder}/{sheetName}.uss");
                 if (sheet != null) root.styleSheets.Add(sheet);
             }
 
@@ -100,15 +97,11 @@ namespace Blocky.Tooling
 
         private static BlockProgramAsset CreateAssetFor(GameObject go)
         {
-            if (!AssetDatabase.IsValidFolder(ProgramsFolder))
-            {
-                if (!AssetDatabase.IsValidFolder("Assets/Demo")) AssetDatabase.CreateFolder("Assets", "Demo");
-                AssetDatabase.CreateFolder("Assets/Demo", "Programs");
-            }
+            BlockyPaths.EnsureFolder(BlockyPaths.ProgramsFolder);
 
             var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
             asset.Save(new ObjectProgram { targetObjectUid = go.name });
-            var path = AssetDatabase.GenerateUniqueAssetPath($"{ProgramsFolder}/{go.name}.asset");
+            var path = AssetDatabase.GenerateUniqueAssetPath($"{BlockyPaths.ProgramsFolder}/{go.name}.asset");
             AssetDatabase.CreateAsset(asset, path);
             AssetDatabase.SaveAssets();
             return asset;

@@ -4,7 +4,7 @@ tags: [compiler, milestone-2]
 
 # Compiler
 
-Source: [[Welcome|TDD §6.2, §7]]. Status: **done** (Milestone 2) — `Assets/Scripts/Blocky.Compiler/`. See [[09 Decisions/Decisions#ADR-002 — Instruction carries branch entry and exit pcs|ADR-002]] and [[09 Decisions/Decisions#ADR-003 — Compile errors are per-stack, not whole-program|ADR-003]] for the two places this build extended the TDD's illustrative shapes.
+Source: [[Welcome|TDD §6.2, §7]]. Status: **done** (Milestone 2) — `Packages/com.revkae.blocky/Runtime/Blocky.Compiler/`. See [[09 Decisions/Decisions#ADR-002 — Instruction carries branch entry and exit pcs|ADR-002]] and [[09 Decisions/Decisions#ADR-003 — Compile errors are per-stack, not whole-program|ADR-003]] for the two places this build extended the TDD's illustrative shapes.
 
 `ProgramCompiler.Link(ObjectProgram, BlockRegistry) → CompiledProgram`, once per load:
 - `blockType` string → `int` opcode (registry index)

@@ -23,14 +23,15 @@ namespace Blocky.Editor.Tests
 
         private static List<(string selector, string body)> _rules;
 
-        /// <summary>Every rule of every Blocky stylesheet, wherever the package sits under Assets.</summary>
+        /// <summary>Every rule of every Blocky stylesheet: in the package wherever it is installed, or under Assets if Blocky was copied in there.</summary>
         private static List<(string selector, string body)> Rules
         {
             get
             {
                 if (_rules != null) return _rules;
-                var sheets = Directory.GetFiles(Application.dataPath, "blocky-*.uss", SearchOption.AllDirectories);
-                Assert.IsNotEmpty(sheets, "no blocky-*.uss under " + Application.dataPath);
+                var root = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(WorkspaceMode).Assembly)?.resolvedPath ?? Application.dataPath;
+                var sheets = Directory.GetFiles(root, "blocky-*.uss", SearchOption.AllDirectories);
+                Assert.IsNotEmpty(sheets, "no blocky-*.uss under " + root);
 
                 _rules = new List<(string, string)>();
                 foreach (var sheet in sheets)

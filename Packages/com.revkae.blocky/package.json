@@ -1,0 +1,26 @@
+{
+  "name": "com.revkae.blocky",
+  "version": "0.1.0",
+  "displayName": "Blocky",
+  "description": "Scratch-style block programming inside a Unity game: an in-game UI Toolkit workspace where players drag blocks to program scene objects, a compiler, and a small VM that runs the programs. Add a workspace with GameObject > Blocky > Workspace.",
+  "unity": "6000.7",
+  "author": {
+    "name": "revkae",
+    "url": "https://github.com/revkae/Blocky"
+  },
+  "keywords": [
+    "block programming",
+    "visual scripting",
+    "education",
+    "ui toolkit"
+  ],
+  "dependencies": {
+    "com.unity.inputsystem": "6.7.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.localizationruntime": "1.0.0",
+    "com.unity.modules.smartstrings": "1.0.0"
+  }
+}

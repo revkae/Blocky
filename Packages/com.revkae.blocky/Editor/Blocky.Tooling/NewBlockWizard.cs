@@ -168,8 +168,8 @@ namespace Blocky.Tooling
                 !EditorUtility.DisplayDialog("New Block", $"{scriptPath} already exists. Replace it?", "Replace", "Cancel"))
                 return;
 
-            EnsureFolder($"{folder}/Resources/Blocks");
-            EnsureFolder($"{folder}/Resources/Languages");
+            BlockyPaths.EnsureFolder($"{folder}/Resources/Blocks");
+            BlockyPaths.EnsureFolder($"{folder}/Resources/Languages");
 
             File.WriteAllText(scriptPath, _spec.OpSource());
             WriteWords(folder);
@@ -198,19 +198,6 @@ namespace Blocky.Tooling
                 var additions = _spec.Strings(language.Strings);
                 if (additions.Count == 0) continue;
                 File.WriteAllText(path, NewBlockSpec.MergeLanguageFile(existing, language.Code, language.Name, additions));
-            }
-        }
-
-        /// <summary>Creates <paramref name="path"/> one folder at a time through the AssetDatabase, so each gets its .meta.</summary>
-        private static void EnsureFolder(string path)
-        {
-            var parts = path.Split('/');
-            var current = parts[0];
-            for (var i = 1; i < parts.Length; i++)
-            {
-                var next = $"{current}/{parts[i]}";
-                if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(current, parts[i]);
-                current = next;
             }
         }
     }
