@@ -91,6 +91,14 @@ namespace Blocky.Runtime
             }
         }
 
+        /// <summary>Silences one object's speaker — what Stop does to the open object.</summary>
+        public void StopFor(GameObject target)
+        {
+            if (target == null) return;
+            var source = target.GetComponent<AudioSource>();
+            if (source != null && _sources.Contains(source)) source.Stop();
+        }
+
         /// <summary>Forgets the generated clips and the speakers it knows about — a new play session starts from nothing.</summary>
         public void Clear()
         {

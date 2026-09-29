@@ -382,6 +382,15 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 - **A project without the 2D physics module still compiles:** the 2D physics code is under `BLOCKY_PHYSICS2D`, which `Blocky.Runtime.asmdef` defines only when `com.unity.modules.physics2d` is present. Both ways were compiled.
 **Not done:** `when looked at` still thinks in 3D; there are no 2D-specific blocks (costumes, layers) — see [[06 Block Catalog/Block Catalog#Not built yet|Not built yet]].
 
+## ADR-039 — Step forward steps only the object open in the editor
+**Status:** Accepted (user request, 2026-09-25: "Pressing step should move only the object that is open currently"). Tested in EditMode; not tried by hand in Play mode.
+**Context:** Step forward started and stepped every script in the scene (ADR on stepping, `TriggerBroker.FireStepAll`), so a learner walking one object's program also moved every other object.
+**Decision:** `Playback.StepForward(GameObject only)` → `TriggerBroker.FireStepAll(only)` starts hats only on that object, and `VmScheduler.Step(only)` grants step budget only to its threads; other objects' threads are skipped by the tick while the step lasts (frozen where they are). Passing null keeps the old whole-scene behavior (API and tests). The run bar passes its open object, and does nothing when none is open. With a target, "when Play clicked" is not fired globally (that would start other objects' scripts); the object's own hat is started by the step instead. Step back is unchanged: snapshots still cover the whole scene.
+**Go (2026-09-25):** same rule — `Playback.Go(only)` starts only that object's Go hats, and its Play hats when it has nothing running; the run bar passes the open object.
+**Stop / Reset / Pause / Step back (2026-09-25):** the whole run bar is per object now. The scheduler pauses objects individually (`Pause(only)`, `Resume(only)`, `Step(only)`, `StopObject`); each paused object runs on its own clock (`NowOf`: the script clock minus the time it has spent paused), so its waits and timed moves resume where they left off while the scene runs on. Step back saves and restores one object's threads, its clock and its `WorldSnapshot` entry; history entries carry their target. Stop also hides that object's speech bubble and silences its speaker (`BlockyAudio.StopFor`); Reset restores just that object (`WorldSnapshot.RestoreObject`). The scene-wide `Stopped` / `WorldReset` events are **not** raised for a one-object Stop/Reset, and clones (no link back to their original) are left alone. Passing null everywhere keeps the whole-scene behavior.
+**Changed by this:** Step no longer freezes other objects (superseding the first draft above), and Go resumes only the open object.
+**Trade-off (superseded for objects paused on their own):** the script clock still advances during a step, so another object's paused timed block may finish instantly on Resume.
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above

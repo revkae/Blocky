@@ -215,7 +215,10 @@ namespace Blocky.Runtime
                 if (CustomBlocks.IsDefinition(stack)) continue;
 
                 // Any other stack can also be started by hand from the run bar's Step forward, whatever hat it has.
-                void StepHandler() => FireForStep(entryPc);
+                void StepHandler(GameObject only)
+                {
+                    if (only == null || only == gameObject) FireForStep(entryPc);
+                }
                 broker.OnStepAll += StepHandler;
                 _unsubscribe.Add(() => broker.OnStepAll -= StepHandler);
 
@@ -223,14 +226,20 @@ namespace Blocky.Runtime
                 {
                     case "event.when_play_clicked":
                     {
-                        void Handler() => Fire(triggerDef, entryPc);
+                        void Handler()
+                        {
+                            if (broker.InScope(gameObject)) Fire(triggerDef, entryPc);
+                        }
                         broker.OnPlayClicked += Handler;
                         _unsubscribe.Add(() => broker.OnPlayClicked -= Handler);
                         break;
                     }
                     case "event.when_go_clicked":
                     {
-                        void Handler() => Fire(triggerDef, entryPc);
+                        void Handler()
+                        {
+                            if (broker.InScope(gameObject)) Fire(triggerDef, entryPc);
+                        }
                         broker.OnGoClicked += Handler;
                         _unsubscribe.Add(() => broker.OnGoClicked -= Handler);
                         break;

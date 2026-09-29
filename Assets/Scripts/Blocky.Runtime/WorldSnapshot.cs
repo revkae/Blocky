@@ -75,12 +75,18 @@ namespace Blocky.Runtime
             foreach (var go in _destroyed) _tracked.Remove(go);
         }
 
-        /// <summary>Records how every tracked object is right now, for <see cref="RestoreMoment"/>.</summary>
-        public WorldMoment SaveMoment()
+        /// <summary>Puts one tracked object back as it started — the run bar's Reset for the open object. Does nothing for an object that isn't tracked.</summary>
+        public void RestoreObject(GameObject go)
         {
-            var objects = new List<Tracked>(_tracked.Count);
+            if (go != null && _tracked.TryGetValue(go, out var tracked)) Apply(tracked, tracked.Start);
+        }
+
+        /// <summary>Records how every tracked object (or just <paramref name="only"/>) is right now, for <see cref="RestoreMoment"/>.</summary>
+        public WorldMoment SaveMoment(GameObject only = null)
+        {
+            var objects = new List<Tracked>(only == null ? _tracked.Count : 1);
             foreach (var (go, tracked) in _tracked)
-                if (go != null) objects.Add(tracked);
+                if (go != null && (only == null || go == only)) objects.Add(tracked);
 
             var states = new ObjectState[objects.Count];
             for (var i = 0; i < objects.Count; i++) states[i] = Read(objects[i]);

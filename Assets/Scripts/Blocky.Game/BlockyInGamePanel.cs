@@ -762,8 +762,8 @@ namespace Blocky.Game
         }
 
         /// <summary>
-        /// Run controls for the whole scene: Go / Stop / Reset, Pause (only while something runs), Step back / Step
-        /// forward, and the speed. Words rather than icons, so a child (or a teacher) doesn't have to guess.
+        /// Run controls for the object open in the editor — the rest of the scene is left alone: Go / Stop / Reset,
+        /// Pause (only while its scripts run), Step back / Step forward. The speed is the one setting that is scene-wide. Words rather than icons, so a child (or a teacher) doesn't have to guess.
         /// Commands go through <see cref="BlockyRuntime.Playback"/> each click, never a cached copy — it is rebuilt
         /// between play sessions.
         /// </summary>
@@ -773,16 +773,16 @@ namespace Blocky.Game
             bar.AddToClassList("blocky-runbar");
 
             var transport = Tray(bar);
-            transport.Add(RunButton("run.go", () => BlockyRuntime.Playback.Go(), "blocky-runbar__go"));
-            transport.Add(RunButton("run.stop", () => BlockyRuntime.Playback.Stop(), "blocky-runbar__stop"));
-            transport.Add(RunButton("run.reset", () => BlockyRuntime.Playback.ResetWorld(), null));
+            transport.Add(RunButton("run.go", () => { if (_target != null) BlockyRuntime.Playback.Go(_target); }, "blocky-runbar__go"));
+            transport.Add(RunButton("run.stop", () => { if (_target != null) BlockyRuntime.Playback.Stop(_target); }, "blocky-runbar__stop"));
+            transport.Add(RunButton("run.reset", () => { if (_target != null) BlockyRuntime.Playback.ResetWorld(_target); }, null));
 
             var stepping = Tray(bar);
             _pauseButton = RunButton(null, TogglePause, null); // Pause or Resume: RefreshRunState words it
             stepping.Add(_pauseButton);
-            _stepBackButton = RunButton("run.step_back", () => BlockyRuntime.Playback.StepBack(), "blocky-runbar__step");
+            _stepBackButton = RunButton("run.step_back", () => { if (_target != null) BlockyRuntime.Playback.StepBack(_target); }, "blocky-runbar__step");
             stepping.Add(_stepBackButton);
-            _stepButton = RunButton("run.step_forward", () => BlockyRuntime.Playback.StepForward(), null);
+            _stepButton = RunButton("run.step_forward", () => { if (_target != null) BlockyRuntime.Playback.StepForward(_target); }, null);
             stepping.Add(_stepButton);
 
             _pausedFlag = new Label { pickingMode = PickingMode.Ignore };
@@ -830,11 +830,12 @@ namespace Blocky.Game
             return button;
         }
 
-        private static void TogglePause()
+        private void TogglePause()
         {
+            if (_target == null) return;
             var playback = BlockyRuntime.Playback;
-            if (playback.IsPaused) playback.Resume();
-            else playback.Pause();
+            if (playback.IsPausedFor(_target)) playback.Resume(_target);
+            else playback.Pause(_target);
         }
 
         private void SetSpeed(int speed)
@@ -932,9 +933,9 @@ namespace Blocky.Game
         private void RefreshRunState()
         {
             var playback = BlockyRuntime.Playback;
-            var paused = playback.IsPaused;
-            var running = playback.IsGoing;
-            var canStepBack = playback.CanStepBack;
+            var paused = playback.IsPausedFor(_target);
+            var running = playback.IsGoingFor(_target);
+            var canStepBack = playback.CanStepBackFor(_target);
             var stepping = playback.IsStepping;
             if (_runStateShown && paused == _shownPaused && running == _shownRunning && canStepBack == _shownCanStepBack && stepping == _shownStepping)
                 return;
@@ -1901,7 +1902,7 @@ namespace Blocky.Game
 
             if (_liveAsset == null) _liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
             _liveAsset.Save(_store.Program);
-            BlockyRuntime.Playback.ForgetSteps();
+            BlockyRuntime.Playback.ForgetSteps(_target);
             _runner.Shutdown();
             _runner.SetProgramAsset(_liveAsset);
             _runner.Initialize();

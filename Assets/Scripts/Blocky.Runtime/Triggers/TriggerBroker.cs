@@ -21,7 +21,7 @@ namespace Blocky.Runtime.Triggers
         {
             if (_playClickedFired) return;
             _playClickedFired = true;
-            OnPlayClicked?.Invoke();
+            InvokeScoped(OnPlayClicked, null);
         }
 
         /// <summary>Call when a new play session starts, so <see cref="FirePlayClicked"/> can fire again.</summary>
@@ -33,17 +33,37 @@ namespace Blocky.Runtime.Triggers
         /// <summary>The in-game "Go" button (TDD-equivalent of Scratch's green flag) — click it as many times as you like, each fires this again.</summary>
         public event Action OnGoClicked;
 
-        public void FireGoClicked() => OnGoClicked?.Invoke();
+        /// <summary>Fires "when Go clicked"; with <paramref name="only"/>, only that object's scripts react.</summary>
+        public void FireGoClicked(GameObject only = null) => InvokeScoped(OnGoClicked, only);
+
+        /// <summary>
+        /// Fires "when Play clicked" for one object only, without touching the once-per-session flag — the
+        /// scene-wide <see cref="FirePlayClicked"/> stays armed for the other objects.
+        /// </summary>
+        public void FirePlayClickedFor(GameObject only) => InvokeScoped(OnPlayClicked, only);
+
+        private GameObject _scope;
+
+        /// <summary>Whether <paramref name="go"/> should react to the Play/Go event being fired: always, unless the fire was aimed at one object.</summary>
+        public bool InScope(GameObject go) => _scope == null || _scope == go;
+
+        private void InvokeScoped(Action handlers, GameObject only)
+        {
+            _scope = only;
+            try { handlers?.Invoke(); }
+            finally { _scope = null; }
+        }
 
         /// <summary>
         /// "Start every script in the scene, whatever hat it has" — the channel Step forward uses. A learner walking
         /// a program block by block cannot produce a key press, a collision or a look while the scene is frozen
         /// between steps, so without this only "when Play clicked" and "when Go clicked" scripts could ever be
-        /// stepped. Listeners leave a script that is already running exactly where it is.
+        /// stepped. Listeners leave a script that is already running exactly where it is. The argument is the one
+        /// object to start scripts on, or null for every object; listeners on any other object ignore it.
         /// </summary>
-        public event Action OnStepAll;
+        public event Action<GameObject> OnStepAll;
 
-        public void FireStepAll() => OnStepAll?.Invoke();
+        public void FireStepAll(GameObject only = null) => OnStepAll?.Invoke(only);
 
         /// <summary>
         /// Scratch's broadcast: a named message any script can send and any number of scripts can listen for.

@@ -36,14 +36,27 @@ namespace Blocky.Runtime
         private float _timerOrigin;
         private bool _paused;
         private bool _stepping;
+        private GameObject _stepOnly; // set while a step is confined to one object's scripts; null means every script steps
+
+        // Objects paused on their own (the run bar acts on the open object); every other object keeps running.
+        // A paused object's scripts run on their own clock — the script clock minus the time it has spent paused —
+        // so a wait or a timed move resumes exactly where it left off, just as it does when the whole scene pauses.
+        private readonly HashSet<GameObject> _pausedObjects = new();
+        private readonly Dictionary<GameObject, float> _lag = new();
 
         public int InstructionBudget { get; set; } = 10_000;
 
         /// <summary>Multiplies every tick's <c>dt</c>: 2 makes a 2-second move take 1 second. Instant blocks are instant at any speed.</summary>
         public float TimeScale { get; set; } = 1f;
 
-        /// <summary>True while scripts are frozen — including between steps.</summary>
+        /// <summary>True while the whole scene is frozen — including between steps.</summary>
         public bool IsPaused => _paused;
+
+        /// <summary>True while <paramref name="target"/>'s scripts are frozen, by a pause of the scene or of that object alone.</summary>
+        public bool IsPausedFor(GameObject target) => _paused || (target != null && _pausedObjects.Contains(target));
+
+        /// <summary>The script clock as <paramref name="target"/> sees it: without the time that object has spent paused.</summary>
+        private float NowOf(GameObject target) => _lag.Count > 0 && _lag.TryGetValue(target, out var lag) ? _now - lag : _now;
 
         /// <summary>True while a <see cref="Step"/> is still under way (a timed block can take several ticks).</summary>
         public bool IsStepping => _stepping;
@@ -101,6 +114,16 @@ namespace Blocky.Runtime
             }
         }
 
+        /// <summary>Whether a script on <paramref name="target"/> is running or about to start.</summary>
+        public bool HasWorkOn(GameObject target)
+        {
+            foreach (var t in _pending)
+                if (t.Target == target && t.State != ThreadState.Done) return true;
+            foreach (var t in _threads)
+                if (t.Target == target && t.State != ThreadState.Done) return true;
+            return false;
+        }
+
         /// <summary>Threads started during a tick begin on the next tick, never mid-tick (TDD §6.4).</summary>
         public VmThread Start(CompiledProgram program, GameObject target, int entryPc)
         {
@@ -142,6 +165,31 @@ namespace Blocky.Runtime
             _threads.Clear();
             _pending.Clear();
             _stepping = false;
+            _stepOnly = null;
+            _pausedObjects.Clear();
+            _lag.Clear();
+        }
+
+        /// <summary>
+        /// Ends every script of <paramref name="target"/> and un-pauses it — the run bar's Stop for one object.
+        /// Not for use from inside a tick (it edits the thread lists, like <see cref="StopAll"/>).
+        /// </summary>
+        public void StopObject(GameObject target)
+        {
+            foreach (var t in _threads)
+                if (t.Target == target) t.State = ThreadState.Done;
+            foreach (var t in _pending)
+                if (t.Target == target) t.State = ThreadState.Done;
+            _threads.RemoveAll(t => t.Target == target);
+            _pending.RemoveAll(t => t.Target == target);
+
+            _pausedObjects.Remove(target);
+            _lag.Remove(target);
+            if (_stepOnly == target)
+            {
+                _stepping = false;
+                _stepOnly = null;
+            }
         }
 
         /// <summary>
@@ -170,32 +218,68 @@ namespace Blocky.Runtime
             t.State = ThreadState.Done;
         }
 
-        /// <summary>Freezes every script where it is. Script time stops too, so a half-finished wait or move resumes exactly where it left off.</summary>
-        public void Pause()
+        /// <summary>
+        /// Freezes every script where it is — or, with <paramref name="only"/>, just that object's scripts while the
+        /// rest carry on. Script time stops too, so a half-finished wait or move resumes exactly where it left off.
+        /// </summary>
+        public void Pause(GameObject only = null)
         {
-            _paused = true;
-            _stepping = false;
+            if (only == null)
+            {
+                _paused = true;
+                _stepping = false;
+                _stepOnly = null;
+                return;
+            }
+
+            _pausedObjects.Add(only);
+            if (_stepOnly == only)
+            {
+                _stepping = false;
+                _stepOnly = null;
+            }
         }
 
-        /// <summary>Runs normally again after <see cref="Pause"/> or <see cref="Step"/>.</summary>
-        public void Resume()
+        /// <summary>Runs normally again after <see cref="Pause"/> or <see cref="Step"/> — everything, or with <paramref name="only"/>, just that object.</summary>
+        public void Resume(GameObject only = null)
         {
-            _paused = false;
-            _stepping = false;
-            foreach (var t in _threads) t.StepParked = false;
+            if (only == null)
+            {
+                _paused = false;
+                _stepping = false;
+                _stepOnly = null;
+                _pausedObjects.Clear();
+                foreach (var t in _threads) t.StepParked = false;
+                return;
+            }
+
+            _pausedObjects.Remove(only);
+            if (_stepOnly == only)
+            {
+                _stepping = false;
+                _stepOnly = null;
+            }
+            foreach (var t in _threads)
+                if (t.Target == only) t.StepParked = false;
         }
 
         /// <summary>
         /// Pauses (if running) and lets every script run exactly one more block, then freezes again — over several
         /// ticks when that block takes time (a timed move, a wait). A script caught in the middle of a block just
         /// finishes it. Scripts that start during the step get one block too.
+        /// With <paramref name="only"/>, just that object pauses and steps; every other object carries on running.
         /// </summary>
-        public void Step()
+        public void Step(GameObject only = null)
         {
-            _paused = true;
+            if (only == null) _paused = true;
+            else _pausedObjects.Add(only);
             _stepping = true;
-            foreach (var t in _threads) GrantStep(t);
+            _stepOnly = only;
+            foreach (var t in _threads)
+                if (Steps(t)) GrantStep(t);
         }
+
+        private bool Steps(VmThread t) => _stepOnly == null || t.Target == _stepOnly;
 
         private static void GrantStep(VmThread t)
         {
@@ -203,16 +287,28 @@ namespace Blocky.Runtime
             t.StepBudget = t.IsMidBlock ? 0 : 1; // mid-block, finishing it *is* the step
         }
 
-        /// <summary>Records every script's progress and the script clock, for <see cref="RestoreMoment"/>.</summary>
-        public SchedulerMoment SaveMoment() => new(_now, _timerOrigin, Save(_threads), Save(_pending));
+        /// <summary>
+        /// Records every script's progress and the script clock, for <see cref="RestoreMoment"/> — or, with
+        /// <paramref name="only"/>, just that object's scripts and its own clock.
+        /// </summary>
+        public SchedulerMoment SaveMoment(GameObject only = null) => only == null
+            ? new SchedulerMoment(_now, _timerOrigin, Save(_threads, null), Save(_pending, null), null)
+            : new SchedulerMoment(NowOf(only), _timerOrigin, Save(_threads, only), Save(_pending, only), only);
 
         /// <summary>
         /// Puts every script back exactly as it was at <paramref name="moment"/> — scripts that have finished since
-        /// come back, scripts started since are ended — and leaves everything paused. The objects in the scene are
+        /// come back, scripts started since are ended — and leaves everything paused (for a moment of one object,
+        /// just that object; the rest of the scene is left running). The objects in the scene are
         /// not this class's to restore: see <see cref="WorldSnapshot.RestoreMoment"/>.
         /// </summary>
         public void RestoreMoment(SchedulerMoment moment)
         {
+            if (moment.Only != null)
+            {
+                RestoreObjectMoment(moment);
+                return;
+            }
+
             foreach (var t in _threads) t.State = ThreadState.Done;
             foreach (var t in _pending) t.State = ThreadState.Done;
             _threads.Clear();
@@ -233,13 +329,69 @@ namespace Blocky.Runtime
             _timerOrigin = moment.TimerOrigin;
             _paused = true;
             _stepping = false;
+            _stepOnly = null;
+            _pausedObjects.Clear(); // the whole scene's clock went back, so every private clock starts over with it
+            _lag.Clear();
         }
 
-        private static ThreadMoment[] Save(List<VmThread> threads)
+        private void RestoreObjectMoment(SchedulerMoment moment)
         {
-            var saved = new ThreadMoment[threads.Count];
-            for (var i = 0; i < threads.Count; i++) saved[i] = new ThreadMoment(threads[i]);
+            var only = moment.Only;
+            foreach (var t in _threads)
+                if (t.Target == only) t.State = ThreadState.Done;
+            foreach (var t in _pending)
+                if (t.Target == only) t.State = ThreadState.Done;
+            _threads.RemoveAll(t => t.Target == only);
+            _pending.RemoveAll(t => t.Target == only);
+
+            foreach (var saved in moment.Threads)
+            {
+                saved.Restore();
+                _threads.Add(saved.Thread);
+            }
+            foreach (var saved in moment.Pending)
+            {
+                saved.Restore();
+                _pending.Add(saved.Thread);
+            }
+
+            _lag[only] = _now - moment.Now; // this object's clock goes back; the scene's keeps running
+            _pausedObjects.Add(only);
+            if (_stepOnly == only)
+            {
+                _stepping = false;
+                _stepOnly = null;
+            }
+        }
+
+        private static ThreadMoment[] Save(List<VmThread> threads, GameObject only)
+        {
+            var count = 0;
+            foreach (var t in threads)
+                if (only == null || t.Target == only) count++;
+
+            var saved = new ThreadMoment[count];
+            var next = 0;
+            foreach (var t in threads)
+                if (only == null || t.Target == only) saved[next++] = new ThreadMoment(t);
             return saved;
+        }
+
+        /// <summary>Adds the time every object paused on its own has been paused for this tick to its private lag.</summary>
+        private void AccrueLag(float dt)
+        {
+            foreach (var go in _pausedObjects)
+            {
+                if (_stepping && (_stepOnly == null || _stepOnly == go)) continue; // being stepped: its clock runs
+                _lag[go] = (_lag.TryGetValue(go, out var lag) ? lag : 0f) + dt;
+            }
+        }
+
+        /// <summary>Whether <paramref name="t"/> is held still this tick: paused with its object or the scene, and not the one being stepped.</summary>
+        private bool IsFrozen(VmThread t)
+        {
+            if (_stepping && Steps(t)) return false;
+            return _paused || _pausedObjects.Contains(t.Target);
         }
 
         public void Tick(float dt)
@@ -249,12 +401,14 @@ namespace Blocky.Runtime
 
             dt *= TimeScale;
             _now += dt;
+            if (_pausedObjects.Count > 0) AccrueLag(dt);
 
             // Threads started since the last Tick begin now, at the top of this one — never mid-tick (TDD §6.4).
             if (_pending.Count > 0)
             {
                 if (_stepping)
-                    foreach (var t in _pending) GrantStep(t);
+                    foreach (var t in _pending)
+                        if (Steps(t)) GrantStep(t);
                 foreach (var t in _pending)
                 {
                     if (t.State == ThreadState.Done) continue; // stopped before it ever ran
@@ -272,7 +426,8 @@ namespace Blocky.Runtime
                 if (t.State == ThreadState.Done) continue;
                 if (t.Target == null) { t.State = ThreadState.Done; continue; }
                 if (t.StepParked) continue;
-                if (t.State == ThreadState.Sleeping && _now < t.WakeAt) continue;
+                if (IsFrozen(t)) continue;
+                if (t.State == ThreadState.Sleeping && NowOf(t.Target) < t.WakeAt) continue;
 
                 var budget = InstructionBudget;
                 t.State = ThreadState.Running;
@@ -315,7 +470,7 @@ namespace Blocky.Runtime
         private bool EveryThreadParked()
         {
             foreach (var t in _threads)
-                if (t.State != ThreadState.Done && !t.StepParked) return false;
+                if (t.State != ThreadState.Done && Steps(t) && !t.StepParked) return false;
             return true;
         }
 
@@ -373,7 +528,7 @@ namespace Blocky.Runtime
             }
 
             var span = new ReadOnlySpan<ParamValue>(t.Program.ParamTable, instr.ParamOffset, instr.ParamCount);
-            var ctx = new OpContext(t, t.Pc, instr, span, dt, _now, _slots, this);
+            var ctx = new OpContext(t, t.Pc, instr, span, dt, NowOf(t.Target), _slots, this);
             t.ActivePc = t.Pc;
 
             OpResult result;
@@ -432,13 +587,15 @@ namespace Blocky.Runtime
         internal readonly float TimerOrigin;
         internal readonly ThreadMoment[] Threads;
         internal readonly ThreadMoment[] Pending;
+        internal readonly GameObject Only; // the one object this moment covers (Now is then its own clock), or null for the whole scene
 
-        internal SchedulerMoment(float now, float timerOrigin, ThreadMoment[] threads, ThreadMoment[] pending)
+        internal SchedulerMoment(float now, float timerOrigin, ThreadMoment[] threads, ThreadMoment[] pending, GameObject only)
         {
             Now = now;
             TimerOrigin = timerOrigin;
             Threads = threads;
             Pending = pending;
+            Only = only;
         }
     }
 }

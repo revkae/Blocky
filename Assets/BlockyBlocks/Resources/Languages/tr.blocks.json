@@ -1,0 +1,9 @@
+{
+  "locale": "tr",
+  "name": "Türkçe",
+  "about": "Words for this project's own blocks, read on top of Blocky's file for this language. Made by Blocky › New Block — translate any that are still in English.",
+  "strings": {
+    "block.game.jump": "jump",
+    "param.amount": "amount"
+  }
+}

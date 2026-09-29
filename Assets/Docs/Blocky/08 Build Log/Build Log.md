@@ -6,6 +6,27 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-09-25 — Step moves only the open object
+User request: "Pressing step should move only the object that is open currently". Design in [[09 Decisions/Decisions#ADR-039 — Step forward steps only the object open in the editor|ADR-039]].
+
+- **Bug fixed:** Step forward stepped every programmed object. Now `Playback.StepForward(only)`, `TriggerBroker.FireStepAll(only)` (event now `Action<GameObject>`) and `VmScheduler.Step(only)` (plus `HasWorkOn`) confine it to one object; `BlockyInGamePanel` passes `_target` and does nothing with no object open.
+- **Verified:** compiled; the whole `Blocky.Runtime.Tests` suite passes in EditMode (243), including new `StepForward_WithAnObject_StepsOnlyThatObjectsScripts`. **Not verified:** the Step button by hand in Play mode with the demo scene.
+
+## 2026-09-25 (run bar) — Stop, Reset, Pause and Step back act on the open object too
+User request: "Stop, Reset and Pause these should effect current object also". Design in [[09 Decisions/Decisions#ADR-039 — Step forward steps only the object open in the editor|ADR-039]].
+
+- **Per-object pause:** `VmScheduler` keeps a set of paused objects plus a per-object clock lag, so a paused object's scripts freeze and its waits/timed blocks resume exactly, while everything else runs. Step now pauses only the stepped object (before, it froze the rest); Go resumes only the open object.
+- **Per-object Stop / Reset / Step back:** `Playback.Stop/ResetWorld/Pause/Resume/StepBack/ForgetSteps(only)`, `IsPausedFor`, `IsGoingFor`, `CanStepBackFor`; `VmScheduler.StopObject`, per-object `SaveMoment/RestoreMoment`; `WorldSnapshot.RestoreObject` and `SaveMoment(only)`; `BlockyAudio.StopFor`. Scene-wide `Stopped`/`WorldReset` events are not raised for a one-object Stop/Reset; clones are left alone.
+- **Panel:** every run-bar button passes `_target` (nothing happens with none open); Pause/Resume word, "Paused" flag and Step back's enabled state read that object.
+- **Verified:** compiled; `Blocky.Runtime.Tests` 249/249 in EditMode, incl. 5 new: pause one object while another runs, a paused wait keeps its place, Stop one, Reset one, step back one. **Not verified:** the buttons by hand in Play mode.
+
+## 2026-09-25 (go) — Go runs only the open object
+User request: "Same goes to GO button it should only affect whichever is open currently". Extends [[09 Decisions/Decisions#ADR-039 — Step forward steps only the object open in the editor|ADR-039]].
+
+- `Playback.Go(only)`: fires that object's "when Go clicked" scripts, and its "when Play clicked" scripts if it has nothing running, via `TriggerBroker.FireGoClicked(only)` / `FirePlayClickedFor(only)` (no once-per-session flag touched). Runner Play/Go handlers check `broker.InScope(gameObject)`. The run bar passes `_target`; with none open, Go does nothing. Scene start still fires everything.
+- **Caveat:** Go still un-pauses the whole scene, so other objects frozen mid-step resume too.
+- **Verified:** compiled; `Blocky.Runtime.Tests` 244/244 in EditMode incl. new `Go_WithAnObject_RunsOnlyThatObjectsScripts`. **Not verified:** by hand in Play mode.
+
 ## 2026-09-24 (2D) — 2D scenes, and "turn left" turns left
 User request: "2D scenes". Design in [[09 Decisions/Decisions#ADR-038 — 2D is a per-object motion plane, and picking and contacts speak both physics engines|ADR-038]].
 

@@ -67,6 +67,10 @@ namespace Blocky.Runtime.Tests
                 Def("event.when_play_clicked", BlockShape.Trigger),
                 Def("event.when_key_pressed", BlockShape.Trigger),
                 Def("event.when_go_clicked", BlockShape.Trigger),
+                Def("control.wait", BlockShape.Statement, new[]
+                {
+                    new ParamSpec { key = "seconds", kind = ParamKind.Number, min = 0, max = 1000 }
+                }),
                 Def("motion.move_forward", BlockShape.Statement, new[]
                 {
                     new ParamSpec { key = "distance", kind = ParamKind.Number, min = -1000, max = 1000 },
@@ -312,6 +316,223 @@ namespace Blocky.Runtime.Tests
 
             Assert.AreEqual(3f, Z, 1e-4f); // one block per press, straight through — not the first block three times
         }
+
+        /// <summary>Regression: Step moved every programmed object in the scene, not just the one open in the editor.</summary>
+        [Test]
+        public void StepForward_WithAnObject_StepsOnlyThatObjectsScripts()
+        {
+            var playback = SetUpScript();
+            var other = new GameObject("PlaybackTestOther");
+            try
+            {
+                other.SetActive(false);
+                var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+                asset.Save(new ObjectProgram
+                {
+                    stacks = new[] { new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = new[] { Move("m1"), Move("m2") } } }
+                });
+                var otherRunner = other.AddComponent<ObjectProgramRunner>();
+                otherRunner.SetProgramAsset(asset);
+                otherRunner.Initialize();
+
+                playback.StepForward(_target);
+                Tick();
+                Tick();
+
+                Assert.AreEqual(1f, Z, 1e-4f);
+                Assert.AreEqual(0f, other.transform.position.z, 1e-4f); // the other object's script never started
+
+                playback.StepForward(_target);
+                Tick();
+
+                Assert.AreEqual(2f, Z, 1e-4f);
+                Assert.AreEqual(0f, other.transform.position.z, 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void Go_WithAnObject_RunsOnlyThatObjectsScripts()
+        {
+            var playback = SetUpScript();
+            var other = new GameObject("PlaybackTestOther");
+            try
+            {
+                other.SetActive(false);
+                var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+                asset.Save(new ObjectProgram
+                {
+                    stacks = new[] { new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = new[] { Move("m1") } } }
+                });
+                var otherRunner = other.AddComponent<ObjectProgramRunner>();
+                otherRunner.SetProgramAsset(asset);
+                otherRunner.Initialize();
+
+                playback.Go(_target);
+                Tick();
+                Tick();
+
+                Assert.AreEqual(3f, Z, 1e-4f);
+                Assert.AreEqual(0f, other.transform.position.z, 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        /// <summary>A second object with a "when Play clicked → move 1" x <paramref name="moves"/> script, wired like the target.</summary>
+        private GameObject MakeOther(int moves, bool neverEnding = false)
+        {
+            var other = new GameObject("PlaybackTestOther");
+            other.SetActive(false);
+            var sequence = new BlockNode[moves];
+            for (var i = 0; i < moves; i++) sequence[i] = neverEnding ? NeverEndingMove($"m{i}") : Move($"m{i}");
+            var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+            asset.Save(new ObjectProgram { stacks = new[] { new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = sequence } } });
+            var runner = other.AddComponent<ObjectProgramRunner>();
+            runner.SetProgramAsset(asset);
+            runner.Initialize();
+            return other;
+        }
+
+        [Test]
+        public void Pause_WithAnObject_FreezesOnlyThatObject_WhileTheOthersRunOn()
+        {
+            var playback = SetUpScript(new[]
+            {
+                new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = new[] { Move("n1"), Move("n2"), Move("n3") } }
+            });
+            var other = MakeOther(3);
+            try
+            {
+                BlockyRuntime.Triggers.FirePlayClicked();
+                playback.Pause(_target);
+                Tick();
+                Tick();
+
+                Assert.IsTrue(playback.IsPausedFor(_target));
+                Assert.IsFalse(playback.IsPausedFor(other));
+                Assert.AreEqual(0f, Z, 1e-4f);                                 // frozen before its first block
+                Assert.AreEqual(3f, other.transform.position.z, 1e-4f);         // ran to its end
+
+                playback.Resume(_target);
+                Tick();
+                Assert.AreEqual(3f, Z, 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void Pause_WithAnObject_KeepsItsWaitWhereItWas()
+        {
+            var playback = SetUpScript(new[]
+            {
+                new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = new[] { Wait("w1", 0.3f), Move("n1") } }
+            });
+            BlockyRuntime.Triggers.FirePlayClicked();
+            Tick(); // starts, waiting 0.3 s of its own time
+            playback.Pause(_target);
+            for (var i = 0; i < 10; i++) Tick(); // one whole second goes by for the scene
+
+            playback.Resume(_target);
+            Tick();
+            Assert.AreEqual(0f, Z, 1e-4f, "the wait must not have counted the time spent paused");
+
+            Tick();
+            Tick();
+            Tick();
+            Assert.AreEqual(1f, Z, 1e-4f);
+        }
+
+        [Test]
+        public void Stop_WithAnObject_EndsOnlyThatObjectsScripts()
+        {
+            var playback = SetUpScript(new[]
+            {
+                new BlockStack { id = "stk_1", triggerBlockType = "event.when_play_clicked", sequence = new[] { NeverEndingMove("n1") } }
+            });
+            var other = MakeOther(1, neverEnding: true);
+            try
+            {
+                BlockyRuntime.Triggers.FirePlayClicked();
+                Tick();
+                Assert.IsTrue(BlockyRuntime.Scheduler.HasWorkOn(_target));
+                Assert.IsTrue(BlockyRuntime.Scheduler.HasWorkOn(other));
+
+                playback.Stop(_target);
+
+                Assert.IsFalse(BlockyRuntime.Scheduler.HasWorkOn(_target));
+                Assert.IsTrue(BlockyRuntime.Scheduler.HasWorkOn(other));
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void ResetWorld_WithAnObject_PutsBackOnlyThatObject()
+        {
+            var playback = SetUpScript();
+            var other = MakeOther(3);
+            try
+            {
+                BlockyRuntime.Triggers.FirePlayClicked();
+                Tick();
+                Assert.AreEqual(3f, Z, 1e-4f);
+                Assert.AreEqual(3f, other.transform.position.z, 1e-4f);
+
+                playback.ResetWorld(_target);
+
+                Assert.AreEqual(0f, Z, 1e-4f);
+                Assert.AreEqual(3f, other.transform.position.z, 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void StepForwardAndBack_WithAnObject_LeavesOtherObjectsRunning()
+        {
+            var playback = SetUpScript();
+            var other = MakeOther(3, neverEnding: false);
+            try
+            {
+                BlockyRuntime.Triggers.FirePlayClicked(); // both start; the other object runs on its own
+                playback.Pause(_target);
+                playback.Resume(_target);
+                playback.StepForward(_target);
+                Tick();
+                Assert.IsTrue(playback.CanStepBackFor(_target));
+                Assert.IsFalse(playback.CanStepBackFor(other));
+                Assert.IsTrue(playback.IsPausedFor(_target));
+
+                playback.StepBack(_target);
+
+                Assert.IsFalse(playback.CanStepBackFor(_target));
+                Assert.IsFalse(playback.IsPausedFor(other));
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
+        }
+
+        private static BlockNode Wait(string id, float seconds) => new()
+        {
+            id = id,
+            blockType = "control.wait",
+            parameters = new[] { new BlockParam { key = "seconds", kind = ParamKind.Number, number = seconds } }
+        };
 
         [Test]
         public void SetSpeed_StaysBetween1And4_AndSpeedsUpScriptTime()

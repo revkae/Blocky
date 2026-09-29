@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Blocky.Runtime.Triggers;
+using UnityEngine;
 
 namespace Blocky.Runtime
 {
@@ -22,6 +23,7 @@ namespace Blocky.Runtime
             public SchedulerMoment Scripts;
             public WorldMoment World;
             public bool PlayClickedArmed; // "when Play clicked" hadn't fired yet — stepping back past the start must re-arm it
+            public GameObject Target;     // the one object this step was taken for, or null for a whole-scene step
         }
 
         private readonly VmScheduler _scheduler;
@@ -30,6 +32,7 @@ namespace Blocky.Runtime
         private readonly BlockyClones _clones;
         private readonly BlockyAudio _audio;
         private readonly List<Moment> _history = new();
+        private readonly HashSet<GameObject> _going = new(); // objects Go was pressed for
         private bool _goPressed;
 
         public Playback(VmScheduler scheduler, TriggerBroker triggers, WorldSnapshot world, BlockyClones clones = null,
@@ -55,6 +58,32 @@ namespace Blocky.Runtime
 
         public bool CanStepBack => _history.Count > 0;
 
+        /// <summary>Whether <paramref name="only"/> has a step to go back to (null: a whole-scene step).</summary>
+        public bool CanStepBackFor(GameObject only) => FindMoment(only) >= 0;
+
+        /// <summary>Whether <paramref name="only"/>'s scripts are frozen — paused on its own or with the scene (null: the whole scene).</summary>
+        public bool IsPausedFor(GameObject only) => only == null ? IsPaused : _scheduler.IsPausedFor(only);
+
+        /// <summary>
+        /// <see cref="IsGoing"/> for one object: Go was pressed for it and its scripts are still running. With null,
+        /// the scene-wide <see cref="IsGoing"/>.
+        /// </summary>
+        public bool IsGoingFor(GameObject only)
+        {
+            if (only == null) return IsGoing;
+            if (_going.Contains(only) && !_scheduler.HasWorkOn(only)) _going.Remove(only);
+            return _going.Contains(only);
+        }
+
+        private int FindMoment(GameObject only)
+        {
+            for (var i = _history.Count - 1; i >= 0; i--)
+                if (_history[i].Target == only) return i;
+            return -1;
+        }
+
+        private void ForgetStepsOf(GameObject only) => _history.RemoveAll(m => m.Target == only);
+
         /// <summary>
         /// Go was pressed and the scripts are still running — what the Pause button waits for. Scripts that start on
         /// their own (at scene start, on a key) don't count. Clears itself once everything has finished, so a script
@@ -74,24 +103,47 @@ namespace Blocky.Runtime
         /// finished, or stopped by an edit) it also re-runs the "when Play clicked" scripts — so Go always starts
         /// everything, and Reset then Go replays the scene from the beginning.
         /// </summary>
-        public void Go()
+        public void Go(GameObject only = null)
         {
-            Resume();
-            if (!_scheduler.HasWork) _triggers.ResetPlaySession(); // a finished scene starts over, not just its Go scripts
-            _triggers.FirePlayClicked(); // does nothing while the scene's first run is still going
-            _triggers.FireGoClicked();
-            _goPressed = true;
+            Resume(only);
+            if (only == null)
+            {
+                if (!_scheduler.HasWork) _triggers.ResetPlaySession(); // a finished scene starts over, not just its Go scripts
+                _triggers.FirePlayClicked(); // does nothing while the scene's first run is still going
+                _triggers.FireGoClicked();
+                _goPressed = true;
+            }
+            else
+            {
+                // Just this object: its "when Play clicked" scripts start again only if it has nothing running.
+                if (!_scheduler.HasWorkOn(only)) _triggers.FirePlayClickedFor(only);
+                _triggers.FireGoClicked(only);
+                _going.Add(only);
+            }
         }
 
         /// <summary>
         /// Ends every running script where it is, and re-arms "when Play clicked" so Go (or Step forward) runs every
         /// script again from there. Without that, most scripts — which start on "when Play clicked", once per session —
         /// would silently not restart after Stop. Objects stay where they got to: <see cref="ResetWorld"/> puts them back.
+        /// With <paramref name="only"/>, just that object's scripts end (and its speech bubble and sound); the rest of
+        /// the scene runs on, and the scene-wide "Stopped" event is not raised, because the scene hasn't stopped.
         /// </summary>
-        public void Stop()
+        public void Stop(GameObject only = null)
         {
+            if (only != null)
+            {
+                ForgetStepsOf(only);
+                _going.Remove(only);
+                _scheduler.StopObject(only);
+                BlockySpeechBubble.Hide(only);
+                _audio?.StopFor(only);
+                return;
+            }
+
             _history.Clear();
             _goPressed = false;
+            _going.Clear();
             _scheduler.StopAll();
             _scheduler.Resume();
             _triggers.ResetPlaySession();
@@ -101,22 +153,35 @@ namespace Blocky.Runtime
             BlockyEvents.RaiseStopped();  // and game code resets whatever it keeps itself
         }
 
-        /// <summary>Stops every script and puts every programmed object back how it started, ready for <see cref="Go"/>.</summary>
-        public void ResetWorld()
+        /// <summary>
+        /// Stops every script and puts every programmed object back how it started, ready for <see cref="Go"/>.
+        /// With <paramref name="only"/>, just that object is stopped and put back (no scene-wide "WorldReset" event).
+        /// </summary>
+        public void ResetWorld(GameObject only = null)
         {
-            Stop();
+            Stop(only);
+            if (only != null)
+            {
+                _world.RestoreObject(only);
+                return;
+            }
+
             _world.RestoreAll();
             BlockyEvents.RaiseWorldReset();
         }
 
-        /// <summary>Freezes every script where it is.</summary>
-        public void Pause() => _scheduler.Pause();
+        /// <summary>Freezes every script where it is — or, with <paramref name="only"/>, that object's scripts while the rest carry on.</summary>
+        public void Pause(GameObject only = null) => _scheduler.Pause(only);
 
-        /// <summary>Runs normally again. The step history is forgotten: once time runs on, the saved steps no longer lead to what's on screen.</summary>
-        public void Resume()
+        /// <summary>
+        /// Runs normally again (the scene, or with <paramref name="only"/> just that object). The step history is
+        /// forgotten: once time runs on, the saved steps no longer lead to what's on screen.
+        /// </summary>
+        public void Resume(GameObject only = null)
         {
-            _history.Clear();
-            _scheduler.Resume();
+            if (only == null) _history.Clear();
+            else ForgetStepsOf(only);
+            _scheduler.Resume(only);
         }
 
         /// <summary>
@@ -129,43 +194,56 @@ namespace Blocky.Runtime
         /// finished starts again from its first block on the next press.
         /// Does nothing when there is no script to start at all, and while the previous step is still finishing
         /// (so every remembered moment is a clean stop between blocks).
+        /// With <paramref name="only"/> (the object open in the editor), just that object's scripts step: its hats
+        /// are started by hand, that object alone is paused between steps, and every other object carries on running.
         /// </summary>
-        public void StepForward()
+        public void StepForward(GameObject only = null)
         {
             if (_scheduler.IsStepping) return;
 
             var moment = new Moment
             {
-                Scripts = _scheduler.SaveMoment(),
-                World = _world.SaveMoment(),
-                PlayClickedArmed = !_triggers.PlayClickedFired
+                Scripts = _scheduler.SaveMoment(only),
+                World = _world.SaveMoment(only),
+                PlayClickedArmed = only == null && !_triggers.PlayClickedFired,
+                Target = only
             };
 
             // Scripts that ran to their end leave "when Play clicked" spent; without re-arming it here, Step after a
             // finished run started nothing and silently froze the scene.
-            var wasRunning = _scheduler.HasWork;
+            var wasRunning = only == null ? _scheduler.HasWork : _scheduler.HasWorkOn(only);
             if (!wasRunning)
             {
-                _triggers.ResetPlaySession();
-                _goPressed = false; // this run was started by Step, not Go
+                if (only == null)
+                {
+                    _triggers.ResetPlaySession();
+                    _goPressed = false; // this run was started by Step, not Go
+                }
+                else _going.Remove(only);
             }
-            _triggers.FirePlayClicked(); // at most once per session: keeps the flag honest for Go and for Step back
-            _triggers.FireStepAll();     // every other hat, on every object, that isn't already running
+            // Firing "when Play clicked" would start every other object's scripts too; the step below starts this one's.
+            if (only == null) _triggers.FirePlayClicked(); // at most once per session: keeps the flag honest for Go and for Step back
+            _triggers.FireStepAll(only);                   // every other hat that isn't already running
 
-            if (!_scheduler.HasWork) return; // nothing to step through: don't pause the scene for nothing
+            var hasWork = only == null ? _scheduler.HasWork : _scheduler.HasWorkOn(only);
+            if (!hasWork) return; // nothing to step through: don't pause the scene for nothing
 
             _history.Add(moment);
             if (_history.Count > MaxStepsBack) _history.RemoveAt(0);
-            _scheduler.Step();
+            _scheduler.Step(only);
         }
 
-        /// <summary>Goes back to just before the last step forward: scripts, objects and all. Stays paused.</summary>
-        public void StepBack()
+        /// <summary>
+        /// Goes back to just before the last step forward: scripts, objects and all. Stays paused. With
+        /// <paramref name="only"/>, undoes that object's last step and touches nothing else.
+        /// </summary>
+        public void StepBack(GameObject only = null)
         {
-            if (_history.Count == 0) return;
+            var index = FindMoment(only);
+            if (index < 0) return;
 
-            var moment = _history[^1];
-            _history.RemoveAt(_history.Count - 1);
+            var moment = _history[index];
+            _history.RemoveAt(index);
 
             _scheduler.RestoreMoment(moment.Scripts);
             _world.RestoreMoment(moment.World);
@@ -180,6 +258,10 @@ namespace Blocky.Runtime
         }
 
         /// <summary>Call when a program changes: the saved steps hold scripts of the old version, which must not come back.</summary>
-        public void ForgetSteps() => _history.Clear();
+        public void ForgetSteps(GameObject only = null)
+        {
+            if (only == null) _history.Clear();
+            else ForgetStepsOf(only);
+        }
     }
 }
