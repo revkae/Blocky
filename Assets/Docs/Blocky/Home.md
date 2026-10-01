@@ -10,9 +10,9 @@ This vault is the single source of truth for design, decisions, and progress. Th
 
 Milestones 1–7, the TDD's own v1, are done, and every goal in its §1.2 is met: data-driven extensibility, deterministic execution, zero-allocation-*capable* steady state (measurable through §11.3's `ProfilerMarker`s, not yet optimized against), structural isolation, headless testability. Work then went past v1 on purpose — the scoping conversation [[09 Decisions/Decisions#ADR-009|ADR-009]] asked for happened when the user asked for "most stuff that exists in scratch and delightex".
 
-What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables, lists and a watcher, custom blocks with inputs and recursion, a `level complete` block, C# events for game code, and per-level toolboxes with block limits ([[12 Game Code/Blocky from CSharp|Blocky from C#]]), Light / Dark / High contrast themes, a New Block wizard for a game's own blocks, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
+What exists today: **88 blocks** (39 steps, 16 conditions, 23 reporters, 10 triggers — [[06 Block Catalog/Block Catalog|Block Catalog]]) with an expression allowed in every input, variables, lists and a watcher, custom blocks with inputs and recursion, a `level complete` block, C# events for game code, and per-level toolboxes with block limits ([[12 Game Code/Blocky from CSharp|Blocky from C#]]), Light / Dark / High contrast themes, a New Block wizard for a game's own blocks, clones, broadcasts, say/think bubbles and generated notes; an in-game editor with Free and Simple modes, multi-select, undo/redo, Go / Stop / Reset, Pause, Step ◀ / ▶, 1x–4x, the running block lit up and plain-language advice; English and Türkçe; programs saved from the game run again the next time it starts ([[09 Decisions/Decisions#ADR-031|ADR-031]]).
 
-**Tests:** 441/441 EditMode tests at the last full run inside Unity (2026-09-29, after Blocky became a package) — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
+**Tests:** 505/505 EditMode tests at the last full run inside Unity (2026-10-02, 0.2.0 — the host API) — see [[08 Build Log/Build Log|Build Log]]. Nothing has been built into a player yet.
 
 **Before release:** [[11 Release/Release Readiness|Release Readiness]] lists what's left for the Asset Store and for classrooms.
 
@@ -34,6 +34,7 @@ What exists today: **87 blocks** (38 steps, 16 conditions, 23 reporters, 10 trig
 - [[10 Localization/Localization|Localization]] — English and Türkçe, and how to add a language (one file)
 - [[11 Release/Release Readiness|Release Readiness]] — what's left before the Asset Store and the classroom, as a checklist
 - [[12 Game Code/Blocky from CSharp|Blocky from C#]] — events and commands for game code (script finished, level complete, messages, the run bar), and puzzle levels: toolboxes and block limits
+- [[12 Game Code/Hosting Blocky|Hosting Blocky]] — for a game with a flow of its own (0.2.0): open/close/target the workspace from code, its own program storage, the ticker's switches, its own gaze, `as [object]`, object dropdowns
 
 ## Build Order (from the TDD, §13)
 

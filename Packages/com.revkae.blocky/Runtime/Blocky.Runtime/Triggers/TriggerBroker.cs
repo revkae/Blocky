@@ -159,6 +159,14 @@ namespace Blocky.Runtime.Triggers
 
         public void UnregisterLookedAt(GameObject target) => _lookedAtListeners.Remove(target);
 
+        /// <summary>
+        /// Fires "when looked at" for exactly this object, as <see cref="PollLookedAt"/> does on the rising edge. For a
+        /// game with its own gaze (a reticle raycast with a dwell timer): turn
+        /// <see cref="BlockyRuntimeTicker.PollLookedAt"/> off and call this instead. The thresholds given to
+        /// <see cref="RegisterLookedAt"/> are simply unused then.
+        /// </summary>
+        public void RaiseLookedAt(GameObject target) => OnLookedAt?.Invoke(target);
+
         /// <summary>One shared raycast-equivalent (angle check) per frame, compared against every listener (TDD §6.7).</summary>
         public void PollLookedAt(Camera camera)
         {

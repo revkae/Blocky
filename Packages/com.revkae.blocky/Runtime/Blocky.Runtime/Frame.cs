@@ -6,6 +6,7 @@ namespace Blocky.Runtime
     /// to stop looping. <see cref="YieldedThisLap"/> backs the loop-yield rule (TDD §6.4): the VM forces a
     /// frame yield at the branch's exit whenever the lap that just finished never yielded on its own.
     /// A custom block's call is a frame too (<see cref="IsCall"/>, ADR-029): its branch is the definition's script.
+    /// So is the mouth of an <c>as [object]</c> block (<see cref="HasActsOn"/>, ADR-042), which carries the object its blocks act on.
     /// </summary>
     public struct Frame
     {
@@ -32,6 +33,16 @@ namespace Blocky.Runtime
         /// <summary>For a call: where the thread's code ended before the call (<see cref="VmThread.EndPc"/>), put back on return.</summary>
         public int CallerEndPc;
 
+        /// <summary>
+        /// True for the mouth of an <c>as [object]</c> block (ADR-042): while this frame is on the stack, the blocks
+        /// act on <see cref="ActsOn"/> instead of the script's own object. A flag beside the reference, because the
+        /// object may be destroyed while the frame is live — and a destroyed object reads as null.
+        /// </summary>
+        public bool HasActsOn;
+
+        /// <summary>The object the blocks inside an <c>as [object]</c> block act on. See <see cref="HasActsOn"/>.</summary>
+        public UnityEngine.GameObject ActsOn;
+
         public Frame(int ownerPc, int exitPc, int counter, bool isLoop)
         {
             OwnerPc = ownerPc;
@@ -41,10 +52,16 @@ namespace Blocky.Runtime
             YieldedThisLap = false;
             IsCall = false;
             CallerEndPc = -1;
+            HasActsOn = false;
+            ActsOn = null;
         }
 
         /// <summary>A custom block's call from <paramref name="ownerPc"/> into a definition that ends at <paramref name="exitPc"/>.</summary>
         public static Frame Call(int ownerPc, int exitPc, int callerEndPc) =>
             new(ownerPc, exitPc, 0, isLoop: false) { IsCall = true, CallerEndPc = callerEndPc };
+
+        /// <summary>The mouth of the <c>as [object]</c> block at <paramref name="ownerPc"/>: its blocks, up to <paramref name="exitPc"/>, act on <paramref name="actsOn"/>.</summary>
+        public static Frame As(int ownerPc, int exitPc, UnityEngine.GameObject actsOn) =>
+            new(ownerPc, exitPc, 0, isLoop: false) { HasActsOn = true, ActsOn = actsOn };
     }
 }

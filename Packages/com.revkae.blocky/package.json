@@ -1,6 +1,6 @@
 {
   "name": "com.revkae.blocky",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "displayName": "Blocky",
   "description": "Scratch-style block programming inside a Unity game: an in-game UI Toolkit workspace where players drag blocks to program scene objects, a compiler, and a small VM that runs the programs. Add a workspace with GameObject > Blocky > Workspace.",
   "unity": "6000.7",

@@ -41,6 +41,10 @@ namespace Blocky.Game
     /// on the block, says why a script won't do anything.
     /// Every word is in the language picked in the title bar (<see cref="BlockyLanguages"/>); switching it redraws
     /// the workspace in place, keeping the object, its undo history and the view.
+    /// A game with a flow of its own can host the workspace instead of handing the screen to it (ADR-041): it opens
+    /// and closes it (<see cref="BlockyInGamePanel.Open"/>, <see cref="BlockyInGamePanel.Close"/>), says which object
+    /// is edited (<see cref="BlockyInGamePanel.SetTarget"/>), hears about all three, and can turn off the picking of
+    /// objects by a click, the hotkey and the corner button.
     /// </summary>
     /// <summary>The workspace's colors (<see cref="BlockyInGamePanel.Theme"/>).</summary>
     public enum BlockyTheme
@@ -86,7 +90,15 @@ namespace Blocky.Game
         private const float MaxGridDots = 4000f;
         private static readonly Vector2 DefaultPan = new(24f, 24f);
 
+        [Tooltip("The key that opens and closes the workspace. None: no key does — the game, or the buttons, open and close it.")]
         [SerializeField] private Key toggleKey = Key.Tab;
+
+        [Tooltip("Clicking an object in the game opens its program. Off: the game says what is edited (SetTarget, Open).")]
+        [SerializeField] private bool pickObjectsOnClick = true;
+
+        [Tooltip("Show the \"Blocks\" button in the corner while the workspace is closed. Off: closed, the workspace draws nothing and takes no input, and the game opens it (Open).")]
+        [SerializeField] private bool showOpener = true;
+
         [SerializeField] private StyleSheet[] styleSheets;
         [SerializeField] private float panelWidth = 820f;
         [SerializeField] private float paletteWidth = 280f; // enough for the widest prototype's last parameter
@@ -162,13 +174,16 @@ namespace Blocky.Game
         private GameObject _target;
         private ObjectProgramRunner _runner;
         private ProgramStore _store;
-        private BlockProgramAsset _liveAsset; // the in-memory asset the edited object's runner hot-reloads from — one per target, reused across edits
         private ProgramCanvasView _canvasView;
         private DragContext _dragContext;
-        private string _storageKey;
         private string _storageNoticeKey; // "storage.unreadable" / "storage.save_failed" while the edited object's save has a problem, else null
         private Button _themeButton;
         private Button _opener; // "Blocks", in the corner while the workspace is closed: the way in without a keyboard
+        private Label _openerLabel;
+        private Label _openerKey;   // the toggle key as a key cap, on the opener…
+        private Button _closeButton;
+        private Label _closeKey;    // …and on the title bar's close button; both are hidden when there is no key
+        private Label _closeLabel;
 
         // Fingers on empty table (Free mode): one pans, two pinch to zoom. Mouse gestures keep their own state.
         private readonly Dictionary<int, Vector2> _touches = new();
@@ -236,9 +251,137 @@ namespace Blocky.Game
         /// <summary>How many blocks the edited object's program uses, the way the limit counts them (hats don't count); 0 with no object.</summary>
         public int BlocksUsed => _store != null ? ProgramQuery.CountBlocks(_store.Program) : 0;
 
-        private void Awake()
+        // ---- for a game that hosts the workspace (ADR-041) -------------------------------------------------
+
+        /// <summary>Whether the workspace is open.</summary>
+        public bool IsOpen => _visible;
+
+        /// <summary>The object whose program is on the table, or null before one is chosen. An object destroyed while it was edited reads as null.</summary>
+        public GameObject Target => _target;
+
+        /// <summary>The workspace went from closed to open — whatever opened it: <see cref="Open"/>, the key, the corner button.</summary>
+        public event Action Opened;
+
+        /// <summary>The workspace went from open to closed — whatever closed it: <see cref="Close"/>, the key, the title bar's button.</summary>
+        public event Action Closed;
+
+        /// <summary>
+        /// Another object is on the table: (the one before, the one now), either of which can be null. Raised after
+        /// the change, for the game's own calls and for the learner's clicks alike — but not when
+        /// <see cref="SetTarget"/> is given the object already there. When the edited object was destroyed, the first
+        /// argument is that destroyed object.
+        /// </summary>
+        public event Action<GameObject, GameObject> TargetChanged;
+
+        /// <summary>
+        /// Whether a click on an object in the game puts its program on the table. Off, the game decides what is edited
+        /// (<see cref="SetTarget"/>, <see cref="Open"/>) — for a game with a selection of its own, which mustn't end up
+        /// with runners on its terrain and props.
+        /// </summary>
+        public bool PickObjectsOnClick
         {
+            get => pickObjectsOnClick;
+            set => pickObjectsOnClick = value;
+        }
+
+        /// <summary>
+        /// With <see cref="PickObjectsOnClick"/> on: maps what a press hit to the object to program — say, the root of
+        /// an imported model whose collider is on a child — or null to ignore the press. Null (the default): the object
+        /// that was hit.
+        /// </summary>
+        public Func<GameObject, GameObject> PickResolver { get; set; }
+
+        /// <summary>
+        /// Whether the "Blocks" button sits in the corner while the workspace is closed. Off, the closed workspace draws
+        /// nothing and takes no input — for a game with a button of its own that calls <see cref="Open"/>.
+        /// </summary>
+        public bool ShowOpener
+        {
+            get => showOpener;
+            set
+            {
+                showOpener = value;
+                if (_root != null) ApplyVisible(_visible);
+            }
+        }
+
+        /// <summary>The key that opens and closes the workspace. <see cref="Key.None"/>: no key does, and the key caps in the title bar and on the corner button go.</summary>
+        public Key ToggleKey
+        {
+            get => toggleKey;
+            set
+            {
+                toggleKey = value;
+                if (_root != null) ShowToggleKey();
+            }
+        }
+
+        /// <summary>
+        /// Opens the workspace — on <paramref name="target"/>'s program when one is given and it isn't the one already
+        /// there. Both changes are made before <see cref="Opened"/> and then <see cref="TargetChanged"/> are raised;
+        /// opening an open workspace on the object it shows raises nothing.
+        /// </summary>
+        public void Open(GameObject target = null)
+        {
+            if (!EnsureBuilt()) return;
+
+            var previous = _target;
+            var retarget = target != null && target != _target;
+            if (retarget) ShowProgramOf(target);
+
+            var opened = !_visible;
+            if (opened) ApplyVisible(true);
+
+            if (opened) Opened?.Invoke();
+            // Unless an Opened handler has already moved on to another object — that change said so itself, and
+            // reporting this one after it would leave a listener believing the wrong object is on the table.
+            if (retarget && ReferenceEquals(_target, target)) TargetChanged?.Invoke(previous, target);
+        }
+
+        /// <summary>Closes the workspace, as its title bar's button and the key do.</summary>
+        public void Close()
+        {
+            if (EnsureBuilt()) SetVisible(false);
+        }
+
+        /// <summary>
+        /// Puts <paramref name="target"/>'s program on the table, giving it an <see cref="ObjectProgramRunner"/> if it
+        /// has none; null clears the table. The object already there is read again from its runner — what a game does
+        /// after replacing the program from its own storage (<see cref="ObjectProgramRunner.SetProgram"/>) — which also
+        /// starts its undo history over. Works whether the workspace is open or closed.
+        /// </summary>
+        public void SetTarget(GameObject target)
+        {
+            if (!EnsureBuilt()) return;
+
+            var previous = _target;
+            ShowProgramOf(target);
+            if (!ReferenceEquals(previous, _target)) TargetChanged?.Invoke(previous, _target);
+        }
+
+        /// <summary>
+        /// Whether a screen point (Input System pixels, origin bottom-left) is over the open workspace or one of its
+        /// open dropdown menus — where the game should leave the pointer, its shortcuts and its camera alone. Closed,
+        /// that is only the corner button, and nowhere when that is hidden (<see cref="ShowOpener"/>).
+        /// </summary>
+        public bool IsPointerOverWorkspace(Vector2 screenPosition) => _root != null && IsOverWorkspace(screenPosition);
+
+        /// <summary>The editing session of the object on the table (null with none) — how the tests make the edits a learner makes by dragging.</summary>
+        internal ProgramStore Store => _store;
+
+        private void Awake() => Build();
+
+        /// <summary>
+        /// Builds the workspace, once. <c>Awake</c>'s work, apart from it so that a game calling in before this object
+        /// has woken — and the tests, outside Play mode, where it never does — get a built workspace too.
+        /// </summary>
+        internal void Build()
+        {
+            if (_root != null) return;
+
             _uiDocument = GetComponent<UIDocument>();
+            if (_uiDocument.rootVisualElement == null) return; // the document isn't up yet (its object is inactive)
+
             BlockyRuntimeTicker.EnsureExists(); // nothing runs without one, and it gives runners back to objects programmed in an earlier session
             _registry = BlockyRuntime.Registry;
             panelWidth = Mathf.Clamp(Mathf.Max(panelWidth, ComfortableWidth), MinPanelWidth, Mathf.Max(MinPanelWidth, Screen.width - MinGameStrip));
@@ -246,24 +389,38 @@ namespace Blocky.Game
             BuildChrome();
             theme = SavedTheme(theme);
             ApplyTheme();
-            SetVisible(false);
-            BlockyInput.IsPointerOverUi = IsPointerOverEditor; // presses on this workspace aren't "mouse down?" in the game
+            ApplyVisible(false);
+            BlockyInput.AddPointerOverUiCheck(IsPointerOverEditor); // presses on this workspace aren't "mouse down?" in the game
+        }
+
+        private bool EnsureBuilt()
+        {
+            if (_root != null) return true;
+
+            Build();
+            if (_root == null) Debug.LogWarning("Blocky: the workspace isn't ready yet — its object has to be active before it can be opened or given an object.", this);
+            return _root != null;
         }
 
         private void OnEnable() => LocalizationSettings.SelectedLocaleChanged += OnLanguageChanged;
 
-        // Tuning a level's toolbox in the Inspector during Play mode redraws the palette straight away.
+        // Tuning a level's toolbox in the Inspector during Play mode redraws the palette straight away; the toggle
+        // key and the corner button follow the Inspector too.
         private void OnValidate()
         {
-            if (Application.isPlaying && _root != null) Toolbox = toolbox;
+            if (!Application.isPlaying || _root == null) return;
+
+            Toolbox = toolbox;
+            ShowToggleKey();
+            ApplyVisible(_visible);
         }
 
         private void OnDisable() => LocalizationSettings.SelectedLocaleChanged -= OnLanguageChanged;
 
-        private void OnDestroy()
-        {
-            if (BlockyInput.IsPointerOverUi == (Func<bool>)IsPointerOverEditor) BlockyInput.IsPointerOverUi = null;
-        }
+        private void OnDestroy() => Release();
+
+        /// <summary>Takes back what <see cref="Build"/> registered outside this object.</summary>
+        internal void Release() => BlockyInput.RemovePointerOverUiCheck(IsPointerOverEditor);
 
         /// <summary>Asked by condition blocks, possibly many times a frame — hit-tests once per frame and remembers.</summary>
         private bool IsPointerOverEditor()
@@ -276,11 +433,19 @@ namespace Blocky.Game
             return _pointerOverEditor;
         }
 
-        private void Update()
+        private void Update() => Tick();
+
+        /// <summary>One frame of the workspace: <c>Update</c>'s work, apart from it so the tests can run a frame outside Play mode.</summary>
+        internal void Tick()
         {
+            if (_root == null) return;
+
+            // The edited object was destroyed (the game deleted it): its table goes, and the game hears about it.
+            if (!ReferenceEquals(_target, null) && _target == null) SetTarget(null);
+
             var keyboard = Keyboard.current;
             var pointer = Pointer.current; // the mouse, a pen or a finger — whichever was used last
-            if (keyboard != null && keyboard[toggleKey].wasPressedThisFrame)
+            if (toggleKey != Key.None && keyboard != null && keyboard[toggleKey].wasPressedThisFrame) // Key.None has no control to read
                 SetVisible(!_visible);
 
             DriveActiveDrag(pointer);
@@ -304,13 +469,24 @@ namespace Blocky.Game
                 else if (IsUndoShortcut(keyboard)) UndoLastEdit();
             }
 
-            if (pointer == null || !pointer.press.wasPressedThisFrame) return;
+            if (!pickObjectsOnClick || pointer == null || !pointer.press.wasPressedThisFrame) return;
 
             var position = pointer.position.ReadValue();
             if (IsOverWorkspace(position)) return; // the press landed somewhere in the workspace, not the game
 
-            var picked = BlockyPicking.ObjectAt(Camera.main, position); // a 3D or 2D collider, or a sprite without one
-            if (picked != null) SetTarget(picked);
+            PickFromPress(BlockyPicking.ObjectAt(Camera.main, position)); // a 3D or 2D collider, or a sprite without one
+        }
+
+        /// <summary>
+        /// A press in the game hit <paramref name="hit"/>: its program goes on the table — or that of the object
+        /// <see cref="PickResolver"/> answers with. Pressing the object already there changes nothing.
+        /// </summary>
+        internal void PickFromPress(GameObject hit)
+        {
+            if (!pickObjectsOnClick || hit == null) return;
+
+            var picked = PickResolver != null ? PickResolver(hit) : hit;
+            if (picked != null && picked != _target) SetTarget(picked);
         }
 
         private static bool IsUndoShortcut(Keyboard keyboard) =>
@@ -333,6 +509,7 @@ namespace Blocky.Game
         private bool IsOverWorkspace(Vector2 screenPointer)
         {
             if (_root.panel == null) return false;
+            if (!_visible && !showOpener) return false; // closed with no corner button: nothing of the workspace is on screen
 
             var point = ScreenToPanel(screenPointer);
             if (_root.ContainsPoint(_root.WorldToLocal(point))) return true;
@@ -545,19 +722,40 @@ namespace Blocky.Game
             bar.Add(BuildThemeButton());
 
             // Also the close button — a tablet has no Tab key.
-            var keyHint = new Button(() => SetVisible(false));
-            keyHint.AddToClassList("blocky-ingame-keyhint");
-            Localize(() => keyHint.tooltip = BlockyText.Format("workspace.close.tooltip", toggleKey.ToString()));
-            var key = new Label(toggleKey.ToString());
-            key.AddToClassList("blocky-ingame-key");
-            keyHint.Add(key);
-            var hides = new Label();
-            hides.AddToClassList("blocky-ingame-keyhint__label");
-            Localize(() => hides.text = BlockyText.Get("keyhint.hides"));
-            keyHint.Add(hides);
-            bar.Add(keyHint);
+            _closeButton = new Button(() => SetVisible(false));
+            _closeButton.AddToClassList("blocky-ingame-keyhint");
+            _closeKey = new Label();
+            _closeKey.AddToClassList("blocky-ingame-key");
+            _closeButton.Add(_closeKey);
+            _closeLabel = new Label();
+            _closeLabel.AddToClassList("blocky-ingame-keyhint__label");
+            _closeButton.Add(_closeLabel);
+            bar.Add(_closeButton);
+
+            Localize(ShowToggleKey); // words this button and the corner opener, which was built before the title bar
 
             return bar;
+        }
+
+        /// <summary>
+        /// Names the toggle key in the two places that show it — the title bar's close button ("Tab hides this") and
+        /// the corner opener ("Blocks Tab") — or, when no key toggles the workspace, drops the key caps and says "Close".
+        /// </summary>
+        private void ShowToggleKey()
+        {
+            var hasKey = toggleKey != Key.None;
+            var keyName = toggleKey.ToString();
+            var cap = hasKey ? DisplayStyle.Flex : DisplayStyle.None;
+
+            _closeKey.text = keyName;
+            _closeKey.style.display = cap;
+            _closeLabel.text = BlockyText.Get(hasKey ? "keyhint.hides" : "workspace.close");
+            _closeButton.tooltip = hasKey ? BlockyText.Format("workspace.close.tooltip", keyName) : BlockyText.Get("workspace.close.tooltip.nokey");
+
+            _openerKey.text = keyName;
+            _openerKey.style.display = cap;
+            _openerLabel.text = BlockyText.Get("workspace.open");
+            _opener.tooltip = hasKey ? BlockyText.Format("workspace.open.tooltip", keyName) : BlockyText.Get("workspace.open.tooltip.nokey");
         }
 
         /// <summary>
@@ -1802,15 +2000,27 @@ namespace Blocky.Game
             RefreshBlockLimit();
         }
 
-        /// <summary>
-        /// Opens or closes the workspace. Closed, the root shrinks to its "Blocks" button in the corner
-        /// (<c>blocky-ingame-root--closed</c> hides everything else), so the rest of the screen is the game's
-        /// again — presses there pick objects and reach the scripts.
-        /// </summary>
+        /// <summary>Opens or closes the workspace and, when that changed anything, says so (<see cref="Opened"/> / <see cref="Closed"/>).</summary>
         private void SetVisible(bool value)
+        {
+            if (_visible == value) return;
+
+            ApplyVisible(value);
+            if (value) Opened?.Invoke();
+            else Closed?.Invoke();
+        }
+
+        /// <summary>
+        /// Shows the workspace open or closed. Closed, the root shrinks to its "Blocks" button in the corner
+        /// (<c>blocky-ingame-root--closed</c> hides everything else), so the rest of the screen is the game's
+        /// again — presses there pick objects and reach the scripts. With that button turned off
+        /// (<see cref="ShowOpener"/>), the closed root isn't drawn at all, so nothing of it can be pressed.
+        /// </summary>
+        private void ApplyVisible(bool value)
         {
             _visible = value;
             _root.EnableInClassList("blocky-ingame-root--closed", !value);
+            _root.style.display = value || showOpener ? DisplayStyle.Flex : DisplayStyle.None;
             _root.style.width = value ? new StyleLength(panelWidth) : new StyleLength(StyleKeyword.Auto);
             _root.style.bottom = value ? new StyleLength(0f) : new StyleLength(StyleKeyword.Auto);
             _root.style.paddingRight = value ? new StyleLength(ResizeHandleWidth) : new StyleLength(0f);
@@ -1818,7 +2028,7 @@ namespace Blocky.Game
 
         /// <summary>
         /// "Blocks", in the top-left corner while the workspace is closed: the way in on a tablet, which has no Tab
-        /// key, and a reminder on a laptop that there is one.
+        /// key, and a reminder on a laptop that there is one. <see cref="ShowToggleKey"/> words it.
         /// </summary>
         private Button BuildOpener()
         {
@@ -1829,26 +2039,44 @@ namespace Blocky.Game
             mark.AddToClassList("blocky-ingame-mark");
             _opener.Add(mark);
 
-            var label = new Label();
-            label.AddToClassList("blocky-opener__label");
-            _opener.Add(label);
+            _openerLabel = new Label();
+            _openerLabel.AddToClassList("blocky-opener__label");
+            _opener.Add(_openerLabel);
 
-            var key = new Label(toggleKey.ToString());
-            key.AddToClassList("blocky-ingame-key");
-            _opener.Add(key);
+            _openerKey = new Label();
+            _openerKey.AddToClassList("blocky-ingame-key");
+            _opener.Add(_openerKey);
 
-            Localize(() =>
-            {
-                label.text = BlockyText.Get("workspace.open");
-                _opener.tooltip = BlockyText.Format("workspace.open.tooltip", toggleKey.ToString());
-            });
             return _opener;
         }
 
-        private void SetTarget(GameObject go)
+        /// <summary>
+        /// Puts <paramref name="go"/>'s program on the table in place of the one there, or clears the table for null
+        /// (a destroyed object counts as null). Says nothing to listeners: the public calls do, once everything they
+        /// change has changed.
+        /// </summary>
+        private void ShowProgramOf(GameObject go)
         {
+            // Whatever was under way belongs to the table that is going: a drag would land its blocks in the program
+            // being put away, and a pan or a selection box would be left holding the pointer.
+            _dragContext.ActiveDrag?.Cancel();
+            if (_selectingBox) EndBoxSelect();
+            if (_panning) EndPan();
+            if (_touches.Count > 0) EndTouches();
+
+            _canvasView?.RemoveFromHierarchy();
+            _canvasView = null;
+            _runningShown.Clear(); // a fresh table lights nothing up yet
+            _pan = DefaultPan;
+            _zoom = 1f;
+
+            if (go == null)
+            {
+                ClearTable();
+                return;
+            }
+
             _target = go;
-            _storageKey = RuntimeProgramStorage.KeyFor(go);
 
             _runner = go.GetComponent<ObjectProgramRunner>();
             if (_runner == null) _runner = go.AddComponent<ObjectProgramRunner>();
@@ -1863,12 +2091,10 @@ namespace Blocky.Game
             _store.OnChanged += _ => OnProgramChanged();
             _store.LimitRefused += OnLimitRefused;
             ApplyToolboxTo(_store);
-            _liveAsset = null; // the previous object's runner keeps its own live asset; this object gets a fresh one on its first edit
 
             _statusLabel.text = go.name; // the lit dot in front of it already says "this is what you're editing"
             _statusChip.AddToClassList("blocky-ingame-status--live");
 
-            _canvasView?.RemoveFromHierarchy();
             _canvasView = new ProgramCanvasView(_store, _registry, CanvasMode.Table) { Mode = workspaceMode };
             _canvasView.style.position = Position.Absolute;
             _canvasView.style.left = 0;
@@ -1878,34 +2104,49 @@ namespace Blocky.Game
             _canvasView.style.transformOrigin = new TransformOrigin(new Length(0f), new Length(0f), 0f);
             _canvasViewport.Insert(0, _canvasView); // under the advice, the tools and the zoom controls
 
-            _pan = DefaultPan;
-            _zoom = 1f;
             ApplyCanvasTransform();
 
             _dragContext.SetTarget(_store, _canvasView);
-            _runningShown.Clear(); // a fresh canvas lights nothing up yet
 
             _canvasView.Rebuilt += OnCanvasRebuilt;
             OnCanvasRebuilt(); // the first build happened inside the constructor, before we could subscribe
         }
 
         /// <summary>
-        /// Saves to the player's save file, then hot-reloads the runner so the edit takes effect immediately —
-        /// the object's own <c>OnEnable</c>/<c>Initialize</c> already ran once at scene start, so a fresh
-        /// compile must be forced explicitly for a change made mid-session to actually run. The step history is
-        /// dropped first: its saved scripts belong to the program as it was before this edit.
+        /// No object is edited: the table is empty, the title bar asks for one again, and the palette loses the last
+        /// object's custom blocks. The run bar, Undo and Delete all do nothing until there is one.
+        /// </summary>
+        private void ClearTable()
+        {
+            _target = null;
+            _runner = null;
+            _store = null;
+            _storageNoticeKey = null;
+            _limitRefused = false;
+            _dragContext.SetTarget(null, null);
+
+            _statusLabel.text = BlockyText.Get("status.pick_object");
+            _statusChip.RemoveFromClassList("blocky-ingame-status--live");
+
+            ApplyCanvasTransform(); // the grid and the zoom readout go back to the start too
+            ShowAdvice(new List<Advice>());
+            RefreshCustomBlocks();
+            RefreshBlockLimit();
+        }
+
+        /// <summary>
+        /// Saves the program (<see cref="BlockyStorage.Current"/>: the player's save file, unless the game keeps
+        /// programs itself), then hands it to the runner, which stops its scripts and compiles it at once — the
+        /// object's own <c>OnEnable</c>/<c>Initialize</c> already ran at scene start, so a change made mid-session
+        /// has to be compiled again to actually run. The runner drops the step history as it does: its saved scripts
+        /// belong to the program as it was before this edit.
         /// </summary>
         private void OnProgramChanged()
         {
             // A failed save keeps the edit (it still runs) and says so under the table; the next good save clears it.
-            _storageNoticeKey = RuntimeProgramStorage.TrySave(_storageKey, _store.Program, out _) ? null : "storage.save_failed";
+            _storageNoticeKey = BlockyStorage.Current.TrySave(_target, _store.Program, out _) ? null : "storage.save_failed";
 
-            if (_liveAsset == null) _liveAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
-            _liveAsset.Save(_store.Program);
-            BlockyRuntime.Playback.ForgetSteps(_target);
-            _runner.Shutdown();
-            _runner.SetProgramAsset(_liveAsset);
-            _runner.Initialize();
+            _runner.SetProgram(_store.Program);
             BlockyEvents.ReportProgramEdited(_target);
         }
     }

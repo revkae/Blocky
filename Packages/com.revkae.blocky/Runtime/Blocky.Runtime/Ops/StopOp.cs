@@ -16,8 +16,8 @@ namespace Blocky.Runtime.Ops
                     ctx.Scheduler?.StopAllThreads();
                     ctx.Thread.State = ThreadState.Done;
                     break;
-                case 2: // other scripts on this object — this one carries on
-                    ctx.Scheduler?.StopOtherThreadsOn(ctx.Target, ctx.Thread);
+                case 2: // other scripts on this object — this one carries on. The script's own object, even inside "as [object]".
+                    ctx.Scheduler?.StopOtherThreadsOn(ctx.Thread.Target, ctx.Thread);
                     return OpResult.Continue;
                 default: // this script
                     ctx.Thread.EndReason = ScriptEndReason.StoppedByBlock;

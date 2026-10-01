@@ -14,10 +14,10 @@ The Package Manager installs the rest (Input System, Newtonsoft JSON, and the Un
 Add this line to your project's `Packages/manifest.json`, under `dependencies`:
 
 ```json
-"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.1.0"
+"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.2.0"
 ```
 
-`?path=` points at this folder inside the repository, and `#v0.1.0` pins a release so your project only updates when you change it. Or use *Window › Package Manager › + › Install package from git URL…* with the same URL.
+`?path=` points at this folder inside the repository, and `#v0.2.0` pins a release so your project only updates when you change it. Or use *Window › Package Manager › + › Install package from git URL…* with the same URL.
 
 Working on Blocky and a game side by side? Point at your local copy instead, and edits show up in both:
 
@@ -32,6 +32,23 @@ Working on Blocky and a game side by side? Point at your local copy instead, and
 1. **GameObject › Blocky › Workspace** — adds the in-game workspace, already wired. One per scene.
 2. Give an object a program: **Blocky › Program Editor**, pick the object, and build its script. The window adds an `ObjectProgramRunner` and saves the program to `Assets/Blocky/Programs`.
 3. Press Play, then **Tab** (or the *Blocks* button) to open the workspace and click an object to program it in the game.
+
+## Inside a game with a flow of its own
+
+By default the workspace opens with Tab, programs whatever you click, saves to files and starts every script when the scene starts. A game that has its own selection, its own Play button or its own save data can take each of those over:
+
+```csharp
+panel.PickObjectsOnClick = false;                  // your selection decides what is edited
+panel.ShowOpener = false;                          // your button opens it (Toggle Key: None in the Inspector)
+panel.Open(selectedObject);
+panel.Closed += SaveMyWorld;
+
+BlockyStorage.Current = new MyProgramStorage();    // IProgramStorage: programs kept in your own save data
+runner.SetProgram(program);                        // or hand each runner its program yourself
+BlockyRuntime.World.Recapture(movedObject);        // Reset returns it to where the player last put it
+```
+
+`BlockyRuntimeTicker` has a switch for each thing it does by itself (starting scripts at scene start, reading the keyboard, deciding what is looked at and clicked), `TriggerBroker.RaiseLookedAt` raises "when looked at" from your own gaze, `BlockyInput.AddPointerOverUiCheck` keeps presses on your interface out of the game, and `ParamFieldFactory.ObjectChoices` turns object inputs into a dropdown of your objects. The statics among these are reset at the start of every Play session — set them as your game starts.
 
 ## Your own blocks
 

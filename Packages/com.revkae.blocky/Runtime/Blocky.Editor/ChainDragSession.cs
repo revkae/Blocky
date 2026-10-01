@@ -24,6 +24,12 @@ namespace Blocky.Editor
 
         /// <param name="panelPointer">Where the pointer is now, in panel (world) coordinates.</param>
         void ForceEnd(Vector2 panelPointer);
+
+        /// <summary>
+        /// Abandons the gesture and applies nothing — the table it would have landed on is going away (the host is
+        /// switching to another object, or the edited one was destroyed).
+        /// </summary>
+        void Cancel();
     }
 
     /// <summary>One drag of blocks in progress — a single chain (<see cref="ChainDragSession"/>) or a selected group (<see cref="GroupDragSession"/>).</summary>

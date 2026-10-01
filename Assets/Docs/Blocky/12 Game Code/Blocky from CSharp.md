@@ -32,7 +32,9 @@ How game code talks to Blocky: hearing what the learner's scripts do, sending th
 | `BlockyRuntime.Playback.Go()` / `Stop()` / `ResetWorld()` | The run bar's Go, Stop and Reset |
 | `BlockyRuntime.Playback.Pause()` / `Resume()` / `StepForward()` / `StepBack()` / `SetSpeed(1–4)` | The rest of the run bar |
 | `BlockyRuntime.Variables.Get("score")` / `Set(...)` / `Item("items", 1)` / `Length("items")` | Read or change what the scripts see; `owner` picks an object's own copy |
-| `runner.SetProgramAsset(asset)` then `Shutdown()` + `Initialize()` | Give an object a program from code (it wins over a save — [[09 Decisions/Decisions#ADR-031|ADR-031]]) |
+| `runner.SetProgram(program)` | Give an object a program from code, in one call (0.2.0): a running runner stops its scripts and compiles it at once. It wins over a save — [[09 Decisions/Decisions#ADR-031|ADR-031]]. (`SetProgramAsset(asset)` then `Shutdown()` + `Initialize()` still works) |
+
+A game with a flow of its own — its own selection, Play button and save data — has more to work with: [[12 Game Code/Hosting Blocky|Hosting Blocky]].
 
 ## A level's toolbox and block limit
 

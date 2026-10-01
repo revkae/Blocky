@@ -116,11 +116,13 @@ namespace Blocky.Runtime
                 var quadRenderer = quad.GetComponent<MeshRenderer>();
                 quadRenderer.sharedMaterial = material;
                 quadRenderer.sortingOrder = BubbleSortingOrder; // on a 2D stage, drawn over the sprites rather than among them
+                quad.AddComponent<BlockyBubblePart>(); // not part of the object's look: "change color" and Reset leave it alone
                 _background = quad.transform;
             }
 
             var textObject = new GameObject("Text");
             textObject.transform.SetParent(holder.transform, false);
+            textObject.AddComponent<BlockyBubblePart>();
             _text = textObject.AddComponent<TextMesh>();
             _text.characterSize = CharacterSize;
             _text.fontSize = FontSize;

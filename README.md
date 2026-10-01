@@ -7,7 +7,7 @@ Scratch-style block programming inside a Unity game: players open an in-game wor
 Blocky is a Unity package. Add this line to your project's `Packages/manifest.json`, under `dependencies`:
 
 ```json
-"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.1.0"
+"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.2.0"
 ```
 
 Then **GameObject › Blocky › Workspace**. Requirements, setup and making your own blocks: [the package's README](Packages/com.revkae.blocky/README.md).

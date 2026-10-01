@@ -506,6 +506,10 @@ namespace Blocky.Runtime
                 return;
             }
 
+            // Inside "as [object]", and that object has been destroyed: its blocks have nothing to act on, so the rest
+            // of them are skipped and the script carries on after the block (ADR-042).
+            if (t.FrameCount > 0 && t.SkipAsIfObjectGone()) return;
+
             if (_stepping && !t.IsMidBlock)
             {
                 if (t.StepBudget <= 0)

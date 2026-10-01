@@ -38,7 +38,8 @@ namespace Blocky.Runtime
         public readonly VmThread Thread;
         public readonly ReadOnlySpan<ParamValue> Params;
 
-        public GameObject Target => Thread.Target;
+        /// <summary>The object the block is about — the one running the script, or inside an <c>as [object]</c> block, that object.</summary>
+        public GameObject Target => Thread.ActsOn;
 
         /// <summary>Scratch's timer, in seconds, on the script clock — 0 when evaluated outside a scheduler (a unit test).</summary>
         public float Timer => _evaluator.Scheduler?.Timer ?? 0f;

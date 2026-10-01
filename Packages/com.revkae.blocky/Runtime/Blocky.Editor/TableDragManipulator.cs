@@ -46,6 +46,11 @@ namespace Blocky.Editor
             if (IsTracking) OnReleased(panelPointer);
         }
 
+        public void Cancel()
+        {
+            if (IsTracking) OnCancelled();
+        }
+
         /// <summary>Starts following <paramref name="pointerId"/> on the panel root and claims the context's single active drag.</summary>
         protected void BeginTracking(int pointerId)
         {

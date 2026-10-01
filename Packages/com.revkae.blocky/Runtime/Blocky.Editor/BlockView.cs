@@ -70,7 +70,8 @@ namespace Blocky.Editor
             header.Add(new Label(DisplayName(definition)));
 
             foreach (var spec in definition.parameters)
-                header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
+                if (!ParamFieldFactory.Hides(definition, spec))
+                    header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
 
             if (store != null && buttons)
             {

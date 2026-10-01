@@ -27,6 +27,7 @@ namespace Blocky.Runtime
         [SerializeField] private MotionPlane motion = MotionPlane.Auto;
 
         private CompiledProgram _compiled;
+        private BlockProgramAsset _ownAsset; // made in memory for a program this runner was handed or found saved — one per runner, reused
         private bool _initialized;
         private bool _programChosen; // the save has been looked for, or code handed a program over — either way, don't look again
         private SavedProgramStatus _savedProgram;
@@ -42,6 +43,30 @@ namespace Blocky.Runtime
             programAsset = asset;
             _programChosen = true;
             _savedProgram = SavedProgramStatus.None; // whatever the save held, this is what runs now
+        }
+
+        /// <summary>
+        /// Replaces the program this object runs, with no asset to make and no order of calls to get right. If the
+        /// runner is running, its scripts stop and it compiles the new program now — the hot reload the in-game editor
+        /// does after an edit; otherwise the program is what it runs when it starts. The program is copied, so later
+        /// changes to <paramref name="program"/> need another call. Wins over a saved program, like
+        /// <see cref="SetProgramAsset"/>. Null means an empty program.
+        /// </summary>
+        public void SetProgram(ObjectProgram program)
+        {
+            if (_ownAsset == null)
+            {
+                _ownAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+                _ownAsset.name = gameObject.name;
+            }
+            _ownAsset.Save(program ?? new ObjectProgram());
+
+            BlockyRuntime.Playback.ForgetSteps(gameObject); // the saved steps hold scripts of the program being replaced
+
+            var wasRunning = _initialized;
+            if (wasRunning) Shutdown();
+            SetProgramAsset(_ownAsset);
+            if (wasRunning) Initialize();
         }
 
         /// <summary>The asset this runner currently loads from, or null. Runtime-safe read (no <c>SerializedObject</c> needed).</summary>
@@ -75,21 +100,22 @@ namespace Blocky.Runtime
         /// The first time the program is needed, looks for one saved by the in-game editor and, when there is one,
         /// runs it instead of the scene's. It becomes this runner's asset, so a clone made later copies it and runs
         /// the same program. A clone looks too, under its own key, and finds nothing: saves belong to scene objects.
+        /// Where it looks is <see cref="BlockyStorage.Current"/> — the save files, unless the game set its own storage.
         /// </summary>
         private void UseSavedProgram()
         {
             if (_programChosen) return;
             _programChosen = true;
-            if (!RuntimeProgramStorage.HasSavesFor(gameObject.scene)) return;
+            var storage = BlockyStorage.Current;
+            if (!storage.HasSavesFor(gameObject.scene)) return;
 
-            var key = RuntimeProgramStorage.KeyFor(gameObject);
-            _savedProgram = RuntimeProgramStorage.TryLoad(key, out var saved);
-            if (_savedProgram != SavedProgramStatus.Loaded) return;
+            _savedProgram = storage.TryLoad(gameObject, out var saved);
+            if (_savedProgram != SavedProgramStatus.Loaded || saved == null) return;
 
-            var asset = ScriptableObject.CreateInstance<BlockProgramAsset>();
-            asset.name = key;
-            asset.Save(saved);
-            programAsset = asset;
+            if (_ownAsset == null) _ownAsset = ScriptableObject.CreateInstance<BlockProgramAsset>();
+            _ownAsset.name = gameObject.name;
+            _ownAsset.Save(saved);
+            programAsset = _ownAsset;
         }
 
         /// <summary>
@@ -99,9 +125,13 @@ namespace Blocky.Runtime
         /// </summary>
         public static int AttachToSavedObjects(Scene scene)
         {
-            if (!scene.IsValid() || !scene.isLoaded || !RuntimeProgramStorage.HasSavesFor(scene)) return 0;
+            var storage = BlockyStorage.Current;
+            if (!scene.IsValid() || !scene.isLoaded || !storage.HasSavesFor(scene)) return 0;
 
             var roots = scene.GetRootGameObjects();
+            if (storage is not FileProgramStorage) return AttachWhereSaved(roots, storage);
+
+            // The save files are keyed by hierarchy path: build each key on the way down, once for the whole scene.
             var transforms = new Transform[roots.Length];
             for (var i = 0; i < roots.Length; i++) transforms[i] = roots[i].transform;
             Array.Sort(transforms, (a, b) => a.GetSiblingIndex().CompareTo(b.GetSiblingIndex()));
@@ -132,6 +162,24 @@ namespace Blocky.Runtime
                 var children = new Transform[t.childCount];
                 for (var i = 0; i < children.Length; i++) children[i] = t.GetChild(i);
                 added += AttachUnder(children, key);
+            }
+            return added;
+        }
+
+        /// <summary>A game's own storage knows its objects however it likes, so every object is simply asked about — once per scene start.</summary>
+        private static int AttachWhereSaved(GameObject[] roots, IProgramStorage storage)
+        {
+            var added = 0;
+            var transforms = new List<Transform>();
+            foreach (var root in roots)
+            {
+                root.GetComponentsInChildren(true, transforms);
+                foreach (var t in transforms)
+                {
+                    if (t.TryGetComponent<ObjectProgramRunner>(out _) || !storage.Exists(t.gameObject)) continue;
+                    t.gameObject.AddComponent<ObjectProgramRunner>();
+                    added++;
+                }
             }
             return added;
         }
@@ -180,7 +228,7 @@ namespace Blocky.Runtime
 
             SubscribeTriggers();
 
-            // Last, once this runner is complete: a new ticker gives runners back to other saved objects as it wakes.
+            // A scene without a ticker gets one; before its first frame it gives runners back to other saved objects.
             if (Application.isPlaying) BlockyRuntimeTicker.EnsureExists();
         }
 

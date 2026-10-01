@@ -37,7 +37,8 @@ namespace Blocky.Editor
             // A null node id targets the stack's trigger params. No registry: triggers have no condition slots.
             if (definition != null)
                 foreach (var spec in definition.parameters)
-                    Header.Add(BlockParams.Create(spec, Array.Find(values, p => p.key == spec.key), definition, null, null, stackId, store, prototype));
+                    if (!ParamFieldFactory.Hides(definition, spec))
+                        Header.Add(BlockParams.Create(spec, Array.Find(values, p => p.key == spec.key), definition, null, null, stackId, store, prototype));
 
             Add(Header);
 

@@ -20,7 +20,13 @@ namespace Blocky.Runtime
         public int NextPc;
 
         public VmThread Thread => _thread;
-        public GameObject Target => _thread.Target;
+
+        /// <summary>
+        /// The object this block acts on: the one running the script — or, inside an <c>as [object]</c> block, the
+        /// object that block names (ADR-042). A block that means the script's own object whatever it is inside, as
+        /// <c>stop</c> does, reads <c>Thread.Target</c>.
+        /// </summary>
+        public GameObject Target => _thread.ActsOn;
 
         /// <summary>The scheduler running this thread — what <c>stop</c> and <c>reset timer</c> reach for. Never null in play.</summary>
         public readonly VmScheduler Scheduler;

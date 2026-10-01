@@ -23,7 +23,9 @@ Runtime (VM)                    VmScheduler (+ pause/step/speed) · Thread pool 
 
 **Shared runtime state is per Play session.** The project enters Play mode with domain reload *off* (Enter Play Mode Options: `DisableDomainReload, DisableSceneReload`), so statics survive from one Play session to the next. `BlockyRuntime` therefore resets itself (scheduler, triggers, world snapshot, playback) through `[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`. Any new static state needs the same treatment. See [[09 Decisions/Decisions#ADR-014|ADR-014]]. Every file with static state also opens with a `#pragma` for Unity's statics-cleanup analyzer and a line saying why — [[09 Decisions/Decisions#ADR-032|ADR-032]].
 
-**Saved programs.** The in-game editor saves one file per object (`BlockyPrograms/<scene>/<path>.json`, `RuntimeProgramStorage`), and a runner runs its object's save instead of its scene program; `BlockyRuntimeTicker` gives a runner back to a saved object that has none. See [[09 Decisions/Decisions#ADR-031|ADR-031]].
+**Saved programs.** The in-game editor saves one file per object (`BlockyPrograms/<scene>/<path>.json`, `RuntimeProgramStorage`), and a runner runs its object's save instead of its scene program; `BlockyRuntimeTicker` gives a runner back to a saved object that has none. See [[09 Decisions/Decisions#ADR-031|ADR-031]]. The files are the default behind an interface: a game that keeps programs in its own save data sets `BlockyStorage.Current` to its own `IProgramStorage`, keyed by `GameObject`.
+
+**Hosting.** Blocky can be the whole experience (its defaults) or a part of a game that has a flow of its own: the game opens, closes and targets the workspace, starts scripts, decides what is looked at and clicked, and stores programs — each through one seam, all additive ([[09 Decisions/Decisions#ADR-041 — A game can host Blocky: the game owns the flow, Blocky keeps its defaults|ADR-041]], [[12 Game Code/Hosting Blocky|Hosting Blocky]]). The layering holds: the two hooks the editor layer needs from a game (`ParamFieldFactory.ObjectChoices`, `IsHidden`) are delegates set from outside, because Blocky.Editor still references neither the runtime nor the scene.
 
 Editor multi-select adds `BlockRef` and the group commands `MoveBlocks` / `DeleteBlocks` to the data layer, and `GroupDragSession` (an `IDragSession`, like `ChainDragSession`) to the editor layer.
 
@@ -56,6 +58,6 @@ Packages/com.revkae.blocky/
   Editor/
     Blocky.Tooling/       Program Editor, New Block wizard, menus, BlockyPaths
 ```
-Each assembly keeps its `Tests/` beside it. The project's own content stays in `Assets/`: the demo scene and its programs, and `Assets/BlockyBlocks` (a game's own block). Tools read Blocky's files from the package and write a project's under `Assets` — installed from git, the package is read-only.
+Each assembly keeps its `Tests/` beside it — Blocky.Game too, since 0.2.0 (`Blocky.Game.Tests`). Blocky.Runtime and Blocky.Game open a few `internal` seams to their own tests with `InternalsVisibleTo`. The project's own content stays in `Assets/`: the demo scene and its programs, and `Assets/BlockyBlocks` (a game's own block). Tools read Blocky's files from the package and write a project's under `Assets` — installed from git, the package is read-only.
 
 Player-facing words live in `Runtime/Resources/Languages/<code>.json` in the package, never in code — see [[10 Localization/Localization|Localization]].

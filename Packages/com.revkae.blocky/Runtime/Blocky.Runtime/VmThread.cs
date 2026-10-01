@@ -79,6 +79,8 @@ namespace Blocky.Runtime
         /// <summary>Reported as started (<see cref="VmScheduler.ThreadStarted"/>), so that only such threads are reported finished.</summary>
         internal bool Announced;
 
+        private bool _warnedAsObject;
+
         public VmThread(CompiledProgram program, GameObject target, int entryPc)
         {
             Program = program;
@@ -114,6 +116,83 @@ namespace Blocky.Runtime
         public void MarkFramesYielded()
         {
             for (var i = 0; i < FrameCount; i++) Frames[i].YieldedThisLap = true;
+        }
+
+        // ---- "as [object]" (ADR-042) ------------------------------------------------------------------
+
+        /// <summary>
+        /// The object this thread's blocks act on right now: inside an <c>as [object]</c> block, that object — the
+        /// innermost one when they nest — and otherwise <see cref="Target"/>. Everything about the thread itself
+        /// (pausing, stopping, which script it is) stays keyed on <see cref="Target"/>.
+        /// </summary>
+        public GameObject ActsOn
+        {
+            get
+            {
+                for (var i = FrameCount - 1; i >= 0; i--)
+                    if (Frames[i].HasActsOn) return Frames[i].ActsOn;
+                return Target;
+            }
+        }
+
+        /// <summary>
+        /// When the object of the <c>as [object]</c> block this thread is inside has been destroyed under it, skips
+        /// the rest of that block's mouth (one warning per run) and returns true: the blocks there have nothing left
+        /// to act on, and each failing in turn would end the whole script instead.
+        /// </summary>
+        internal bool SkipAsIfObjectGone()
+        {
+            for (var i = FrameCount - 1; i >= 0; i--)
+            {
+                if (!Frames[i].HasActsOn) continue;
+                if (Frames[i].ActsOn != null) return false;
+                if (i == FrameCount - 1 && Pc == Frames[i].OwnerPc) return false; // its blocks have all run: the op is about to leave it anyway
+
+                WarnAsObjectMissing(null);
+                LeaveAs();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Leaves the innermost <c>as [object]</c> block from wherever the thread is inside it — loops and custom
+        /// blocks begun in there are abandoned — and carries on with the block after it. Timers inside start over, so
+        /// a block cut short doesn't resume half way the next time round.
+        /// </summary>
+        private void LeaveAs()
+        {
+            while (FrameCount > 0)
+            {
+                var frame = TopFrame();
+                PopFrame();
+                if (frame.IsCall)
+                {
+                    EndPc = frame.CallerEndPc;
+                    CallDepth--;
+                }
+                if (!frame.HasActsOn) continue;
+
+                Array.Clear(Scratch, frame.OwnerPc + 1, frame.ExitPc - frame.OwnerPc - 1); // the mouth's own blocks
+                Pc = frame.ExitPc;
+                ResumePc = -1;
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Says, once per run of this script, that an <c>as [object]</c> block had no object to act on:
+        /// <paramref name="name"/> matched nothing, or (null) the object was destroyed while its blocks ran.
+        /// </summary>
+        internal void WarnAsObjectMissing(string name)
+        {
+            if (_warnedAsObject) return;
+            _warnedAsObject = true;
+
+            var owner = Target != null ? Target.name : "a destroyed object";
+            Debug.LogWarning(name != null
+                ? $"Blocky: an \"as\" block on '{owner}' found no object named '{name}', so the blocks inside it were skipped."
+                : $"Blocky: the object of an \"as\" block on '{owner}' was destroyed while its blocks ran, so the rest of them were skipped.");
         }
 
         // ---- custom blocks (ADR-029) -------------------------------------------------------------------

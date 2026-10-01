@@ -55,7 +55,8 @@ namespace Blocky.Editor
             header.AddToClassList("blocky-block__header");
             header.Add(new Label(BlockView.DisplayName(definition)));
             foreach (var spec in definition.parameters)
-                header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
+                if (!ParamFieldFactory.Hides(definition, spec))
+                    header.Add(BlockParams.Create(spec, Array.Find(node.parameters, p => p.key == spec.key), definition, node.id, registry, stackId, store, prototype));
             Add(header);
 
             new BlockShapePainter(this, () => new BlockOutline { Width = layout.width, Height = layout.height, Hexagon = hexagon, Pill = !hexagon });
