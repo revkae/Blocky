@@ -110,7 +110,15 @@ While any added check says true, `mouse down?` is false and "when clicked" doesn
 
 ## `change color` on models [10]
 
-It recolors every renderer under the object, in every material slot — so a model whose meshes sit under a renderer-less root changes color, and Reset and Step back put every one back. A speech bubble is left alone. `set visible` still switches only the object's own renderer.
+It recolors every renderer under the object, in every material slot — so a model whose meshes sit under a renderer-less root changes color, and Reset and Step back put every one back. A speech bubble is left alone. `set visible` reaches the same renderers (0.2.1).
+
+## Speech bubbles seen from far away — `BlockySpeechBubble.ReadableDistance` (0.2.1)
+
+```csharp
+BlockySpeechBubble.ReadableDistance = 10f; // as the game starts: reset every Play session
+```
+
+A bubble is one size in the world whatever its object's scale is. Past `ReadableDistance` from the main camera it grows with the distance, so it stays as large on screen as it is from there — for a world that is walked around in, or seen through a headset. The default, infinity, keeps every bubble its real size. A message wraps at 28 characters, and the bubble is drawn with Blocky's own shaders (`Resources/Blocky`), so there is nothing to set up for the built-in pipeline or URP ([[09 Decisions/Decisions#ADR-044 — A speech bubble is measured in the world, not in its object, and Blocky draws it with shaders of its own|ADR-044]]).
 
 ## XR-Education's wiring, as an example
 

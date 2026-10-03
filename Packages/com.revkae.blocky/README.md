@@ -14,10 +14,10 @@ The Package Manager installs the rest (Input System, Newtonsoft JSON, and the Un
 Add this line to your project's `Packages/manifest.json`, under `dependencies`:
 
 ```json
-"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.2.0"
+"com.revkae.blocky": "https://github.com/revkae/Blocky.git?path=/Packages/com.revkae.blocky#v0.2.1"
 ```
 
-`?path=` points at this folder inside the repository, and `#v0.2.0` pins a release so your project only updates when you change it. Or use *Window › Package Manager › + › Install package from git URL…* with the same URL.
+`?path=` points at this folder inside the repository, and `#v0.2.1` pins a release so your project only updates when you change it. Or use *Window › Package Manager › + › Install package from git URL…* with the same URL.
 
 Working on Blocky and a game side by side? Point at your local copy instead, and edits show up in both:
 

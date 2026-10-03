@@ -48,6 +48,28 @@ namespace Blocky.Runtime.Tests
         }
 
         [Test]
+        public void RestoreAll_ShowsEveryRendererUnderTheObjectAgain()
+        {
+            // "set visible" hides every renderer under the object, so Reset has to put every one back.
+            var child = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            child.transform.SetParent(_cube.transform, false);
+            var hiddenFromTheStart = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            hiddenFromTheStart.transform.SetParent(_cube.transform, false);
+            hiddenFromTheStart.GetComponent<Renderer>().enabled = false;
+
+            var snapshot = new WorldSnapshot();
+            snapshot.Capture(_cube);
+
+            foreach (var renderer in _cube.GetComponentsInChildren<Renderer>()) renderer.enabled = false;
+
+            snapshot.RestoreAll();
+
+            Assert.IsTrue(_cube.GetComponent<Renderer>().enabled);
+            Assert.IsTrue(child.GetComponent<Renderer>().enabled, "a child mesh comes back too");
+            Assert.IsFalse(hiddenFromTheStart.GetComponent<Renderer>().enabled, "a part that started hidden stays hidden");
+        }
+
+        [Test]
         public void Capture_KeepsTheFirstState()
         {
             var snapshot = new WorldSnapshot();

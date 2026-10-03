@@ -7,7 +7,7 @@ namespace Blocky.Runtime
     /// <summary>
     /// Keeps track of every programmed object — how it started, for Reset, and how it is at any moment
     /// (<see cref="SaveMoment"/>), for Step back. Records exactly what blocks can change: position, rotation,
-    /// scale, visibility, the materials and colors of every renderer under it, and a physics body's motion. A new
+    /// scale, and — for every renderer under it — visibility, materials and colors, and a physics body's motion. A new
     /// block that changes something else (a light, a sound) must be added here too, or Reset and Step back won't
     /// undo it.
     /// An object's start is where it was when first captured, until <see cref="Recapture"/> moves it — what a game
@@ -18,8 +18,7 @@ namespace Blocky.Runtime
         internal sealed class Tracked
         {
             public GameObject GameObject;
-            public Renderer Renderer;     // the object's own: the one "set visible" switches
-            public Renderer[] Renderers;  // every renderer under it, its own included: "change color" recolors them all
+            public Renderer[] Renderers;  // every renderer under it, its own included: "change color" and "set visible" reach them all
             public Rigidbody Body;
 #if BLOCKY_PHYSICS2D // set by Blocky.Runtime.asmdef when the project has Unity's 2D physics module
             public Rigidbody2D Body2D;
@@ -40,8 +39,6 @@ namespace Blocky.Runtime
             public Quaternion LocalRotation;
             public Vector3 LocalScale;
             public bool Active;
-            public Renderer OwnRenderer; // the object's own renderer then, or null
-            public bool RendererEnabled;
             public RendererLook[] Looks; // one per renderer under the object, as it was then
             public Vector3 Velocity;
             public Vector3 AngularVelocity;
@@ -49,10 +46,11 @@ namespace Blocky.Runtime
             public float AngularVelocity2D;
         }
 
-        /// <summary>One renderer's materials and colors at one moment. It names its renderer, so it stays right when the object's renderers change.</summary>
+        /// <summary>One renderer's visibility, materials and colors at one moment. It names its renderer, so it stays right when the object's renderers change.</summary>
         internal struct RendererLook
         {
             public Renderer Renderer;
+            public bool Enabled;         // "set visible" switches every renderer under the object
             public Material[] Materials; // shared: reading .materials would make copies
             public Color[] Colors;       // per material; meaningful where HasColor says so
             public bool[] HasColor;
@@ -207,7 +205,6 @@ namespace Blocky.Runtime
         private void FindParts(Tracked tracked)
         {
             var go = tracked.GameObject;
-            tracked.Renderer = go.GetComponent<Renderer>();
             tracked.Body = go.GetComponent<Rigidbody>();
 #if BLOCKY_PHYSICS2D
             tracked.Body2D = go.GetComponent<Rigidbody2D>();
@@ -250,8 +247,6 @@ namespace Blocky.Runtime
                 LocalRotation = transform.localRotation,
                 LocalScale = transform.localScale,
                 Active = go.activeSelf,
-                OwnRenderer = tracked.Renderer,
-                RendererEnabled = tracked.Renderer != null && tracked.Renderer.enabled,
                 Looks = new RendererLook[tracked.Renderers.Length]
             };
 
@@ -285,6 +280,7 @@ namespace Blocky.Runtime
             var look = new RendererLook
             {
                 Renderer = renderer,
+                Enabled = renderer.enabled,
                 Materials = _materials.ToArray(),
                 Colors = new Color[_materials.Count],
                 HasColor = new bool[_materials.Count]
@@ -306,7 +302,6 @@ namespace Blocky.Runtime
             transform.localScale = state.LocalScale;
             if (go.activeSelf != state.Active) go.SetActive(state.Active);
 
-            if (state.OwnRenderer != null) state.OwnRenderer.enabled = state.RendererEnabled;
             foreach (var look in state.Looks) ApplyLook(tracked, look);
 
             var body = tracked.Body;
@@ -340,6 +335,8 @@ namespace Blocky.Runtime
         {
             var renderer = look.Renderer;
             if (renderer == null) return;
+
+            renderer.enabled = look.Enabled;
 
             // "change color" works on per-object copies of the materials (ADR-008). Pointing back at the materials of
             // that moment undoes the swap; the copies themselves are freed by Unity's next unused-asset sweep.

@@ -17,8 +17,26 @@ namespace Blocky.Runtime.Tests
         public void TearDown()
         {
             Object.DestroyImmediate(_target);
+            if (_camera != null) Object.DestroyImmediate(_camera);
+            BlockySpeechBubble.CameraForTests = null;
+            BlockySpeechBubble.ReadableDistance = float.PositiveInfinity;
             BlockyRuntime.Reset();
         }
+
+        private GameObject _camera;
+
+        /// <summary>
+        /// The camera the bubble faces and measures its distance from. Handed over through the test seam rather than
+        /// tagged MainCamera: the scene open in the Editor may have a main camera of its own, and which of two wins is not ours to say.
+        /// </summary>
+        private void PutCameraAt(Vector3 position)
+        {
+            _camera = new GameObject("SayTestsCamera");
+            _camera.transform.position = position;
+            BlockySpeechBubble.CameraForTests = _camera.AddComponent<Camera>();
+        }
+
+        private Transform Bubble() => _target.GetComponentInChildren<TextMesh>().transform.parent;
 
         private static BlockDefinition Def(string blockType, BlockShape shape, ParamSpec[] parameters = null)
         {
@@ -168,6 +186,138 @@ namespace Blocky.Runtime.Tests
             var bubble = _target.GetComponentInChildren<TextMesh>().transform.parent;
             Assert.Greater(bubble.localPosition.y, 0f);
             Assert.IsNull(bubble.GetComponentInChildren<Collider>(), "the bubble's backing quad has no collider");
+        }
+
+        [Test]
+        public void TheBubbleIsTheSameSize_WhateverTheObjectsScale()
+        {
+            // Imported models come at every scale: an elephant at 0.03, a car at 4. The bubble hangs under the object
+            // and would shrink to nothing, or grow to a billboard, with it.
+            _target.transform.localScale = new Vector3(4f, 4f, 4f);
+            BlockySpeechBubble.Show(_target, "Big", think: false);
+            Assert.AreEqual(1f, Bubble().lossyScale.x, 1e-3f);
+            Assert.AreEqual(1f, Bubble().lossyScale.y, 1e-3f);
+
+            _target.transform.localScale = new Vector3(0.03f, 0.03f, 0.03f);
+            BlockySpeechBubble.Show(_target, "Small", think: false);
+            Assert.AreEqual(1f, Bubble().lossyScale.x, 1e-3f);
+            Assert.AreEqual(1f, Bubble().lossyScale.y, 1e-3f);
+        }
+
+        [Test]
+        public void TheBubbleClearsEverythingTheObjectShows_NotJustItsRoot()
+        {
+            // A model whose root has no renderer and whose pivot is at its feet: its mesh stands well above the pivot.
+            var mesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            mesh.transform.SetParent(_target.transform, false);
+            mesh.transform.localPosition = new Vector3(0f, 3f, 0f);
+            _target.transform.localScale = new Vector3(2f, 2f, 2f); // the mesh's top is now at y = 7
+
+            BlockySpeechBubble.Show(_target, "Up here", think: false);
+
+            var top = mesh.GetComponent<Renderer>().bounds.max.y;
+            Assert.AreEqual(7f, top, 1e-3f);
+            Assert.Greater(Bubble().position.y, top, "the bubble is above the top of the mesh, not inside it");
+        }
+
+        [Test]
+        public void TheBubbleFollowsTheObject_WhenItMoves()
+        {
+            var mesh = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            mesh.transform.SetParent(_target.transform, false);
+            BlockySpeechBubble.Show(_target, "Coming along", think: false);
+            var before = Bubble().position;
+
+            _target.transform.position += new Vector3(5f, 0f, 0f);
+
+            Assert.AreEqual(before.x + 5f, Bubble().position.x, 1e-3f, "it is the object's child, so it never lags a frame behind");
+        }
+
+        [Test]
+        public void ALongMessageWraps_AtItsSpaces()
+        {
+            const string sentence = "The quick brown fox jumps over the lazy dog and keeps on running through the park";
+
+            var wrapped = BlockySpeechBubble.Wrap(sentence);
+
+            StringAssert.Contains("\n", wrapped);
+            foreach (var line in wrapped.Split('\n'))
+                Assert.LessOrEqual(line.Length, BlockySpeechBubble.MaxLineLength, $"'{line}' is longer than a bubble line");
+            Assert.AreEqual(sentence, wrapped.Replace('\n', ' '), "nothing but the line breaks changed");
+        }
+
+        [Test]
+        public void Wrap_LeavesShortMessagesAndLongWordsAlone_AndKeepsLineBreaks()
+        {
+            Assert.AreEqual("Hello!", BlockySpeechBubble.Wrap("Hello!"));
+            Assert.AreEqual("Supercalifragilisticexpialidocious", BlockySpeechBubble.Wrap("Supercalifragilisticexpialidocious", 10));
+            Assert.AreEqual("one two\nthree\nfour", BlockySpeechBubble.Wrap("one two three\nfour", 8));
+            Assert.AreEqual(string.Empty, BlockySpeechBubble.Wrap(string.Empty));
+        }
+
+        [Test]
+        public void TheBubbleOnScreen_IsTheWrappedMessage()
+        {
+            const string sentence = "one two three four five six seven eight nine ten eleven";
+            var scheduler = Start(Say(sentence, 0f));
+
+            scheduler.Tick(1f);
+
+            Assert.AreEqual(BlockySpeechBubble.Wrap(sentence), VisibleBubbleText());
+        }
+
+        [Test]
+        public void TheBubbleIsDrawnWithBlockysOwnShaders_WhichEveryPipelineDraws()
+        {
+            // A render pipeline's own unlit shader is the wrong thing to reach for: a project can have the URP package
+            // installed and render with the built-in pipeline, where URP's shaders exist and draw as the magenta error color.
+            BlockySpeechBubble.Show(_target, "Hello!", think: false);
+
+            var back = Bubble().Find("Back").GetComponent<Renderer>().sharedMaterial.shader;
+            var text = Bubble().Find("Text").GetComponent<Renderer>().sharedMaterial.shader;
+
+            Assert.AreEqual("Hidden/Blocky/Bubble Back", back.name);
+            Assert.AreEqual("Hidden/Blocky/Bubble Text", text.name, "depth tested: Unity's font shader draws 3D text through walls");
+            Assert.IsTrue(back.isSupported && text.isSupported);
+        }
+
+        [Test]
+        public void TheBubbleLiesFlatOnTheScreen_WhereverItIs()
+        {
+            // Off to one side of a camera that looks down at an angle: a bubble turned towards where the camera stands
+            // would be seen at a slant there.
+            _target.transform.position = new Vector3(30f, 0f, 20f);
+            PutCameraAt(new Vector3(0f, 5f, -10f));
+            _camera.transform.rotation = Quaternion.Euler(20f, 15f, 0f);
+
+            BlockySpeechBubble.Show(_target, "Flat", think: false);
+
+            Assert.AreEqual(0f, Quaternion.Angle(_camera.transform.rotation, Bubble().rotation), 1e-3f);
+        }
+
+        [Test]
+        public void ByDefault_ABubbleIsItsRealSize_HoweverFarTheCameraIs()
+        {
+            PutCameraAt(new Vector3(0f, 0f, -100f));
+
+            BlockySpeechBubble.Show(_target, "Far away", think: false);
+
+            Assert.AreEqual(1f, Bubble().lossyScale.x, 1e-3f);
+        }
+
+        [Test]
+        public void WithAReadableDistance_AFarBubbleGrows_AndANearOneKeepsItsSize()
+        {
+            BlockySpeechBubble.ReadableDistance = 10f;
+            _target.transform.position = new Vector3(0f, -0.5f, 0f); // the top of an object with nothing to show: the origin
+            PutCameraAt(new Vector3(0f, 0f, -40f));
+
+            BlockySpeechBubble.Show(_target, "Four times as far", think: false);
+            Assert.AreEqual(4f, Bubble().lossyScale.x, 1e-2f, "at four times the distance it is four times the size: the same on screen");
+
+            _camera.transform.position = new Vector3(0f, 0f, -5f);
+            BlockySpeechBubble.Show(_target, "Close by", think: false);
+            Assert.AreEqual(1f, Bubble().lossyScale.x, 1e-3f, "nearer than the readable distance it is never smaller than its real size");
         }
 
         [Test]

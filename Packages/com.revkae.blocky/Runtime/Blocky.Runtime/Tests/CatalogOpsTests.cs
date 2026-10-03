@@ -125,6 +125,32 @@ namespace Blocky.Runtime.Tests
         }
 
         [Test]
+        public void SetVisible_HidesEveryRendererUnderTheObject_ButNotItsSpeechBubble()
+        {
+            // An imported model: a root with no renderer of its own, and its meshes on children.
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            body.transform.SetParent(_target.transform, false);
+            head.transform.SetParent(body.transform, false);
+            BlockySpeechBubble.Show(_target, "Still here", think: false);
+
+            var def = Def("looks.set_visible", new[] { new ParamSpec { key = "visible", kind = ParamKind.Bool } });
+            var node = new BlockNode
+            {
+                id = "n1", blockType = "looks.set_visible",
+                parameters = new[] { new BlockParam { key = "visible", kind = ParamKind.Bool, boolean = false } }
+            };
+
+            var (scheduler, compiled) = BuildScheduler(def, node);
+            scheduler.Start(compiled, _target, compiled.StackEntryPoints[0]);
+            scheduler.Tick(1f);
+
+            Assert.IsFalse(body.GetComponent<Renderer>().enabled, "a child mesh is hidden");
+            Assert.IsFalse(head.GetComponent<Renderer>().enabled, "and one further down");
+            Assert.IsTrue(_target.GetComponentInChildren<TextMesh>().GetComponent<Renderer>().enabled, "the bubble is not the object's look");
+        }
+
+        [Test]
         public void SetScale_Instant_SetsLocalScale()
         {
             var def = Def("looks.set_scale", new[]

@@ -2,6 +2,24 @@
 
 All notable changes to this package are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] — 2026-10-02
+
+Found by building a whole world out of library models in the first game that hosts Blocky. No block, save file or API of 0.2.0 changes meaning.
+
+### Added
+- **`BlockySpeechBubble.ReadableDistance`:** past this distance from the main camera a bubble grows with the distance, so it stays as large on screen as it is from there — for a world that is walked around in or seen through a headset. Infinity (the default) keeps every bubble its real size. Reset every Play session, like the other switches.
+- **A long message wraps** at its spaces, 28 characters to a line (`BlockySpeechBubble.Wrap`, `MaxLineLength`); a sentence used to be one line across the scene.
+
+### Changed
+- **`set visible` shows or hides every renderer under the object**, as `change color` recolors them all — on a model whose meshes sit under a root with no renderer it did nothing. Reset and Step back put each renderer back. A speech bubble is left alone.
+- **A speech bubble is the same size whatever the object's scale is**, sits above everything the object shows (not half the root renderer's height above its pivot), and lies flat on the screen instead of facing where the camera stands.
+- **The bubble is drawn with Blocky's own two shaders** (`Resources/Blocky`), the same in every render pipeline. Its text is depth tested, and its card writes depth.
+
+### Fixed
+- A speech bubble's card was magenta in a project that has the URP package installed but renders with the built-in pipeline.
+- A speech bubble was huge over a scaled-up model, invisible over a scaled-down one, and inside a model whose pivot is at its feet.
+- A speech bubble's text showed through walls, and through a nearer bubble.
+
 ## [0.2.0] — 2026-10-01
 
 Blocky can be hosted: a game with a flow of its own — its own selection, Play button and save data — can run Blocky inside it. Everything here is additive, and every default is what 0.1.0 did.
