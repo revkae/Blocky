@@ -46,8 +46,8 @@ What ties Blocky to 6.7 is the language pass: `Blocky.Localization` runs on 6.7'
 | **A. Wait for 6.7 LTS** | Upgrade when it ships, test again | No porting | Only buyers on 6.7+; launch waits |
 | **B. Support 6.3 LTS and up** (recommended) | On older versions, look words up in `LanguageFiles` directly; keep the module path behind a version define for 6.7+ if its plural forms matter | Far more buyers and schools; launch sooner | Porting, and testing on two versions |
 
-- [ ] Choose A or B and record it as an ADR.
-- [ ] Move the project off alpha 6 — to the current 6.7 beta (A) or to 6.3 LTS (B) — and run section 1 again there.
+- [x] Choose A or B and record it as an ADR. **B, 2026-10-15** ([[09 Decisions/Decisions#ADR-045 — Unity 6.3 LTS is the oldest version Blocky supports; 6.7's localization runtime is used only where it exists|ADR-045]]): `package.json` says `6000.3`; Blocky uses 6.7's localization runtime where both modules exist and reads its language files itself everywhere else. 6.0 LTS leaves security support on 2026-10-16 and 2022.3 already has, so nothing older.
+- [ ] Move the project off alpha 6 — to the current 6.7 beta (A) or to 6.3 LTS (B) — and run section 1 again there. *Changed by ADR-045:* this project stays on 6.7 (it keeps the localization-runtime path tested) and should move from `6000.7.0a6` to the installed `6000.7.0b2`; a clean 6.3 URP project installs the package by path and runs the same suite — 519/519 on `6000.3.8f1` and on 6.7, no compile errors or warnings on 6.3 (2026-10-15). The Asset Store upload is made from 6.3. Section 1's hand checks are still to do on 6.3.
 
 ## 4. Ready for teachers and students
 They use a finished app, never the Unity Editor, so most of this is the app around the workspace.
@@ -94,12 +94,12 @@ They use a finished app, never the Unity Editor, so most of this is the app arou
 - [ ] **Leave the MIT `LICENSE` out of the package.** Buyers get the Asset Store EULA; other license terms need Unity's written agreement.
 - [ ] **Third-Party Notices.** Nothing third-party is bundled today — sounds are generated, the bubble uses Unity's built-in font, Newtonsoft comes as a Unity package. Add `Third-Party Notices.txt` the day that changes.
 - [ ] **Disclose AI assistance.** Blocky was built with AI coding assistance, so the listing must say so in its *AI description* field — plainly, with what was added or changed by hand.
-- [ ] **Trademarks.** Keep *Scratch*, *Delightex*, *CoSpaces*, *CoBlocks* and *Blockly* out of the title, keywords, images and on-screen text. The Free-mode tooltip says "The Scratch table" today (`mode.free.tooltip` in `en.json`, "Scratch masası" in `tr.json`). Code comments and this vault are fine.
+- [x] **Trademarks** — the shipped text is clean since 2026-10-15: the Free-mode tooltip ("One open table…", "Açık masa…"), the `package.json` description and both READMEs say *visual block programming*. About 90 code comments still name Scratch to describe behaviour ("as in Scratch, stop ends the script"); they are descriptive, not branding, and can be reworded if a reviewer asks. Keep *Scratch*, *Delightex*, *CoSpaces*, *CoBlocks* and *Blockly* out of the title, keywords, images and on-screen text. The Free-mode tooltip says "The Scratch table" today (`mode.free.tooltip` in `en.json`, "Scratch masası" in `tr.json`). Code comments and this vault are fine.
 - [ ] **A title people can find.** "Blocky" alone is crowded on the store (*Blocky Vehicle Pack*, *Blocky Level Generator*…) and one letter from Google's *Blockly*. Something like *Blocky – Visual Block Coding for Education*.
 - [ ] **Publisher account** in the Publisher Portal: profile, payout profile (PayPal monthly or bank transfer quarterly), tax form (W-8BEN from outside the US). Unity keeps 30% of each sale.
 
 ### Manual and store page
-- [ ] **A manual inside the package** (PDF or Markdown in `Assets/Blocky/Documentation/`) — required for code packages; this vault is design notes, not a manual:
+- [x] **A manual inside the package** — done 2026-10-15: twelve Markdown pages in `Packages/com.revkae.blocky/Documentation~/` (88 blocks in the reference), also built as a website by MkDocs Material (`mkdocs.yml`, `.github/workflows/docs.yml` → GitHub Pages). *Still open:* screenshots, and whether the Asset Store validator counts a `Documentation~` folder (run it and see). It covers:
   - Quick start in five minutes: import → drop in the prefab → give an object a program → Play → Tab.
   - Using the workspace — most of it is already in [[08 Build Log/Demo Scene#In-game program editor|Demo Scene]].
   - Block reference — from [[06 Block Catalog/Block Catalog|Block Catalog]].

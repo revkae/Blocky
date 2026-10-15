@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Blocky.Localization.Tests
 {
-    /// <summary>Looking words up through Unity Localization, in English and in Turkish.</summary>
+    /// <summary>Looking words up, in English and in Turkish — through Unity Localization on 6.7+, from the files before it.</summary>
     public class BlockyTextTests
     {
         [Test]
@@ -51,11 +51,50 @@ namespace Blocky.Localization.Tests
         [Test]
         public void EveryTranslation_FallsBackToEnglish()
         {
-            var locales = BlockyLanguages.Available;
+            var languages = BlockyLanguages.Available;
+            var english = LanguageFiles.Find("en");
 
-            Assert.AreEqual("en", locales[0].Code);
-            foreach (var locale in locales.Skip(1))
-                Assert.AreEqual("en", locale.FallbackCode, locale.Code);
+            Assert.AreEqual("en", languages[0].Code);
+            foreach (var language in languages.Skip(1))
+            using (BlockyLanguages.Override(language.Code))
+                foreach (var key in english.Strings.Keys.Where(k => english.Strings[k].IndexOf('{') < 0))
+                    Assert.AreNotEqual(key, BlockyText.Get(key), $"{language.Code} has no text for {key}, and English didn't stand in");
+        }
+
+        [Test]
+        public void Select_SwitchesTheLanguage_AndSaysSo()
+        {
+            var saved = PlayerPrefs.GetString(BlockyLanguages.SavedChoiceKey, null);
+            var before = BlockyLanguages.Current.Code;
+            var other = before == "tr" ? "en" : "tr";
+            BlockyLanguage heard = null;
+            void Hear(BlockyLanguage language) => heard = language;
+
+            BlockyLanguages.Changed += Hear;
+            try
+            {
+                Assert.IsTrue(BlockyLanguages.Select(other));
+                Assert.AreEqual(other, BlockyLanguages.Current.Code);
+                Assert.AreEqual(other, heard?.Code);
+                Assert.IsFalse(BlockyLanguages.Select("xx"), "a language with no file");
+            }
+            finally
+            {
+                BlockyLanguages.Changed -= Hear;
+                BlockyLanguages.Select(before);
+                if (saved == null) PlayerPrefs.DeleteKey(BlockyLanguages.SavedChoiceKey);
+                else PlayerPrefs.SetString(BlockyLanguages.SavedChoiceKey, saved);
+            }
+        }
+
+        [Test]
+        public void ALanguage_KnowsItsNameAndCulture()
+        {
+            var turkish = BlockyLanguages.Available.First(l => l.Code == "tr");
+
+            Assert.AreEqual("Türkçe", turkish.Name);
+            Assert.AreEqual("tr", turkish.Culture.TwoLetterISOLanguageName);
+            Assert.AreSame(turkish, BlockyLanguages.Available.First(l => l.Code == "tr"), "one object per language");
         }
 
         [Test]

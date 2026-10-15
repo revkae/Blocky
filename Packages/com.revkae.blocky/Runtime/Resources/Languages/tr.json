@@ -7,7 +7,7 @@
     "storage.unreadable": "“{0}” için kaydedilen program açılamadı, bu yüzden sahnedeki programını çalıştırıyor. Eski dosya saklandı.",
     "storage.save_failed": "“{0}” için program kaydedilemedi. Değişikliğin şimdi çalışıyor ama bir dahaki sefere burada olmayacak.",
     "mode.free": "Serbest",
-    "mode.free.tooltip": "Scratch masası: bloklar her yere konabilir; yayılabilir, kaydırabilir ve yakınlaştırabilirsin",
+    "mode.free.tooltip": "Açık masa: bloklar her yere konabilir; yayılabilir, kaydırabilir ve yakınlaştırabilirsin",
     "mode.simple": "Basit",
     "mode.simple.tooltip": "Numaralı tek sütun: her blok betiğe katılır ve masa yalnızca kayar",
     "language.tooltip": "Dil",

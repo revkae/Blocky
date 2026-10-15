@@ -1,10 +1,10 @@
 # Blocky
 
-Scratch-style block programming inside a Unity game. Players open an in-game workspace, drag blocks onto a table to program the objects in the scene, and a small VM runs the programs — in Play mode and in builds.
+Visual block programming inside a Unity game. Players open an in-game workspace, drag blocks onto a table to program the objects in the scene, and a small VM runs the programs — in Play mode and in builds.
 
 ## Requirements
 
-- Unity **6000.7** or newer (Blocky's languages use 6.7's built-in localization module).
+- Unity **6.3 LTS** (6000.3) or newer. On 6.7 and later, in a project with the built-in localization and Smart Strings modules, Blocky's languages run on Unity Localization; on earlier versions Blocky reads its language files itself.
 - The **Input System**. Set *Project Settings › Player › Active Input Handling* to *Input System Package (New)* or *Both*.
 
 The Package Manager installs the rest (Input System, Newtonsoft JSON, and the Unity modules Blocky uses).

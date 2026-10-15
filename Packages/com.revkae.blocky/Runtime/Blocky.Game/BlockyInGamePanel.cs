@@ -6,7 +6,6 @@ using Blocky.Editor;
 using Blocky.Localization;
 using Blocky.Runtime;
 using Blocky.Runtime.Persistence;
-using Unity.Localization;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
@@ -402,7 +401,7 @@ namespace Blocky.Game
             return _root != null;
         }
 
-        private void OnEnable() => LocalizationSettings.SelectedLocaleChanged += OnLanguageChanged;
+        private void OnEnable() => BlockyLanguages.Changed += OnLanguageChanged;
 
         // Tuning a level's toolbox in the Inspector during Play mode redraws the palette straight away; the toggle
         // key and the corner button follow the Inspector too.
@@ -415,7 +414,7 @@ namespace Blocky.Game
             ApplyVisible(_visible);
         }
 
-        private void OnDisable() => LocalizationSettings.SelectedLocaleChanged -= OnLanguageChanged;
+        private void OnDisable() => BlockyLanguages.Changed -= OnLanguageChanged;
 
         private void OnDestroy() => Release();
 
@@ -775,7 +774,7 @@ namespace Blocky.Game
             foreach (var locale in locales)
             {
                 var code = locale.Code;
-                var name = locale.LocaleName;
+                var name = locale.Name;
                 var button = new Button(() => BlockyLanguages.Select(code))
                 {
                     text = locales.Count <= 3 ? name : code.ToUpperInvariant() // an id, so invariant casing
@@ -862,7 +861,7 @@ namespace Blocky.Game
             apply();
         }
 
-        private void OnLanguageChanged(Locale _) => ApplyLanguage();
+        private void OnLanguageChanged(BlockyLanguage _) => ApplyLanguage();
 
         /// <summary>
         /// Rewords the workspace in place: the chrome, the tips, the palette and the table (block names, fields and

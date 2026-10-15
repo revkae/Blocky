@@ -7,7 +7,7 @@
     "storage.unreadable": "The saved program for “{0}” couldn't be opened, so it runs its scene program. The old file was kept.",
     "storage.save_failed": "Couldn't save the program for “{0}”. Your change runs now, but won't be here next time.",
     "mode.free": "Free",
-    "mode.free.tooltip": "The Scratch table: blocks go anywhere, and you can spread out, pan and zoom",
+    "mode.free.tooltip": "One open table: blocks go anywhere, and you can spread out, pan and zoom",
     "mode.simple": "Simple",
     "mode.simple.tooltip": "One numbered column: every block joins the script, and the table only scrolls",
     "language.tooltip": "Language",

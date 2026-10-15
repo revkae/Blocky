@@ -2,6 +2,19 @@
 
 All notable changes to this package are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Blocky runs on Unity 6.3 LTS and later, not only 6.7 (ADR-045).
+
+### Changed
+- **Unity 6.3 LTS is the oldest version Blocky supports** (`"unity": "6000.3"`). The localization and Smart Strings modules are no longer dependencies: on Unity 6.7+, in a project that has both, Blocky uses Unity's localization runtime as before; everywhere else it reads its language files itself, falls back to English a key at a time, and fills `{0}`-style placeholders with ordinary formatting — the same words either way. `BlockyLanguages.UsesUnityLocalization` says which.
+- **`BlockyLanguages.Current` and `Available` give a `BlockyLanguage`** (`Code`, `Name`, `Culture`) instead of Unity's `Locale`, which older versions don't have. Code that read `LocaleName` reads `Name`; `CultureInfo` is `Culture`.
+- The Input System dependency is `1.18.0`, the version Unity 6.3 has; a newer editor still uses its own.
+- The Free mode's tooltip and the package description no longer name another product.
+
+### Added
+- **`BlockyLanguages.Changed`:** raised with the new language when the one on show changes. The workspace rewords itself on it; on 6.7+ it is also raised when a game switches language through Unity Localization.
+
 ## [0.2.1] — 2026-10-02
 
 Found by building a whole world out of library models in the first game that hosts Blocky. No block, save file or API of 0.2.0 changes meaning.

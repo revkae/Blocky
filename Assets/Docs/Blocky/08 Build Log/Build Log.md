@@ -6,6 +6,13 @@ tags: [build-log]
 
 Reverse-chronological. One entry per session/milestone step.
 
+## 2026-10-15 — Unity 6.3 LTS and up (519/519 on 6.3 and 6.7)
+- **Why:** the Asset Store takes no uploads from alpha or beta editors, and 6.7 is still in beta. 6.3 LTS is where buyers are; 6.0 leaves support tomorrow ([[09 Decisions/Decisions#ADR-045 — Unity 6.3 LTS is the oldest version Blocky supports; 6.7's localization runtime is used only where it exists|ADR-045]]).
+- **What changed:** `package.json` → `"unity": "6000.3"`, Input System `1.18.0`, no localization modules. `Blocky.Localization` has two back ends picked by asmdef version defines (`BLOCKY_LOCALIZATION_RUNTIME`, `BLOCKY_SMART_STRINGS`): `UnityLocalizationBackend.cs` (ADR-030's code, moved) and `LanguageFileBackend.cs` (reads the files, English per key, PlayerPrefs → `-language=` → UI culture → English). `BlockyLanguages` hands out `BlockyLanguage` instead of Unity's `Locale` and raises `Changed`; the workspace listens to that. Two new tests (`Select_SwitchesTheLanguage_AndSaysSo`, `ALanguage_KnowsItsNameAndCulture`); the fallback test now checks behaviour instead of `Locale.FallbackCode`.
+- **Trademark pass:** the Free-mode tooltip, the package description and both READMEs no longer say Scratch.
+- **Verified:** 519/519 EditMode here on `6000.7.0a6` and in a new Universal 3D project on `6000.3.8f1` (package by `file:` path, `testables`); no errors or `CS` warnings on 6.3; each compiled `Blocky.Localization.dll` holds only its own back end.
+- **Not verified:** the language buttons, the saved choice and `-language=` by hand on 6.3; a 6.3 player build.
+
 ## 2026-10-02 — 0.2.1: speech bubbles and `set visible` on real models (517/517, run from XR-Education)
 User request (in XR-Education): build an example world that shows what Blocky can do with that project's objects, "and fix the errors and bugs you meet along the way". The world (47 library objects, 19 of them coded, a 45-second show run by broadcasts) used most of the catalog on imported models at every scale, and met these in Blocky. Design in [[09 Decisions/Decisions#ADR-044 — A speech bubble is measured in the world, not in its object, and Blocky draws it with shaders of its own|ADR-044]].
 

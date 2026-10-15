@@ -1,0 +1,67 @@
+site_name: Blocky
+site_description: Visual block programming inside a Unity game — the Blocky user manual.
+site_author: revkae
+repo_url: https://github.com/revkae/Blocky
+repo_name: revkae/Blocky
+edit_uri: edit/main/Packages/com.revkae.blocky/Documentation~/
+docs_dir: Packages/com.revkae.blocky/Documentation~
+
+validation:
+  omitted_files: warn
+  unrecognized_links: warn
+  anchors: warn
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Using Blocky:
+      - Using the workspace: workspace.md
+      - Block reference: blocks.md
+  - For developers:
+      - Custom blocks: custom-blocks.md
+      - Scripting: scripting.md
+      - Saving and loading: saving.md
+      - Languages: languages.md
+      - Builds and platforms: builds.md
+      - Running the tests: tests.md
+  - Troubleshooting: troubleshooting.md
+  - Changelog: changelog.md

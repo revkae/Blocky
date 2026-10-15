@@ -1,3 +1,4 @@
+#if BLOCKY_LOCALIZATION_RUNTIME && BLOCKY_SMART_STRINGS // set by Blocky.Localization.asmdef when the project has both Unity 6.7 modules
 using System;
 using System.Collections.Generic;
 using Unity.Localization;
@@ -72,3 +73,4 @@ namespace Blocky.Localization
         }
     }
 }
+#endif
