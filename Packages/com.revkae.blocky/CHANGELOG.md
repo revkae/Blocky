@@ -14,6 +14,10 @@ Blocky runs on Unity 6.3 LTS and later, not only 6.7 (ADR-045).
 
 ### Added
 - **`BlockyLanguages.Changed`:** raised with the new language when the one on show changes. The workspace rewords itself on it; on 6.7+ it is also raised when a game switches language through Unity Localization.
+- **Tooltips on the workspace's controls (ADR-046).** Rest the mouse on a control for half a second and it says what it does: Go, Stop, Reset, Pause / Resume, both Step buttons, the Speed caption and each speed, the zoom buttons and percentage, and the object's name in the title bar (15 new words in each language file, `*.tooltip`). They show in a game and in a build, under the control or, for the zoom and Undo / Redo columns on the right, beside it.
+
+### Fixed
+- **Tooltips never appeared in a game.** UI Toolkit draws `VisualElement.tooltip` only in Editor windows, so the tooltips Blocky already had (Free / Simple, the language and theme buttons, Close, Undo / Redo, the "?" and the block limit) were never seen. The workspace now draws them itself (`TooltipLayer`), from the frame rather than from pointer events, so a disabled button — Step back before any step — still explains itself. A finger has no hover, so on a touchscreen nothing changes.
 
 ## [0.2.1] — 2026-10-02
 

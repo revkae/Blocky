@@ -472,6 +472,20 @@ Every drag produces exactly one `DropChain` command (TDD §8.3's one-command-per
 **Behaviour change:** none in what a player sees. For code: `BlockyLanguages.Current.LocaleName` is now `.Name`, `.CultureInfo` is `.Culture`; anything that subscribed to `LocalizationSettings.SelectedLocaleChanged` to follow Blocky should use `BlockyLanguages.Changed`.
 **Revisit if:** a translation needs plural forms on 6.3 (add a small plural rule to the file back end rather than raising the minimum), or 6.7 LTS has been out long enough that 6.3 buyers are few — then the file back end can go and ADR-030 stands alone again.
 
+## ADR-046 — Blocky draws its own tooltips, from the frame, inside the workspace
+**Status:** Accepted (2026-10-25).
+**Context:** in the first game that hosts Blocky, learners couldn't tell what ◀ Step, Reset, `=` or the speeds do — the run bar and the zoom buttons had no tooltips. And the ones the workspace did set (Free / Simple, languages, theme, Close, Undo / Redo, "?", the block limit) had never been seen: UI Toolkit shows `VisualElement.tooltip` only in Editor panels, where the Editor raises `TooltipEvent` and draws the box. A runtime panel does neither. App UI has a runtime tooltip of its own (that is why the host's tooltips work), but Blocky depends on nothing past UI Toolkit and the Input System.
+**Decision:**
+- **One `TooltipLayer` per workspace**, a child of the root added after everything it explains and just before the `DragLayer`, which stays the last child (a drag puts the tooltip away anyway). It shows the `tooltip` property, so a control sets its words as it always did, and `Localize` rewords them with the language.
+- **Driven from the frame, not from pointer events.** `BlockyInGamePanel.Tick` hands it the panel's pick under `Pointer.current`, whether the pointer went down, and the unscaled time. A disabled button gets no pointer events, and ◀ Step is disabled until there is a step to take back — the control that most needs explaining. It is also how drags already follow the pointer (the real pointer each frame).
+- **Only its own parent's elements.** A host's UI in the same panel may have tooltips drawn by something else (App UI); answering for those too would show two.
+- **Timing:** a 0.5 s rest; within 0.4 s of one going away the next shows at once, so a bar can be read along; a press puts it away until the pointer has left that control. Mouse and pen only: a finger has no hover, and on a touchscreen a long press is already a drag.
+- **Placement:** under the control and centred, above it when there is no room; beside it (left, else right) for a control inside a `blocky-tooltip-beside` column — the zoom buttons and Undo / Redo stand in columns on the right edge, where a tooltip underneath would cover the next button. Always inside the workspace. On its first frame the tooltip sits at the root's top-left, see-through, and is placed and faded in on the next: an absolutely positioned element wraps to the width left to its right, so measured where it lands near an edge it would come out tall and narrow.
+**Alternatives rejected:** listening for `TooltipEvent` (never sent in a runtime panel); `PointerEnterEvent` / `PointerLeaveEvent` on each control (miss disabled ones, and need wiring per control); depending on App UI.
+**Verified (2026-10-25):** 14 new tests (11 on the layer by hand, 3 on the workspace), **533/533** EditMode; by eye in Play mode in XR-Education — see the [[08 Build Log/Build Log|Build Log]].
+**Behaviour change:** tooltips appear. The block limit chip now takes the pointer (so its tooltip can be read) instead of letting a press through to what is under it.
+**Revisit if:** Unity's runtime panels learn to draw tooltips; learners on tablets need them (a press-and-hold on a button, which is not a drag there, could show one).
+
 ## Open questions carried from TDD §15
 Track resolution here as decisions get made:
 1. In-world authoring surface needed? → blocks §8.1 decision above

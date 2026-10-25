@@ -358,6 +358,59 @@ namespace Blocky.Game.Tests
             Assert.AreEqual(DisplayStyle.Flex, Root.style.display.value, "the corner button is the closed workspace");
         }
 
+        // ---- tooltips -------------------------------------------------------------------------------------
+
+        [Test]
+        public void EveryControlOnTheBars_AndBesideTheTable_SaysWhatItDoes()
+        {
+            _panel.Open(_cube);
+            _panel.Tick(); // Pause/Resume is worded with the run state
+
+            var controls = new List<VisualElement>
+            {
+                Root.Q(className: "blocky-ingame-status"),     // the object's name
+                Root.Q(className: "blocky-runbar__speed"),     // the "Speed" caption
+                Root.Q(className: "blocky-zoom-controls")      // the zoom percentage
+            };
+            foreach (var bar in new[] { "blocky-ingame-topbar", "blocky-runbar", "blocky-zoom-controls", "blocky-table-tools" })
+                controls.AddRange(Root.Q(className: bar).Query<Button>().ToList());
+
+            var unexplained = new List<string>();
+            foreach (var control in controls)
+                if (string.IsNullOrEmpty(control.tooltip) || control.tooltip.Contains(".tooltip")) // a word missing from the file reads as its key
+                    unexplained.Add($".{string.Join(".", control.GetClasses())} \"{(control as Button)?.text}\": \"{control.tooltip}\"");
+
+            Assert.Greater(controls.Count, 15, "the bars are all there");
+            CollectionAssert.IsEmpty(unexplained);
+        }
+
+        [Test]
+        public void TheWorkspace_DrawsItsTooltips_ForTheGamesPanelDrawsNone()
+        {
+            _panel.Build();
+
+            var layer = Root.Q<TooltipLayer>();
+            Assert.IsNotNull(layer);
+            Assert.AreSame(Root, layer.hierarchy.parent, "it answers for the whole workspace");
+            Assert.AreEqual(Root.IndexOf(layer) + 1, Root.IndexOf(Root.Q<DragLayer>()), "under the dragged block, which stays on top");
+        }
+
+        [Test]
+        public void ClosingTheWorkspace_PutsAShownTooltipAway()
+        {
+            _panel.Open(_cube);
+            var layer = Root.Q<TooltipLayer>();
+            var go = Root.Q<Button>(className: "blocky-runbar__go");
+            layer.Tick(go, false, 0f);
+            layer.Tick(go, false, TooltipLayer.ShowDelay);
+            Assume.That(layer.IsShown);
+
+            _panel.Close();
+            _panel.Tick();
+
+            Assert.IsFalse(layer.IsShown);
+        }
+
         // ---- the game's own storage (#4) -----------------------------------------------------------------
 
         [Test]

@@ -39,6 +39,9 @@
     --bk-scroll-track: rgba(0, 0, 0, 0.03);
     --bk-scroll-thumb: rgba(26, 31, 44, 0.20);
     --bk-scroll-thumb-hover: rgba(26, 31, 44, 0.36);
+    --bk-tooltip-bg: rgb(26, 30, 42);
+    --bk-tooltip-ink: rgb(240, 242, 248);
+    --bk-tooltip-line: rgba(255, 255, 255, 0.08);
 }
 
 .blocky-ingame-root {
@@ -853,6 +856,33 @@
     border-radius: 4px;
 }
 
+/* A control's tooltip (TooltipLayer): the dark of the title bar on the light theme, lifted off the surfaces on the
+   dark one. Shown see-through for a frame while the layout measures it, then placed and faded in. */
+.blocky-tooltip {
+    max-width: 280px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--bk-tooltip-line);
+    background-color: var(--bk-tooltip-bg);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 110ms;
+}
+
+.blocky-tooltip--shown {
+    opacity: 1;
+}
+
+.blocky-tooltip__label {
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    color: var(--bk-tooltip-ink);
+    white-space: normal;
+    -unity-text-align: middle-left;
+}
+
 /* Sits in the root's right padding strip — the seam between the workspace and the live game view. */
 .blocky-ingame-resize-handle {
     position: absolute;
@@ -1030,6 +1060,8 @@
     --bk-scroll-track: rgba(255, 255, 255, 0.03);
     --bk-scroll-thumb: rgba(255, 255, 255, 0.18);
     --bk-scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+    --bk-tooltip-bg: rgb(56, 63, 80);
+    --bk-tooltip-line: rgb(78, 87, 108);
 }
 
 .blocky-theme--dark .blocky-ingame-canvas-viewport {
@@ -1073,6 +1105,9 @@
     --bk-scroll-track: rgba(0, 0, 0, 0.06);
     --bk-scroll-thumb: rgba(0, 0, 0, 0.55);
     --bk-scroll-thumb-hover: rgba(0, 0, 0, 0.8);
+    --bk-tooltip-bg: rgb(0, 0, 0);
+    --bk-tooltip-ink: rgb(255, 255, 255);
+    --bk-tooltip-line: rgb(255, 255, 255);
     --blocky-color-motion: rgb(128, 181, 255);
     --blocky-color-looks: rgb(204, 179, 255);
     --blocky-color-control: rgb(255, 190, 76);

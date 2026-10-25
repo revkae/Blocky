@@ -37,7 +37,8 @@ namespace Blocky.Game
     /// running starts, whatever hat it has, so a "when key pressed" script can be walked through too) and a
     /// 1x–4x speed — and the block a script is on lights up while it runs.
     /// Undo (button or Ctrl+Z) takes back the last edit, and plain-language advice under the table, with a badge
-    /// on the block, says why a script won't do anything.
+    /// on the block, says why a script won't do anything. Every control says what it does in a tooltip when a mouse
+    /// rests on it (<see cref="TooltipLayer"/> — a game's panel draws none of its own).
     /// Every word is in the language picked in the title bar (<see cref="BlockyLanguages"/>); switching it redraws
     /// the workspace in place, keeping the object, its undo history and the view.
     /// A game with a flow of its own can host the workspace instead of handing the screen to it (ADR-041): it opens
@@ -143,6 +144,7 @@ namespace Blocky.Game
         private VisualElement _resizeHandle;
         private VisualElement _paletteHandle;
         private VisualElement _selectionBox;
+        private TooltipLayer _tooltips;
         private DragLayer _dragLayer;
         private readonly Dictionary<BlockCategory, VisualElement> _paletteSections = new();
         private readonly List<(BlockCategory category, List<BlockDefinition> blocks)> _blocksByCategory = new();
@@ -449,6 +451,7 @@ namespace Blocky.Game
 
             DriveActiveDrag(pointer);
             EndStaleTableGestures(pointer);
+            TickTooltips(pointer);
 
             if (!_visible) return;
 
@@ -542,6 +545,20 @@ namespace Blocky.Game
             var position = ScreenToPanel(pointer.position.ReadValue());
             if (pointer.press.isPressed) drag.Poll(position);
             else drag.ForceEnd(position);
+        }
+
+        /// <summary>
+        /// The tooltip of whatever a mouse or pen rests on (<see cref="TooltipLayer"/>: a game panel draws none of its
+        /// own). Nothing while the workspace is closed, for a finger — it has no hover — or while the pointer is busy
+        /// dragging a block, panning, drawing a box or moving a seam.
+        /// </summary>
+        private void TickTooltips(Pointer pointer)
+        {
+            var hovers = _visible && _root.panel != null && pointer != null && pointer is not Touchscreen &&
+                         _dragContext?.ActiveDrag == null && !_panning && !_selectingBox && !_resizing && !_resizingPalette &&
+                         _touches.Count == 0;
+            var hovered = hovers ? _root.panel.Pick(ScreenToPanel(pointer.position.ReadValue())) : null;
+            _tooltips.Tick(hovered, hovers && pointer.press.wasPressedThisFrame, Time.unscaledTime);
         }
 
         /// <summary>Delete/Backspace inside a number or text box edits the text — it must not delete the block.</summary>
@@ -659,6 +676,9 @@ namespace Blocky.Game
             _resizeHandle.Add(Grip("blocky-ingame-resize-handle__grip"));
             _root.Add(_resizeHandle);
 
+            _tooltips = new TooltipLayer(); // over the whole workspace; only a dragged block, which puts it away, draws above it
+            _root.Add(_tooltips);
+
             _dragLayer = new DragLayer();
             _root.Add(_dragLayer); // last sibling — always renders above everything else in the workspace
 
@@ -703,6 +723,7 @@ namespace Blocky.Game
             Localize(() =>
             {
                 if (_target == null) _statusLabel.text = BlockyText.Get("status.pick_object"); // once picked, it shows the object's name
+                _statusChip.tooltip = BlockyText.Get("status.tooltip");
             });
             _statusChip.Add(_statusLabel);
             bar.Add(_statusChip);
@@ -992,13 +1013,20 @@ namespace Blocky.Game
             speed.AddToClassList("blocky-runbar__speed");
             var speedLabel = new Label();
             speedLabel.AddToClassList("blocky-runbar__speed-label");
-            Localize(() => speedLabel.text = BlockyText.ToUpper(BlockyText.Get("run.speed"))); // a small-caps caption, like the palette's
+            Localize(() =>
+            {
+                speedLabel.text = BlockyText.ToUpper(BlockyText.Get("run.speed")); // a small-caps caption, like the palette's
+                speed.tooltip = BlockyText.Get("run.speed.tooltip"); // the caption's, and the tray's around the buttons
+            });
             speed.Add(speedLabel);
             for (var value = 1; value <= Playback.MaxSpeed; value++)
             {
                 var chosen = value;
                 var button = new Button(() => SetSpeed(chosen)) { text = $"{value}x" };
                 button.AddToClassList("blocky-runbar__speed-button");
+                Localize(() => button.tooltip = chosen == 1
+                    ? BlockyText.Get("run.speed.normal.tooltip")
+                    : BlockyText.Format("run.speed.faster.tooltip", chosen));
                 _speedButtons.Add(button);
                 speed.Add(button);
             }
@@ -1017,13 +1045,18 @@ namespace Blocky.Game
             return tray;
         }
 
-        /// <summary>A run-bar button named by the string <paramref name="key"/>; a null key leaves the wording to the caller.</summary>
+        /// <summary>A run-bar button named by the string <paramref name="key"/>, with <c>key.tooltip</c> saying what it does; a null key leaves both to the caller.</summary>
         private Button RunButton(string key, Action onClick, string modifierClass)
         {
             var button = new Button(onClick);
             button.AddToClassList("blocky-runbar__button");
             if (modifierClass != null) button.AddToClassList(modifierClass);
-            if (key != null) Localize(() => button.text = BlockyText.Get(key));
+            if (key != null)
+                Localize(() =>
+                {
+                    button.text = BlockyText.Get(key);
+                    button.tooltip = BlockyText.Get(key + ".tooltip");
+                });
             return button;
         }
 
@@ -1144,6 +1177,7 @@ namespace Blocky.Game
             _shownStepping = stepping;
 
             _pauseButton.text = BlockyText.Get(paused ? "run.resume" : "run.pause");
+            _pauseButton.tooltip = BlockyText.Get(paused ? "run.resume.tooltip" : "run.pause.tooltip");
             _pauseButton.style.display = running ? DisplayStyle.Flex : DisplayStyle.None;
             _pausedFlag.style.display = paused ? DisplayStyle.Flex : DisplayStyle.None;
             _stepBackButton.SetEnabled(canStepBack);
@@ -1253,8 +1287,9 @@ namespace Blocky.Game
         {
             var tools = new VisualElement { pickingMode = PickingMode.Ignore };
             tools.AddToClassList("blocky-table-tools");
+            tools.AddToClassList(TooltipLayer.BesideClass); // a column on the right edge, like the zoom buttons
 
-            _limitChip = new Label { pickingMode = PickingMode.Ignore };
+            _limitChip = new Label(); // pickable, so the pointer can rest on it and read its tooltip
             _limitChip.AddToClassList("blocky-limit");
             _limitChip.style.display = DisplayStyle.None; // until an object is picked in a level with a limit
             Localize(() =>
@@ -1393,13 +1428,15 @@ namespace Blocky.Game
             _zoomControls = new VisualElement();
             var controls = _zoomControls;
             controls.AddToClassList("blocky-zoom-controls");
-            controls.Add(ZoomButton("+", () => ZoomAround(ViewportCenter, _zoom * ZoomStep)));
-            controls.Add(ZoomButton("−", () => ZoomAround(ViewportCenter, _zoom / ZoomStep)));
-            controls.Add(ZoomButton("=", ResetView));
+            controls.AddToClassList(TooltipLayer.BesideClass); // a column on the right edge: tooltips go to its left
+            controls.Add(ZoomButton("+", "table.zoom_in.tooltip", () => ZoomAround(ViewportCenter, _zoom * ZoomStep)));
+            controls.Add(ZoomButton("−", "table.zoom_out.tooltip", () => ZoomAround(ViewportCenter, _zoom / ZoomStep)));
+            controls.Add(ZoomButton("=", "table.zoom_reset.tooltip", ResetView));
 
             _zoomLabel = new Label { pickingMode = PickingMode.Ignore }; // worded by ShowZoom
             _zoomLabel.AddToClassList("blocky-zoom-level");
             controls.Add(_zoomLabel);
+            Localize(() => controls.tooltip = BlockyText.Get("table.zoom.tooltip")); // the percentage's: the label lets the pointer through to here
             return controls;
         }
 
@@ -1412,10 +1449,12 @@ namespace Blocky.Game
             _zoomLabel.text = BlockyText.Format("table.zoom", percent);
         }
 
-        private static Button ZoomButton(string text, Action onClick)
+        /// <summary>The symbols need no words, so only the tooltip (<paramref name="tooltipKey"/>) follows the language.</summary>
+        private Button ZoomButton(string text, string tooltipKey, Action onClick)
         {
             var button = new Button(onClick) { text = text };
             button.AddToClassList("blocky-zoom-button");
+            Localize(() => button.tooltip = BlockyText.Get(tooltipKey));
             return button;
         }
 

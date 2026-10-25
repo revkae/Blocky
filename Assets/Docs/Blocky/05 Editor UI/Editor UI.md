@@ -77,6 +77,12 @@ Source: [[Welcome|TDD §8]]. Status: **Milestones 4 and 5 done.** `PaletteView`,
 - **Slim scrollbars** (USS): 8px, no arrow buttons, rounded 6px thumb; the palette's horizontal scroller is hidden.
 - **Pause** shows only after Go (`Playback.IsGoing`), not for scripts that started by themselves.
 
+**Update — tooltips a game shows (2026-10-25).** See [[09 Decisions/Decisions#ADR-046 — Blocky draws its own tooltips, from the frame, inside the workspace|ADR-046]]:
+- **Why there were none:** UI Toolkit draws `VisualElement.tooltip` only in Editor panels. The workspace set it on the mode, language, theme, close, Undo / Redo, "?" and limit controls, and in a game none of them ever showed.
+- **`TooltipLayer`** (`Blocky.Editor`) — one per workspace, a child of the root just before the `DragLayer`. `Tick(hovered, pressed, now)` from `BlockyInGamePanel.TickTooltips`, which picks under `Pointer.current` each frame (mouse and pen; nothing while closed, dragging, panning, boxing, moving a seam or touching). It walks up from the pick to the nearest `tooltip` inside its own parent only. 0.5 s rest (`ShowDelay`), at once within 0.4 s of the last one (`WarmWindow`), put away by a press until the pointer leaves.
+- **Placement:** under the control (above if no room); beside it for anything inside `TooltipLayer.BesideClass` (`blocky-tooltip-beside`: the zoom column, the Undo / Redo column); clamped to the workspace. Shown at the root's top-left on its first frame, so the layout wraps it with the whole width, then placed and faded in (`blocky-tooltip--shown`).
+- **Words:** run-bar buttons read `<key>.tooltip` in `RunButton` (as `ModeButton` does); Pause / Resume's follows its word in `RefreshRunState`; the Speed tray, each speed, the zoom buttons (`ZoomButton` takes a key), the zoom column (the percentage label is `Ignore`, so the column answers for it) and the object pill have theirs. The limit chip is pickable now so its tooltip can be read.
+
 **Still not done:** the Editor window (`Blocky/Program Editor`) still edits structure with buttons — it renders the new shapes (condition slots and their dropdown included) but has no drag.
 
 **What Milestone 4 actually built:** `ParamFieldFactory` (real UI Toolkit controls — `FloatField`/`Toggle`/`TextField`/`DropdownField` — each `SetEnabled(false)`, so Milestone 5 wires up the *same* controls live instead of replacing them), `BlockView` (one `VisualElement` per node, holds `NodeId` not a node reference, recurses into `branchCount` body-slots), `UnknownBlockView` (a removed/renamed block type still renders and preserves its raw params, TDD §10.2), and `StackView` (trigger header + top-level sequence). Styling is a base USS sheet plus one small per-category sheet, colors as USS custom properties (`--blocky-color-*`) so re-theming touches no C#, per §8.5.
@@ -97,6 +103,7 @@ UI Toolkit, not UGUI — see [[09 Decisions/Decisions#ADR-001 UI Toolkit vs UGUI
 - `PaletteView` — drag-out clones a fresh `BlockNode` with regenerated ids
 - `ProgramCanvasView` — hosts top-level stacks, pan/zoom, subscribes to `ProgramStore.OnChanged`
 - `DragLayer` — single absolutely-positioned overlay, sibling of canvas
+- `TooltipLayer` — draws the hovered control's `tooltip` in a game (runtime panels draw none); driven by the workspace's frame
 - `TableDragManipulator` (+ `CanvasDragManipulator`, `PaletteDragManipulator`) and `ChainDragSession` — press/drag/release and the drag itself (the state machine below was the original, now-deleted design)
 - `BlockViewPool` — recycles views by block type
 

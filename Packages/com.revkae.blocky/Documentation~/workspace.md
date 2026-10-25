@@ -27,6 +27,8 @@ The palette is ready before you pick anything, so you can look through it first.
 - **The table** — where the object's program is built.
 - **The advice list**, under the table — why a script won't do anything.
 
+Not sure what a button does? Rest the mouse on it for half a second and a tooltip says. Moving straight on to the next button shows its tooltip at once, and a click puts it away. A greyed-out button explains itself too.
+
 ## Block shapes
 
 The shape of a block tells you where it fits.
@@ -173,5 +175,6 @@ The workspace works with a finger or a pen as well as a mouse.
 - In Free mode, one finger on empty table pans and two fingers pinch to zoom.
 - A finger on a palette block always drags it out. Scroll the palette with the tabs, or by dragging beside the blocks.
 - `When Key Pressed` and `key pressed?` need a keyboard.
+- There are no tooltips: a finger has no hover. A pen that hovers over the screen shows them, as a mouse does.
 
 Touch has not been tried on every kind of device; mouse and keyboard remain the most tested way to use Blocky.

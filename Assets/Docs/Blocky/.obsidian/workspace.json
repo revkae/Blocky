@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "11 Release/Release Readiness.md",
+                "file": "00 Overview/Goals and Non-Goals.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Release Readiness"
+              "title": "Goals and Non-Goals"
             }
           }
         ]
@@ -187,12 +187,13 @@
   },
   "active": "c33690699bb02865",
   "lastOpenFiles": [
+    "01 Architecture/Architecture Overview.md",
+    "11 Release/Release Readiness.md",
     "12 Game Code/Blocky from CSharp.md.meta",
     "12 Game Code/Blocky from CSharp.md",
     "12 Game Code",
     "12 Game Code.meta",
     "10 Localization/Localization.md",
-    "11 Release/Release Readiness.md",
     "00 Overview/Goals and Non-Goals.md",
     "11 Release/Release Readiness.md.meta",
     "11 Release",
@@ -201,7 +202,6 @@
     "08 Build Log/Build Log.md.tmp.30180.abc13f01cdb8",
     "05 Editor UI/Editor UI.md.tmp.30180.57e78ff56208",
     "08 Build Log/Build Log.md.tmp.30180.29d155aad80c",
-    "08 Build Log/Build Log.md.tmp.30180.9fa0d09e882a",
     "Welcome.md",
     "08 Build Log/Demo Scene.md",
     "07 Testing/Testing Strategy.md",
@@ -212,7 +212,6 @@
     "02 Data Model/Data Model.md",
     "08 Build Log/Build Log.md",
     "09 Decisions/Decisions.md",
-    "01 Architecture/Architecture Overview.md",
     "Home.md"
   ]
 }
